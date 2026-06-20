@@ -154,20 +154,20 @@ const SCALES = {
   },
   texture: {
     title: 'Texture',
-    desc: '1 = thick / very sticky · 10 = watery — descriptive only, no "better/worse" direction',
+    desc: '1 = thick / very sticky (heavier, harder to clear) · 10 = watery (lighter, generally a better sign)',
     options: [
-      { score:1, label:'Solid' }, { score:2, label:'V. Thick' }, { score:3, label:'Thick' },
-      { score:4, label:'Sticky' }, { score:5, label:'Tacky' }, { score:6, label:'Moderate' },
-      { score:7, label:'Loose' }, { score:8, label:'Thin' }, { score:9, label:'V. Thin' }, { score:10, label:'Watery' },
+      { score:1, label:'Solid', icon:'🪨' }, { score:2, label:'V. Thick', icon:'🧊' }, { score:3, label:'Thick', icon:'🍯' },
+      { score:4, label:'Sticky', icon:'🥣' }, { score:5, label:'Tacky', icon:'🧈' }, { score:6, label:'Moderate', icon:'🥛' },
+      { score:7, label:'Loose', icon:'🫗' }, { score:8, label:'Thin', icon:'💧' }, { score:9, label:'V. Thin', icon:'💦' }, { score:10, label:'Watery', icon:'🌧️' },
     ]
   },
   volume: {
     title: 'Volume',
     desc: '1 = >45 mL (most) · 10 = 0–5 mL (least)',
     options: [
-      { score:1, label:'>45mL' }, { score:2, label:'40-45' }, { score:3, label:'35-40' },
-      { score:4, label:'30-35' }, { score:5, label:'25-30' }, { score:6, label:'20-25' },
-      { score:7, label:'15-20' }, { score:8, label:'10-15' }, { score:9, label:'5-10' }, { score:10, label:'0-5mL' },
+      { score:1, label:'>45mL', icon:'🪣' }, { score:2, label:'40-45', icon:'🥤' }, { score:3, label:'35-40', icon:'🧃' },
+      { score:4, label:'30-35', icon:'☕' }, { score:5, label:'25-30', icon:'🥛' }, { score:6, label:'20-25', icon:'🧊' },
+      { score:7, label:'15-20', icon:'💧' }, { score:8, label:'10-15', icon:'💦' }, { score:9, label:'5-10', icon:'🫧' }, { score:10, label:'0-5mL', icon:'✨' },
     ]
   },
 };
@@ -241,7 +241,7 @@ function renderScaleRow(key) {
   const container = document.getElementById('sg-' + key);
   const row1 = scale.options.slice(0,5), row2 = scale.options.slice(5,10);
   function makeBtn(opt) {
-    const swatchHtml = opt.swatch ? `<span class="swatch" style="background:${opt.swatch}"></span>` : `<span class="e">${'●'.repeat(1)}</span>`;
+    const swatchHtml = opt.swatch ? `<span class="swatch" style="background:${opt.swatch}"></span>` : `<span class="e">${opt.icon || '•'}</span>`;
     return `<button class="scale-btn" id="sb-${key}-${opt.score}" onclick="selectScale('${key}', ${opt.score})">
       ${swatchHtml}<span class="enum">${opt.score}</span><span class="elabel">${opt.label}</span>
     </button>`;

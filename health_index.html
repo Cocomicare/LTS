@@ -246,22 +246,24 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 const PARAMS = [
   { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:10, maxAgeDays:2, direction:'higher_better',
     desc:'Subjective wellness score', source:'symptoms' },
-  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:22, maxAgeDays:2, direction:'higher_better',
+  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:20, maxAgeDays:2, direction:'higher_better',
     desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
-  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:15, maxAgeDays:2, direction:'higher_better',
+  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:13, maxAgeDays:2, direction:'higher_better',
     desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
-  { key:'pef', name:'PEF', icon:'💨', unit:'L/min', weight:10, maxAgeDays:2, direction:'higher_better',
+  { key:'pef', name:'PEF', icon:'💨', unit:'L/min', weight:8, maxAgeDays:2, direction:'higher_better',
     desc:'Peak expiratory flow', source:'peakflow', field:'pef' },
-  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:18, maxAgeDays:2, direction:'higher_better',
+  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:15, maxAgeDays:2, direction:'higher_better',
     desc:'Inspiratory volume — complements peak flow', source:'spiro' },
-  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:7, maxAgeDays:2, direction:'stable',
+  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:6, maxAgeDays:2, direction:'stable',
     desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
-  { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:6, maxAgeDays:7, direction:'stable',
+  { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:5, maxAgeDays:7, direction:'stable',
     desc:'Tacrolimus side effect marker', source:'vitals', vitalType:'bp_systolic' },
-  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:13, maxAgeDays:3, direction:'lower_better',
+  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:12, maxAgeDays:3, direction:'lower_better',
     desc:'Key infection indicator', source:'vitals', vitalType:'temp' },
-  { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:6, maxAgeDays:14, direction:'stable',
+  { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:5, maxAgeDays:14, direction:'stable',
     desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
+  { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:6, maxAgeDays:3, direction:'higher_better',
+    desc:'Composite of color + texture + volume', source:'sputum' },
 ];
 const NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'pef', 'hr'];
 
@@ -303,13 +305,14 @@ async function refreshAll() {
   const btn = document.getElementById('refresh-btn');
   if (btn) btn.textContent = '⟳ Syncing…';
   try {
-    const [settingsRes, historyRes, symptomRows, vitalsRows, peakflowRows, spiroRows] = await Promise.all([
+    const [settingsRes, historyRes, symptomRows, vitalsRows, peakflowRows, spiroRows, sputumRows] = await Promise.all([
       sb.from('health_index_settings').select('*').eq('user_id', currentUser.id).maybeSingle(),
       sb.from('health_index_history').select('*').eq('user_id', currentUser.id).order('computed_at', { ascending: true }),
       sb.from('symptom_checkins').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
       sb.from('vitals_readings').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
       sb.from('peak_flow_sessions').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
       sb.from('spirometer_sessions').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
+      sb.from('sputum_logs').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
     ]);
 
     settingsRow = settingsRes.data || null;
@@ -320,6 +323,9 @@ async function refreshAll() {
     rawData.pef  = (peakflowRows.data || []).filter(r => r.pef  != null).map(r => ({ date: r.taken_at, value: Number(r.pef) }));
     rawData.spiro = (spiroRows.data || []).filter(r => r.session_data && r.session_data.volume_ml != null)
       .map(r => ({ date: r.taken_at, value: Number(r.session_data.volume_ml) }));
+    // Sputum composite: average of color + texture + volume (all on the same higher=better 1-10 scale).
+    rawData.sputum = (sputumRows.data || []).filter(r => r.color_score != null && r.texture_score != null && r.volume_score != null)
+      .map(r => ({ date: r.taken_at, value: (Number(r.color_score) + Number(r.texture_score) + Number(r.volume_score)) / 3 }));
     ['spo2','hr','bp_systolic','temp','wt'].forEach(vt => {
       const key = vt === 'bp_systolic' ? 'bp' : vt;
       rawData[key] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
@@ -560,7 +566,7 @@ function toggleBreakdown() {
 async function saveScoreToHistory(score, breakdown) {
   if (score === null) return;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-  const existing = historyRows.find(h => {
+  const todaysRows = historyRows.filter(h => {
     const d = new Date(h.computed_at); d.setHours(0,0,0,0);
     return d.getTime() === todayStart.getTime();
   });
@@ -568,10 +574,20 @@ async function saveScoreToHistory(score, breakdown) {
   breakdown.forEach(b => { components[b.param.key] = b.score; });
 
   try {
-    if (existing) {
-      if (existing.score !== score) {
-        await updateRow('health_index_history', existing.id, { score, components });
-        existing.score = score; existing.components = components;
+    if (todaysRows.length) {
+      // Keep the most-recent row for today, update it, and delete any older duplicates
+      // (duplicates could exist from earlier app versions before saves were properly awaited).
+      todaysRows.sort((a,b) => new Date(b.computed_at) - new Date(a.computed_at));
+      const keep = todaysRows[0];
+      const dupes = todaysRows.slice(1);
+
+      if (keep.score !== score) {
+        const updated = await updateRow('health_index_history', keep.id, { score, components });
+        keep.score = updated.score; keep.components = updated.components;
+      }
+      for (const dupe of dupes) {
+        await deleteRow('health_index_history', dupe.id);
+        historyRows = historyRows.filter(h => h.id !== dupe.id);
       }
     } else {
       const inserted = await insertRow('health_index_history', {
@@ -579,7 +595,10 @@ async function saveScoreToHistory(score, breakdown) {
       });
       historyRows.push(inserted);
     }
-  } catch (e) { /* non-fatal — score still displays even if history save fails */ }
+  } catch (e) {
+    console.error('saveScoreToHistory failed:', e.message);
+    showToast('Could not save score to history: ' + e.message, 'error');
+  }
 }
 
 let trendChart = null;
