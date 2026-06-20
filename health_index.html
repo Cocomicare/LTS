@@ -112,10 +112,6 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
     <span class="logo-title">Health Index</span>
     <span class="logo-sub">Composite Score</span>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-ghost btn-sm" onclick="showTab('settings')">⚙️ Settings</button>
-    <button class="btn btn-primary btn-sm" id="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
-  </div>
 </header>
 
 <div class="tabs">
@@ -743,6 +739,7 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'index') refreshAll();
   if (name === 'trend') renderTrend();
   if (name === 'settings') {
     buildWeightRows();
