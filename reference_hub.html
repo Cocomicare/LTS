@@ -16,6 +16,16 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
 .page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
 .intro { font-size:13px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
+.search-box { width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:10px; font-size:15px; margin-bottom:16px; background:var(--surface); font-family:'DM Sans',sans-serif; }
+.search-box:focus { outline:none; border-color:var(--teal); }
+.search-status { font-size:12px; color:var(--ink3); margin:-10px 0 12px 2px; }
+.result-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:8px; cursor:pointer; transition:all .15s; }
+.result-card:hover { border-color:var(--teal); box-shadow:0 4px 16px rgba(13,92,107,.08); }
+.result-top { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.result-icon { font-size:16px; }
+.result-name { font-size:13.5px; font-weight:600; color:var(--ink); }
+.result-snippet { font-size:12.5px; color:var(--ink2); line-height:1.5; }
+.result-snippet mark { background:#FDE89A; color:var(--ink); padding:0 2px; border-radius:2px; }
 .ref-tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:12px; margin-bottom:8px; -webkit-tap-highlight-color:transparent; }
 .ref-tile:hover { border-color:var(--teal); box-shadow:0 4px 16px rgba(13,92,107,.08); }
 .ref-tile-icon { font-size:22px; flex-shrink:0; }
@@ -31,7 +41,9 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   <div class="logo-sub">Education & Reference</div>
 </header>
 <div class="page">
-  <div class="intro">Information from your UF Health Shands transplant team. Tap a topic to read.</div>
+  <input type="text" class="search-box" id="search" placeholder="🔍 Search the guide (e.g. a medication, 'sunscreen', 'bronchoscopy')…" oninput="onSearchInput()">
+  <div class="search-status" id="search-status"></div>
+  <div class="intro" id="intro">Information from your UF Health Shands transplant team. Tap a topic to read.</div>
   <div id="content"></div>
 </div>
 
@@ -51,14 +63,25 @@ const ITEMS = [
   { name:'Writing to Your Donor Family', icon:'💌', desc:'Guidance, sample content, contact info', file:'reference_donor_family.html' },
 ];
 
+let pageTextCache = null; // populated lazily: [{...item, text}]
+let isLoggedIn = false;
+
 (async function init() {
   const user = await getCurrentUser();
   const content = document.getElementById('content');
   if (!user) {
     content.innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    document.getElementById('search').style.display = 'none';
     return;
   }
-  content.innerHTML = ITEMS.map(item => `
+  isLoggedIn = true;
+  renderDefaultList();
+})();
+
+function renderDefaultList() {
+  document.getElementById('intro').style.display = '';
+  document.getElementById('search-status').textContent = '';
+  document.getElementById('content').innerHTML = ITEMS.map(item => `
     <div class="ref-tile" onclick="window.location.href='${item.file}'">
       <span class="ref-tile-icon">${item.icon}</span>
       <div>
@@ -67,7 +90,74 @@ const ITEMS = [
       </div>
       <span class="ref-tile-chevron">→</span>
     </div>`).join('');
-})();
+}
+
+// Fetch + strip HTML tags from every reference page once, cache the plain text for searching.
+async function ensurePageTextLoaded() {
+  if (pageTextCache) return pageTextCache;
+  document.getElementById('search-status').textContent = 'Indexing guide…';
+  const results = await Promise.all(ITEMS.map(async item => {
+    try {
+      const res = await fetch(item.file);
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const text = (doc.body.innerText || doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+      return { ...item, text };
+    } catch (e) {
+      return { ...item, text: '' };
+    }
+  }));
+  pageTextCache = results;
+  return results;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function buildSnippet(text, query) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return '';
+  const start = Math.max(0, idx - 60);
+  const end = Math.min(text.length, idx + query.length + 80);
+  let snippet = text.slice(start, end);
+  if (start > 0) snippet = '…' + snippet;
+  if (end < text.length) snippet = snippet + '…';
+  const re = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+  return escapeHtml(snippet).replace(re, m => `<mark>${m}</mark>`);
+}
+
+let searchDebounce = null;
+function onSearchInput() {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(runSearch, 150);
+}
+
+async function runSearch() {
+  if (!isLoggedIn) return;
+  const q = document.getElementById('search').value.trim();
+  if (!q) { renderDefaultList(); return; }
+
+  document.getElementById('intro').style.display = 'none';
+  const pages = await ensurePageTextLoaded();
+
+  const matches = pages.filter(p => p.text.toLowerCase().includes(q.toLowerCase()));
+  const statusEl = document.getElementById('search-status');
+  const contentEl = document.getElementById('content');
+
+  if (!matches.length) {
+    statusEl.textContent = `No results for "${q}"`;
+    contentEl.innerHTML = '';
+    return;
+  }
+
+  statusEl.textContent = `${matches.length} section${matches.length>1?'s':''} match "${q}"`;
+  contentEl.innerHTML = matches.map(m => `
+    <div class="result-card" onclick="window.location.href='${m.file}'">
+      <div class="result-top"><span class="result-icon">${m.icon}</span><span class="result-name">${m.name}</span></div>
+      <div class="result-snippet">${buildSnippet(m.text, q)}</div>
+    </div>`).join('');
+}
 </script>
 </body>
 </html>
