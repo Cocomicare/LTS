@@ -568,8 +568,7 @@ function renderHistory() {
         </div>
         <div class="hist-emojis" style="flex:1;padding:0 8px">${emojis}</div>
         <div>
-          <div class="hist-wellness">${score}</div>
-          ${rawAvg ? `<div class="hist-raw-avg">avg ${rawAvg}/10</div>` : ''}
+          ${rawAvg ? `<div class="hist-wellness">${rawAvg}<span style="font-size:14px;color:var(--ink3)">/10</span></div>` : ''}
         </div>
         <div class="hist-actions">
           <button class="btn-icon" onclick="editCheckin('${r.id}')" title="Edit">✏️</button>
