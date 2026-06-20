@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incentive Spirometer</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --surface2:#E8EFF5; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#3B82C4; --accent2:#E8F1FA;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --radius:12px; --radius-sm:8px;
+  --spiro:#6B4FA8; --spiro-bg:#F0EAFA;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; margin-left:8px; }
+.tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); padding:0 20px; }
+.tab { padding:11px 16px; font-size:13px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }
+.tab.active { color:var(--spiro); border-bottom-color:var(--spiro); }
+.page { display:none; padding:20px; max-width:600px; margin:0 auto; }
+.page.active { display:block; }
+.sync-note { font-size:11px; color:var(--ink3); text-align:center; margin-bottom:10px; }
+
+.log-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); border-left:4px solid var(--spiro); padding:20px; margin-bottom:16px; }
+.card-title { font-family:'DM Serif Display',serif; font-size:16px; margin-bottom:16px; }
+.big-input-wrap { display:flex; flex-direction:column; align-items:center; gap:6px; margin-bottom:16px; }
+.big-input-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); }
+.big-input-row { display:flex; align-items:center; gap:10px; }
+.big-input { width:180px; text-align:center; font-family:'DM Mono',monospace; font-size:48px; font-weight:500; padding:16px 12px; border-radius:var(--radius); border:2px solid var(--border); background:var(--bg); color:var(--ink); }
+.big-input:focus { outline:none; border-color:var(--spiro); background:var(--spiro-bg); }
+.big-input-unit { font-family:'DM Mono',monospace; font-size:18px; color:var(--ink3); }
+
+.form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.form-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px; }
+label { font-size:11px; font-weight:500; color:var(--ink2); letter-spacing:.3px; text-transform:uppercase; }
+input[type="date"], input[type="time"] { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); width:100%; }
+input:focus { outline:none; border-color:var(--spiro); }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all .15s; }
+.btn-primary { background:var(--spiro); color:#fff; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:none; border:1px solid var(--border); color:var(--ink2); }
+.icon-btn { background:none; border:none; color:var(--ink3); cursor:pointer; font-size:15px; padding:4px; }
+.icon-btn:hover { color:var(--spiro); }
+
+.hist-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:10px; padding:14px 16px; display:flex; align-items:center; gap:12px; }
+.hist-date { font-family:'DM Mono',monospace; font-size:13px; color:var(--ink); min-width:90px; }
+.hist-time-text { font-size:11px; color:var(--ink3); margin-top:1px; }
+.hist-val { font-family:'DM Mono',monospace; font-size:24px; font-weight:500; color:var(--ink); flex:1; letter-spacing:-0.3px; }
+.hist-actions { display:flex; gap:6px; flex-shrink:0; }
+
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
+.stat-eyebrow { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin-bottom:4px; }
+.stat-val { font-family:'DM Mono',monospace; font-size:21px; font-weight:500; color:var(--ink); letter-spacing:-0.3px; }
+.chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:14px; }
+.chart-title { font-size:11px; font-weight:600; color:var(--ink2); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.chart-wrap { position:relative; height:200px; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px; z-index:999; opacity:0; transition:all .25s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Incentive Spirometer</span>
+    <span class="logo-sub">Inspiratory Volume</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('log')" id="tab-log">Log Session</button>
+  <button class="tab" onclick="showTab('history')" id="tab-history">History</button>
+  <button class="tab" onclick="showTab('trends')" id="tab-trends">Trends</button>
+</div>
+
+<!-- LOG -->
+<div class="page active" id="page-log">
+  <div class="log-card">
+    <div class="card-title" id="log-card-title">Log a Session</div>
+    <div class="big-input-wrap">
+      <div class="big-input-label">Inspiratory Volume</div>
+      <div class="big-input-row">
+        <input type="number" class="big-input" id="volume-val" placeholder="—" oninput="onVolInput()">
+        <span class="big-input-unit">mL</span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Date</label><input type="date" id="log-date"></div>
+      <div class="form-group"><label>Time</label><input type="time" id="log-time"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="clearLog()">Clear</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveSession()" disabled>Save Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
+  <div id="history-content"></div>
+</div>
+
+<!-- TRENDS -->
+<div class="page" id="page-trends">
+  <div id="trends-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let currentUser = null;
+let sessions = [];           // rows from spirometer_sessions, sorted by taken_at asc
+let realtimeChannel = null;
+let trendChart = null;
+let editingId = null;
+const recentLocalWriteIds = new Set();
+function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
+
+function volumeOf(s) { return s.session_data && s.session_data.volume_ml != null ? Number(s.session_data.volume_ml) : null; }
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+(async function init() {
+  initLogForm();
+
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+
+  sessions = await fetchRows('spirometer_sessions', currentUser.id, 'taken_at', true);
+  renderHistory();
+
+  realtimeChannel = subscribeToTable('spirometer_sessions', currentUser.id, handleRealtimeChange);
+})();
+
+function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwnRecentWrite = recentLocalWriteIds.has(id);
+
+  if (payload.eventType === 'INSERT') {
+    if (!sessions.some(s => s.id === payload.new.id)) sessions.push(payload.new);
+  } else if (payload.eventType === 'UPDATE') {
+    const i = sessions.findIndex(s => s.id === payload.new.id);
+    if (i >= 0) sessions[i] = payload.new; else sessions.push(payload.new);
+  } else if (payload.eventType === 'DELETE') {
+    sessions = sessions.filter(s => s.id !== payload.old.id);
+  }
+  sessions.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+
+  if (document.getElementById('page-history').classList.contains('active')) renderHistory();
+  if (document.getElementById('page-trends').classList.contains('active')) renderTrends();
+
+  if (!isOwnRecentWrite) showToast('Updated from another device', 'success');
+}
+
+// ══════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name==='history') renderHistory();
+  if (name==='trends')  renderTrends();
+}
+
+// ══════════════════════════════════════════════════
+//  FORM
+// ══════════════════════════════════════════════════
+function initLogForm() {
+  const now = new Date();
+  document.getElementById('log-date').value = now.toISOString().slice(0,10);
+  document.getElementById('log-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('volume-val').value = '';
+  document.getElementById('save-btn').disabled = true;
+  document.getElementById('save-btn').textContent = 'Save Session';
+  document.getElementById('log-card-title').textContent = 'Log a Session';
+  editingId = null;
+}
+function clearLog() { initLogForm(); }
+function onVolInput() {
+  const v = parseFloat(document.getElementById('volume-val').value);
+  document.getElementById('save-btn').disabled = isNaN(v);
+}
+
+async function saveSession() {
+  const date = document.getElementById('log-date').value;
+  const time = document.getElementById('log-time').value || '00:00';
+  const vol  = parseFloat(document.getElementById('volume-val').value);
+  if (!date) { showToast('Please select a date', 'error'); return; }
+  if (isNaN(vol)) { showToast('Enter a volume', 'error'); return; }
+
+  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
+
+  try {
+    if (editingId) {
+      const updated = await updateRow('spirometer_sessions', editingId, {
+        session_data: { volume_ml: vol }, taken_at,
+      });
+      markLocalWrite(updated.id);
+      const i = sessions.findIndex(s => s.id === editingId);
+      if (i >= 0) sessions[i] = updated;
+      showToast('Session updated ✓', 'success');
+    } else {
+      const inserted = await insertRow('spirometer_sessions', {
+        user_id: currentUser.id,
+        session_data: { volume_ml: vol },
+        taken_at,
+      });
+      markLocalWrite(inserted.id);
+      sessions.push(inserted);
+      showToast('Session saved ✓', 'success');
+    }
+    sessions.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+    clearLog();
+    showTab('history');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function editSession(id) {
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  editingId = id;
+  const d = new Date(s.taken_at);
+  document.getElementById('log-date').value = d.toISOString().slice(0,10);
+  document.getElementById('log-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('volume-val').value = volumeOf(s) ?? '';
+  document.getElementById('save-btn').disabled = false;
+  document.getElementById('save-btn').textContent = 'Update Session';
+  document.getElementById('log-card-title').textContent = 'Editing Session';
+  showTab('log');
+  window.scrollTo(0,0);
+}
+
+async function deleteSession(id) {
+  if (!confirm('Delete this session?')) return;
+  try {
+    await deleteRow('spirometer_sessions', id);
+    markLocalWrite(id);
+    sessions = sessions.filter(s => s.id !== id);
+    renderHistory();
+    showToast('Deleted');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════════
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtTime(iso) { return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+
+function renderHistory() {
+  const list = sessions.slice().reverse();
+  const el = document.getElementById('history-content');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🫁</div><div class="empty-title">No sessions yet</div><div class="empty-sub">Log your first spirometer session above.</div></div>`;
+    return;
+  }
+  el.innerHTML = list.map(s => {
+    const vol = volumeOf(s);
+    return `<div class="hist-card">
+      <div>
+        <div class="hist-date">${fmtDate(s.taken_at)}</div>
+        <div class="hist-time-text">${fmtTime(s.taken_at)}</div>
+      </div>
+      <div class="hist-val">${vol ?? '—'} <span style="font-size:13px;color:var(--ink3)">mL</span></div>
+      <div class="hist-actions">
+        <button class="icon-btn" onclick="editSession('${s.id}')" title="Edit">✏️</button>
+        <button class="icon-btn" onclick="deleteSession('${s.id}')" title="Delete">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  TRENDS
+// ══════════════════════════════════════════════════
+function renderTrends() {
+  const el = document.getElementById('trends-content');
+  const valid = sessions.filter(s => volumeOf(s) != null);
+  if (valid.length < 2) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-title">Not enough data yet</div><div class="empty-sub">Log at least 2 sessions to see trends.</div></div>`;
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+    return;
+  }
+  const vols = valid.map(s => volumeOf(s));
+  const best = Math.max(...vols);
+  const avg = Math.round(vols.reduce((a,b)=>a+b,0)/vols.length);
+  const latest = vols[vols.length-1];
+
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-eyebrow">Latest</div><div class="stat-val">${latest}<span style="font-size:13px;color:var(--ink3)"> mL</span></div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Average</div><div class="stat-val">${avg}<span style="font-size:13px;color:var(--ink3)"> mL</span></div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Personal Best</div><div class="stat-val">${best}<span style="font-size:13px;color:var(--ink3)"> mL</span></div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Inspiratory Volume Over Time</div>
+      <div class="chart-wrap"><canvas id="trend-canvas"></canvas></div>
+    </div>`;
+
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend-canvas'), {
+    type:'line',
+    data:{ labels: valid.map(s=>fmtDate(s.taken_at)), datasets:[
+      { label:'Volume (mL)', data:vols, borderColor:'#6B4FA8', backgroundColor:'rgba(107,79,168,0.08)', borderWidth:2.5, pointRadius:4, fill:true, tension:0.3 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ y:{ grid:{color:'#E8EFF5'} }, x:{ grid:{display:false} } }
+    }
+  });
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+window.addEventListener('beforeunload', () => { if (realtimeChannel) sb.removeChannel(realtimeChannel); });
+</script>
+</body>
+</html>
