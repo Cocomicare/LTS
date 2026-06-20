@@ -507,8 +507,7 @@ function goHome() {
   document.getElementById('view-module').classList.remove('active');
   document.getElementById('screen-dashboard').style.display = '';
   document.getElementById('module-iframe').src = 'about:blank';
-  renderHeroScore();
-  renderTiles();
+  refreshDashboardData();
 }
 
 // ══════════════════════════════════════════════════
@@ -537,7 +536,33 @@ function showToast(msg, type='') {
 //  INIT
 // ══════════════════════════════════════════════════
 initAuth();
-setInterval(() => { if (currentUser) { renderHeroScore(); renderTiles(); } }, 60000);
+async function refreshDashboardData() {
+  if (!currentUser) return;
+  // Proactively ensure the session token is still valid (and refresh it if expired)
+  // before firing off any queries — otherwise a stale token causes silent 401s.
+  try {
+    const { data, error } = await sb.auth.getSession();
+    if (error || !data.session) {
+      // Session couldn't be refreshed — send back to login rather than show stale/broken data.
+      currentUser = null;
+      showScreen('screen-login');
+      return;
+    }
+  } catch (e) {
+    return;
+  }
+  renderHeroScore();
+  renderTiles();
+}
+
+setInterval(refreshDashboardData, 60000);
+
+// Also refresh immediately whenever the tab/window regains focus or visibility —
+// covers the common case of switching away and coming back after the token expired.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshDashboardData();
+});
+window.addEventListener('focus', refreshDashboardData);
 </script>
 </body>
 </html>
