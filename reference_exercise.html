@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exercise Guidelines</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.alert { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:8px; padding:12px 14px; margin:10px 0; font-weight:600; color:var(--danger); line-height:1.5; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Exercise Guidelines</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>🏋️ Lifting Limits</h2>
+      <p>For the first 6 weeks after transplant, avoid lifting anything over 10 pounds. A good reference: a gallon of milk weighs approximately 8 pounds — gauge accordingly. You may strengthen your arms by lifting up to 5 pounds at a time.</p>
+    </div>
+
+    <div class="card">
+      <h2>Ongoing Exercise</h2>
+      <p>Once discharged, you're expected to continue an exercise regimen either at home or in a gym. This helps decrease fatigue, bone loss, weight gain, and high blood pressure. Your exercise program will be guided by inpatient and outpatient physical therapists.</p>
+      <p>You're expected to walk at least <strong>2 times per day</strong> in addition to physical therapy appointments. Physical therapists will dictate your walking guidelines.</p>
+    </div>
+
+    <div class="card">
+      <h2>Pulmonary Rehabilitation</h2>
+      <p>You'll attend pulmonary rehab at least three days a week after discharge, or as prescribed. Your progress will be closely monitored and shared with the lung transplant team until cleared.</p>
+    </div>
+
+    <div class="alert">Stop exercising and notify your coordinator if you experience shortness of breath, dizziness, or pain.</div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Don'ts (3-Month Restrictions)</h2>
+      <p>Do not lift more than 5 pounds or participate in strenuous activities for the first three months post-transplant. No driving for the first three months post-transplant.</p>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

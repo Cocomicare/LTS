@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Immunizations</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.alert { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:8px; padding:12px 14px; margin:10px 0; font-weight:600; color:var(--danger); line-height:1.5; }
+.virus-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+.virus-chip { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:9px 12px; font-size:13px; }
+.link { color:var(--accent); text-decoration:none; font-weight:600; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Immunizations</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <div class="alert">NO LIVE Vaccines after transplantation due to a weakened immune system.</div>
+      <p>Live viruses used in many childhood vaccinations include:</p>
+      <div class="virus-grid">
+        <div class="virus-chip">Measles — MMR vaccine</div>
+        <div class="virus-chip">Mumps — MMR vaccine</div>
+        <div class="virus-chip">Rubella — MMR vaccine</div>
+        <div class="virus-chip">Varicella-Zoster — Chickenpox/Shingles</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Around Others Who Are Vaccinated</h2>
+      <p>Vaccines are recommended for people in close contact with you. However, if you're around someone who has received a live virus vaccine, you could become ill due to exposure, because of your weakened immune system after transplant.</p>
+      <div class="alert">If your friends or family are vaccinated with a live virus, you are at risk of becoming infected. Avoid close contact with anyone who has received a live vaccine for at least 10–14 days.</div>
+    </div>
+
+    <div class="card">
+      <h2>Your Own Vaccinations</h2>
+      <p>A general adult vaccination schedule can be found on the CDC webpage: <a class="link" href="https://www.cdc.gov/vaccines" target="_blank">cdc.gov/vaccines</a></p>
+      <p>Patients should receive immunizations <strong>before</strong> transplant. Once you receive a transplant, you are not likely to produce a strong immune response due to immunosuppressive medications.</p>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

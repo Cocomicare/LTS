@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Returning to Normal Life</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --good:#2D9E6B; --good-bg:#E8F7F1; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card.dos { border-left:4px solid var(--good); }
+.card.donts { border-left:4px solid var(--danger); }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card.dos h2 { color:var(--good); }
+.card.donts h2 { color:var(--danger); }
+.card ul { margin:6px 0 6px 4px; line-height:1.8; color:var(--ink2); list-style:none; }
+.card.dos li::before { content:'✓ '; color:var(--good); font-weight:700; }
+.card.donts li::before { content:'✕ '; color:var(--danger); font-weight:700; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Returning to Normal Life</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card dos">
+      <h2>Do's</h2>
+      <ul>
+        <li>Contact your transplant coordinator immediately if you experience a fever, infectious symptoms, or a decline in lung function</li>
+        <li>Take your medications as directed and ensure routine blood tests are collected</li>
+        <li>Plan ahead by refilling your medications before you run out</li>
+        <li>Resume sexual activity when comfortable and use birth control</li>
+        <li>Wear a mask in public, at the hospital, and around sick contacts</li>
+        <li>Exercise regularly to maintain proper conditioning</li>
+        <li>Monitor your weight and maintain a healthy diet</li>
+        <li>Wear sunscreen and protective clothing outdoors — your medications increase skin cancer risk</li>
+      </ul>
+    </div>
+
+    <div class="card donts">
+      <h2>Don'ts</h2>
+      <ul>
+        <li>Avoid pregnancy — risks posed by immunosuppressive medications; use birth control and barrier methods to prevent STDs</li>
+        <li>Do not smoke or drink alcohol</li>
+        <li>Avoid contact with anyone who is sick, has a cold, or has respiratory symptoms</li>
+        <li>Do not lift more than 5 pounds or do strenuous activity for the first 3 months</li>
+        <li>No driving for the first 3 months post-transplant</li>
+        <li>Do not use NSAIDs like ibuprofen or Aleve® — affects renal function</li>
+        <li>Avoid live vaccines</li>
+        <li>Avoid gardening — soil contains fungal spores that could affect your health</li>
+        <li>Avoid reptiles or birds as pets, and avoid all animal feces</li>
+      </ul>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

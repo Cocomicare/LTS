@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>General Discharge Instructions</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --warn:#E07B39; --warn-bg:#FDF0E8; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; color:var(--ink); }
+.card h3 { font-size:14px; font-weight:600; margin:14px 0 6px; color:var(--ink2); }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul, .card ol { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.alert { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:8px; padding:12px 14px; margin:10px 0; font-weight:600; color:var(--danger); line-height:1.5; }
+.warn-box { background:var(--warn-bg); border:1px solid #f0d8b8; border-radius:8px; padding:12px 14px; margin:10px 0; color:#9a5a1f; line-height:1.5; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">General Discharge Instructions</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>📓 Keep a Binder</h2>
+      <p>Use a three-ring binder notebook to track your home monitoring information. Bring this notebook to every clinic visit, every bronchoscopy visit, or if hospitalized.</p>
+      <p>Purchase a bathroom scale, a blood pressure machine, and an oral thermometer. Home monitoring is done to look for infection, rejection, weight changes, and blood pressure changes.</p>
+    </div>
+
+    <div class="card">
+      <h2>What to Record</h2>
+      <h3>Every Morning</h3>
+      <ul><li>Weight</li><li>Temperature*</li><li>Pulse</li><li>Blood pressure</li><li>Spirometry</li></ul>
+      <h3>Every Evening</h3>
+      <ul><li>Temperature*</li><li>Pulse</li><li>Blood pressure</li></ul>
+      <div class="alert">* Call day, night, on weekends, or holidays for a temperature of 100.0°F or greater. This is an emergency.</div>
+    </div>
+
+    <div class="card">
+      <h2>🫁 Daily Spirometry</h2>
+      <p>Spirometry monitors your lung function — comparable to the FEV1 score from your official pulmonary function test.</p>
+      <ul>
+        <li>Record the <strong>highest value out of 3 attempts</strong></li>
+        <li>Bring your spirometer to every clinic visit, bronchoscopy visit, or hospitalization</li>
+        <li>Do not perform the test more than 3 times in one day</li>
+      </ul>
+      <div class="warn-box">Call your coordinator if your spirometry readings are consistently (3 or more values) below the number set by your transplant team.</div>
+    </div>
+
+    <div class="card">
+      <h2>Numbered Precautions</h2>
+      <ol>
+        <li>Avoid shopping in crowded places, especially during the first 6 months after transplant.</li>
+        <li><strong>Wear a mask in public places</strong> — hospitals, churches, movie theaters, shopping malls, etc. This is a lifelong precaution.</li>
+        <li>Do not allow people with colds or fevers to visit you in your home without a mask; everyone should wash hands before contact with you.</li>
+        <li>Do not eat from buffets or salad bars.</li>
+        <li>Do not eat undercooked meats or raw seafood.</li>
+        <li>Do not perform outdoor "chores" (mowing, planting, gardening) — risk of mold/fungus/spore exposure that could harm your new lung(s).</li>
+        <li>Do not add any new medications, including OTC drugs or herbal supplements, without first consulting your coordinator.</li>
+        <li>Do not change your medication times without speaking to your coordinator — some are timed according to drug levels.</li>
+        <li>Do not allow your medications to run out — many pharmacies need 48 hours to fill prescriptions; mail order can take 2–3 weeks.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>🚫 OTC Medications to Avoid</h2>
+      <p>Due to kidney toxicity, do not use:</p>
+      <ul><li>Advil® / Motrin® / Aleve®</li><li>Ibuprofen products</li><li>Non-steroidal products (NSAIDs)</li></ul>
+      <p>If you need pain medication, call your coordinator — some medications interfere with how immunosuppressive drugs are absorbed.</p>
+    </div>
+
+    <div class="card">
+      <h2>📞 Important Reasons to Call Your Coordinator</h2>
+      <ul>
+        <li><strong>Temperature:</strong> 100.0°F or above</li>
+        <li><strong>Blood pressure:</strong> Systolic &gt;160 or &lt;90; Diastolic &gt;100 or &lt;40 (recheck after 15–30 min before calling)</li>
+        <li><strong>Heart rate:</strong> Above 125 bpm at rest</li>
+        <li><strong>FEV1 values:</strong> Trending down over 3 days in a row</li>
+        <li><strong>Breathing:</strong> Shortness of breath that is different or new</li>
+        <li><strong>Fatigue:</strong> A decrease in energy level</li>
+        <li><strong>Sputum:</strong> Change in color or increase in amount</li>
+        <li><strong>Vomiting or diarrhea:</strong> More than 3 watery stools/day — call ASAP, this can change medication absorption and lead to rejection. Soft, pudding-like stools 1–3×/day is expected.</li>
+      </ul>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

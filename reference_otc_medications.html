@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Safe Over-the-Counter Medications</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#A0357E; --good:#2D9E6B; --good-bg:#E8F7F1; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.search-box { width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:10px; font-size:15px; margin-bottom:16px; background:var(--surface); }
+.search-box:focus { outline:none; border-color:var(--accent); }
+.row-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:10px; }
+.problem { font-family:'DM Serif Display',serif; font-size:15px; color:var(--accent); margin-bottom:8px; }
+.safe-block { background:var(--good-bg); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+.safe-label { font-size:10px; font-weight:700; color:var(--good); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
+.generic { font-size:13px; color:var(--ink); margin-bottom:2px; }
+.brands { font-size:12px; color:var(--ink2); }
+.avoid-block { background:var(--danger-bg); border-radius:8px; padding:10px 12px; }
+.avoid-label { font-size:10px; font-weight:700; color:var(--danger); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
+.avoid-text { font-size:12.5px; color:var(--ink2); line-height:1.5; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Safe OTC Medications</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page">
+  <input type="text" class="search-box" id="search" placeholder="🔍 Search by symptom (e.g. headache, cough)…" oninput="filterRows()">
+  <div id="content"></div>
+</div>
+
+<script>
+const ROWS = [
+  { problem:'Low-grade Fever, Joint Aches, Headache', safe:'Acetaminophen ONLY', brands:'Tylenol®',
+    avoid:'Oral methyl salicylate or any NSAID like ibuprofen (Advil®, Motrin®, Advil Dual Action®), naproxen (Aleve®/Naprosyn®), aspirin (avoid doses higher than baby aspirin/81mg), or ketorolac (Toradol®)' },
+  { problem:'Dry Nose', safe:'Sodium Chloride Nasal Spray/Drops', brands:'Ocean Spray®' },
+  { problem:'Indigestion', safe:'Calcium Carbonate, Magnesium Hydroxide, Aluminum Hydroxide', brands:'Tums®, Rolaids®, Gaviscon®, Acid Gone®, Alamag®, Gelusil®, Maalox Advanced®, Mylanta Classic®, Mintox®, Milk of Magnesia®, Rulox®',
+    avoid:'Alka Seltzer® (contains aspirin) and Pepto-Bismol® products (bismuth subsalicylate)' },
+  { problem:'Heartburn', safe:'Famotidine, Lansoprazole, Omeprazole, Esomeprazole, Omeprazole/Sodium Bicarbonate', brands:'Pepcid AC®, Prevacid®, Prilosec OTC®, Nexium 24hr®, Zegrid OTC®',
+    avoid:'Tagamet HB® / Tagamet® (Cimetidine)' },
+  { problem:'Motion Sickness', safe:'Dimenhydrinate, Meclizine', brands:'Dramamine®, Dramamine Less Drowsy®, Bonine®, Antivert®' },
+  { problem:'Muscle Aches and Pains', safe:'Topical Lidocaine, Topical Menthol, Topical Camphor, Topical Capsaicin', brands:'Salonpas® Hot Gel Patch, Aspercreme® w/ Lidocaine Max Strength, Biofreeze®, Bengay® Vanishing Scent, Tiger Balm®, Capzasin HP®, IcyHot® Patch/Gel',
+    avoid:'Oral methyl salicylate or any NSAID like ibuprofen (Advil®, Motrin®), naproxen (Aleve®), aspirin (over baby dose), or ketorolac (Toradol®)' },
+  { problem:'Sore Throat', safe:'Menthol, Benzocaine', brands:"Luden's®, Vicks®, Chloraseptic®, NICE®, Halls®, Cepacol Lozenges®" },
+  { problem:'Sleep', safe:'Doxylamine, Melatonin', brands:'Unisom®' },
+  { problem:'Abdominal Bloating/Gas', safe:'Simethicone', brands:'Mylicon®, Mylanta Gas®, Gas-X®, Digel®, Gelusil®, Phazyme®' },
+  { problem:'Allergies', safe:'Diphenhydramine, Loratadine, Cetirizine, Fexofenadine, Levocetirizine, Cromolyn nasal spray, Azelastine nasal spray, Fluticasone nasal spray, Mometasone nasal spray',
+    brands:'Benadryl®, Claritin®, Zyrtec®, Allegra®, Xyzal®, NasalCrom®, Nasonex®, Astepro®, Flonase®',
+    avoid:'Claritin D®, Zyrtec D®, or Allegra D® — decongestants should be avoided' },
+  { problem:'Sneezing, Runny Nose', safe:'Chlorpheniramine; Chlorpheniramine + Acetaminophen', brands:'Chlortrimeton®, Coricidin HBP & Flu®' },
+  { problem:'Congestion', safe:'Guaifenesin (+/- Dextromethorphan)', brands:'Mucinex®, Robitussin® (plain), Robitussin DM®, Mucinex DM®, Coricidin HBP Chest Congestion & Cough®, Equate Tussin DM®',
+    avoid:'Oral decongestants like pseudoephedrine (Sudafed®) or phenylephrine (Sudafed PE®); nasal decongestants like Neo-Synephrine® or Afrin®/Sinex® (oxymetazoline)' },
+  { problem:'Constipation', safe:'Docusate, Senna, Psyllium, Bisacodyl, Polyethylene glycol 3350, Milk of Magnesia, Fiber, Sodium Phosphates',
+    brands:'Colace®, Senokot®, Metamucil®, Dulcolax®, Miralax®, Phillips®, Fiberall®, Fleet Enema®' },
+  { problem:'Cough', safe:'Dextromethorphan', brands:'Robitussin Cough Gels®, Delsym®, Robitussin DM®, Coricidin HBP®',
+    avoid:'Combination products with phenylephrine: Sudafed PE Cold & Cough®, Theraflu®, Mapap Multi-Symptom Cold®, Mucinex Fast-Max Severe Congestion & Cough®, Vicks Dayquil Cold & Flu Multi-Symptom®' },
+  { problem:'Diarrhea', safe:'Loperamide', brands:'Imodium A-D®, Imodium Multi-Symptom Relief®',
+    avoid:'Pepto-Bismol® or any product with bismuth subsalicylate, unless otherwise instructed by your provider' },
+];
+
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    document.getElementById('search').style.display = 'none';
+    return;
+  }
+  renderRows(ROWS);
+})();
+
+function renderRows(rows) {
+  document.getElementById('content').innerHTML = rows.map(r => `
+    <div class="row-card">
+      <div class="problem">${r.problem}</div>
+      <div class="safe-block">
+        <div class="safe-label">✓ Safe</div>
+        <div class="generic">${r.safe}</div>
+        <div class="brands">${r.brands}</div>
+      </div>
+      ${r.avoid ? `<div class="avoid-block"><div class="avoid-label">✕ Avoid</div><div class="avoid-text">${r.avoid}</div></div>` : ''}
+    </div>`).join('');
+}
+
+function filterRows() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = ROWS.filter(r => (r.problem + r.safe + r.brands + (r.avoid||'')).toLowerCase().includes(q));
+  renderRows(filtered);
+}
+</script>
+<div class="source-note" style="text-align:center;color:#8A9EAF;font-size:11px;margin-top:10px">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+</body>
+</html>

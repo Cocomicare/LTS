@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diabetes Management</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#C9456A; --warn-bg:#FDF0E8; --danger:#C94040; --danger-bg:#FAEAEA; --good:#2D9E6B; --good-bg:#E8F7F1; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card h3 { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin:10px 0 6px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul, .card ol { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.low-box { background:var(--danger-bg); border-radius:8px; padding:14px 16px; }
+.low-box h3 { color:var(--danger); }
+.high-box { background:var(--warn-bg); border-radius:8px; padding:14px 16px; }
+.high-box h3 { color:#9a5a1f; }
+.alert { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:8px; padding:12px 14px; margin:10px 0; font-weight:600; color:var(--danger); line-height:1.5; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Diabetes Management</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>About Post-Transplant Diabetes</h2>
+      <p>Your body may need supplemental insulin or oral medication due to the immunosuppressive drug regimen used to keep your body from rejecting your new lung(s). Developing diabetes post-transplant has not been shown to hinder recovery.</p>
+      <h3>Risk Factors</h3>
+      <ul>
+        <li>Age generally over 40</li>
+        <li>Obesity, BMI greater than 30</li>
+        <li>Frequent acute rejection treated with high-dose steroids</li>
+        <li>Tacrolimus or cyclosporine treatment</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Controlling Diabetes</h2>
+      <p>Make healthy food choices, avoid skipping meals, exercise, take your medication, and monitor blood sugar levels.</p>
+      <p>Test your blood glucose <strong>before all meals and at bedtime</strong>. You need to keep a record of your blood glucose levels in your binder.</p>
+      <div class="alert">Do not ever stop any of your diabetes medications without first speaking to your coordinator.</div>
+      <h3>Successful Treatment Includes</h3>
+      <ul>
+        <li>Exercise</li>
+        <li>Controlling diet</li>
+        <li>Injecting insulin</li>
+        <li>Taking oral hypoglycemic medications</li>
+        <li>General diabetes education, blood glucose monitoring, warning signs, and quick remedies</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Hemoglobin A1C Test</h2>
+      <p>A common blood test that gauges your average blood glucose over the past 2–3 months. A high A1C means poor blood sugar control and increases complication risk — your treatment plan will be adjusted if needed.</p>
+    </div>
+
+    <div class="card low-box">
+      <h3>🔴 Hypoglycemia — Low Blood Sugar</h3>
+      <p>Occurs from too little food, too much insulin/medicine, or too much exercise. <strong>Below 70mg/dL</strong> (70–115mg/dL is acceptable).</p>
+      <p><strong>Symptoms (treat immediately):</strong></p>
+      <ul><li>Shaking</li><li>Hunger</li><li>Sweating</li><li>Weakness or fatigue</li><li>Anxiety</li><li>Headache</li><li>Dizziness</li><li>Irritability</li></ul>
+      <p>Drink milk or juice and eat a handful of crackers. Then test blood sugar. If symptoms persist, eat a peanut butter or meat sandwich with a glass of milk. <strong>If symptoms continue, call your coordinator immediately.</strong></p>
+    </div>
+
+    <div class="card high-box" style="margin-top:16px">
+      <h3>🟠 Hyperglycemia — High Blood Sugar</h3>
+      <p>Occurs from eating too much with too little insulin, or stress/illness. <strong>Above 150mg/dL</strong> (115–150mg/dL acceptable).</p>
+      <p><strong>Symptoms (progress slowly):</strong></p>
+      <ul><li>Extreme thirst</li><li>Drowsiness</li><li>Frequent urination</li><li>Nausea</li><li>Dry skin</li><li>Hunger</li></ul>
+      <p><strong>FIRST check blood sugar.</strong> If above 250mg/dL several times in a row, call your coordinator.</p>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>How to Give a Subcutaneous Injection</h2>
+      <p>"Subcutaneous" means the medicine is injected into the fat layer under the skin — back of arm, abdomen, or upper thigh.</p>
+      <ol>
+        <li>Wash hands with soap and water</li>
+        <li>Wipe the top of the medicine bottle with an alcohol pad</li>
+        <li>Pull the needle cover off — <strong>do not touch the needle</strong></li>
+        <li>Pull back on the plunger to pull air into the syringe</li>
+        <li>Push the needle through the top of the bottle</li>
+        <li>Turn the bottle upside down and push air into the bottle</li>
+        <li>Pull the medicine into the syringe by pulling back the plunger (push bubbles back into bottle if any)</li>
+        <li>Pull back until you have the right amount</li>
+        <li>Take the needle out of the bottle</li>
+        <li>Clean the skin with an alcohol pad, then pinch the skin</li>
+        <li>Quickly insert the needle at a 45° angle</li>
+        <li>Release the pinched skin and slowly push the plunger down to inject</li>
+        <li>Pull the needle out and gently press an alcohol swab on the spot</li>
+      </ol>
+      <p><strong>Never put the needle cover back on.</strong> Put used syringes in a sharps container. When full, return it to the clinic, doctor's office, or health department.</p>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

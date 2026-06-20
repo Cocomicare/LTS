@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nutrition & Healthy Eating</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3F9142; --good-bg:#E8F7F1; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.tip-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--accent); color:#fff; border-radius:50%; font-size:11px; font-weight:700; margin-right:8px; flex-shrink:0; }
+.tip-row { display:flex; gap:4px; margin-bottom:14px; }
+.tip-title { font-weight:600; color:var(--ink); display:block; margin-bottom:2px; }
+.tip-body { color:var(--ink2); font-size:13.5px; line-height:1.55; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Nutrition & Healthy Eating</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>🍽️ Why Nutrition Matters</h2>
+      <p>Nutrition strongly impacts your recovery time after transplant. Lack of proper nutrients increases your risk of death and infection, and leads to longer mechanical ventilation and ICU stays.</p>
+      <p>Some post-transplant medications cause weight gain and increase appetite — excess weight gain can cause diabetes, heart disease, and high blood pressure. You aren't limited in food types, just modify your diet for balanced nutrition.</p>
+    </div>
+
+    <div class="card">
+      <h2>General Guidelines</h2>
+      <ul>
+        <li>Plenty of fruits and vegetables — <strong>all must be washed</strong> with warm water and soap, or a food-safe cleaner like FIT®</li>
+        <li>Reduce salt and processed foods — use herbs/spices instead of salt</li>
+        <li>Drink plenty of water (unless told to limit fluids)</li>
+        <li>Eat high-fiber foods — raw vegetables and fruits</li>
+        <li>Eat calcium-rich foods — low-fat dairy and green, leafy vegetables</li>
+        <li>Moderate fat and oil — use nonstick, fat-free sprays or sauces</li>
+        <li>Pay attention to serving sizes on food labels</li>
+        <li>Eat foods high in protein — meat, poultry, fish, eggs, nuts (no salt), beans</li>
+        <li>All meat/poultry cooked to 150°F (pink center, no blood, "medium")</li>
+        <li><strong>No sushi or raw seafood</strong> (i.e. oysters)</li>
+        <li>Bake, grill, broil, or steam foods</li>
+        <li><strong>Do not eat from buffets or salad bars</strong></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>15 Easy Choices for Health & Fighting Disease</h2>
+      <div class="tip-row"><span class="tip-num">1</span><div><span class="tip-title">Trade pork chops for beef — occasionally</span><span class="tip-body">Beef has 5× the selenium of pork, twice that of chicken. Selenium lowers prostate cancer risk and helps maintain muscle mass during weight loss.</span></div></div>
+      <div class="tip-row"><span class="tip-num">2</span><div><span class="tip-title">Skim your potatoes</span><span class="tip-body">Use evaporated skim milk instead of whole milk in mashed potatoes — 3× the calcium, same creamy texture, less fat.</span></div></div>
+      <div class="tip-row"><span class="tip-num">3</span><div><span class="tip-title">Full-fat isn't so bad</span><span class="tip-body">Just follow moderation.</span></div></div>
+      <div class="tip-row"><span class="tip-num">4</span><div><span class="tip-title">Whey in your diet</span><span class="tip-body">Adding Ricotta cheese to smoothies may help fight cancer — whey is filled with cysteine, building cancer-fighting glutathione.</span></div></div>
+      <div class="tip-row"><span class="tip-num">5</span><div><span class="tip-title">Build your own yogurt</span><span class="tip-body">Avoid flavored yogurts with high-fructose corn syrup. Add fresh/dried fruit to plain yogurt, or try Greek yogurt (high protein, low sodium/carbs).</span></div></div>
+      <div class="tip-row"><span class="tip-num">6</span><div><span class="tip-title">Spread the fruity goodness</span><span class="tip-body">1 tbsp UNSWEETENED fruit spread (not sugary jams) counts as a fruit serving.</span></div></div>
+      <div class="tip-row"><span class="tip-num">7</span><div><span class="tip-title">Iceberg + the rest of the family</span><span class="tip-body">Iceberg has more alpha-carotene (antioxidant) than once thought — but don't skip spinach (calcium + folate).</span></div></div>
+      <div class="tip-row"><span class="tip-num">8</span><div><span class="tip-title">Red is the new black</span><span class="tip-body">Red bell peppers, tomatoes, watermelon contain lycopene — can reduce prostate cancer risk 20%. Heating tomatoes/peppers improves absorption.</span></div></div>
+      <div class="tip-row"><span class="tip-num">9</span><div><span class="tip-title">Salsa your way to health</span><span class="tip-body">Use as a vegetable dip/marinade — packed with lycopene, no fat, only 4 calories & 70mg sodium per tablespoon.</span></div></div>
+      <div class="tip-row"><span class="tip-num">10</span><div><span class="tip-title">Herbs lend a helping hand</span><span class="tip-body">1 tbsp FRESH oregano has more antioxidants than an apple, with virtually no calories.</span></div></div>
+      <div class="tip-row"><span class="tip-num">11</span><div><span class="tip-title">A little nutty</span><span class="tip-body">Nuts are high in fat but good oils — a golf-ball size of slivered almonds gives vitamin E. Don't overdo it.</span></div></div>
+      <div class="tip-row"><span class="tip-num">12</span><div><span class="tip-title">Join the dark side</span><span class="tip-body">Dark/semi-sweet chocolate has the most flavonoids/polyphenols — fights heart disease, keeps LDL in check.</span></div></div>
+      <div class="tip-row"><span class="tip-num">13</span><div><span class="tip-title">A cue from the horses</span><span class="tip-body">Oats substitute for crackers/breadcrumbs, boost immune system, reduce cholesterol via soluble fiber.</span></div></div>
+      <div class="tip-row"><span class="tip-num">15</span><div><span class="tip-title">The seeds you need</span><span class="tip-body">Flaxseed is packed with omega-3s — add 3–4 tbsp to cereal/oatmeal/salad. Flaxseed oil is fine too, but lower in nutrients/fiber than the seeds.</span></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Cholesterol</h2>
+      <p>High cholesterol is common post-transplant due to diet, family history, and the corticosteroid/immunosuppressant medications used to prevent rejection. It's a factor in cardiovascular problems — the second most common cause of kidney failure.</p>
+      <p>Most cholesterol is made in the liver, but also comes from meats and high-fat foods.</p>
+      <p><strong>Transplant patients are asked to:</strong></p>
+      <ul><li>Exercise regularly</li><li>Eat a diet high in fiber</li><li>Eat foods low in saturated fats and total fat</li></ul>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

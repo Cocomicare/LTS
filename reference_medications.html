@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medications Guide</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.drug-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; border-left:4px solid var(--accent); }
+.drug-card.steroid { border-left-color:#E0A030; }
+.drug-card.anti-infection { border-left-color:#2D9E6B; }
+.drug-card.bp { border-left-color:#7B5EA7; }
+.drug-card.diuretic { border-left-color:#E07B39; }
+.drug-name { font-family:'DM Serif Display',serif; font-size:16px; margin-bottom:2px; }
+.drug-generic { font-size:12px; color:var(--ink3); margin-bottom:10px; }
+.field { margin-bottom:6px; line-height:1.55; }
+.field strong { color:var(--ink); }
+.field span { color:var(--ink2); }
+.section-divider { font-family:'DM Serif Display',serif; font-size:14px; color:var(--accent); margin:24px 4px 10px; text-transform:uppercase; letter-spacing:.5px; font-style:italic; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Medications Guide</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="section-divider">Immunosuppressants</div>
+
+    <div class="drug-card">
+      <div class="drug-name">Cyclosporine / Tacrolimus</div>
+      <div class="drug-generic">Neoral® / Gengraf® · Prograf® / FK506</div>
+      <div class="field"><strong>Purpose:</strong> <span>Suppresses the immune system; prevents rejection of your new lung.</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Taken every day, twice a day at 9:00 a.m. and 9:00 p.m. for the rest of your life. Do not skip doses unless scheduled to do so. Do not take before bloodwork is drawn.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>↑ blood pressure; tremors; cramping of arms/hands/legs/feet; hair growth; kidney/liver changes; anxiety; swollen gums; infection susceptibility; headache.</span></div>
+      <div class="field"><strong>⚠️ Do not take with grapefruit juice</strong> <span>— this can cause dangerously high levels.</span></div>
+    </div>
+
+    <div class="drug-card">
+      <div class="drug-name">Sirolimus</div>
+      <div class="drug-generic">Rapamune®</div>
+      <div class="field"><strong>Purpose:</strong> <span>Suppresses the immune system; prevents rejection.</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Can cause decreased kidney function when taken with cyclosporine/Prograf®.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>High blood pressure; low white blood cell count; poor wound healing; anemia.</span></div>
+    </div>
+
+    <div class="drug-card">
+      <div class="drug-name">Azathioprine / Mycophenolate / Mycophenolic Acid</div>
+      <div class="drug-generic">Imuran® · CellCept® · Myfortic®</div>
+      <div class="field"><strong>Purpose:</strong> <span>Suppresses the immune system; prevents rejection.</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Reduces white blood cells that help fight infections.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Easy bruising; skin irritations; mild hair loss; intestinal irritation; anemia.</span></div>
+    </div>
+
+    <div class="drug-card steroid">
+      <div class="drug-name">Prednisone</div>
+      <div class="drug-generic">Deltasone® — Steroid / Immunosuppressant</div>
+      <div class="field"><strong>Purpose:</strong> <span>Inhibits or decreases inflammation (redness, swelling, destruction of small blood vessels).</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Your body adjusts to this drug to function properly. Take exactly as prescribed — never stop or discontinue all at once unless directed by your team.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Mood swings; increased appetite; weight gain; elevated blood sugar; muscle weakness; joint pain; fragile/easy-bruising skin; sunburn risk (use sunscreen); softening of bones; rounded face; fine facial/body hair growth.</span></div>
+    </div>
+
+    <div class="section-divider">Anti-Infection Medications</div>
+
+    <div class="drug-card anti-infection">
+      <div class="drug-name">SMZ/TMP or Dapsone</div>
+      <div class="drug-generic">Septra® / SS-DS / Bactrim™ — Oral antibiotic</div>
+      <div class="field"><strong>Purpose:</strong> <span>Prevents a specific type of bacterial infection. Taken for life, 3×/week (Mon/Wed/Fri).</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Skin rashes/irritation; nausea; headache.</span></div>
+    </div>
+
+    <div class="drug-card anti-infection">
+      <div class="drug-name">Acyclovir / Valganciclovir</div>
+      <div class="drug-generic">Zovirax® / Valcyte® — Antiviral</div>
+      <div class="field"><strong>Comments:</strong> <span>Acyclovir can be given orally or IV.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Nausea; vomiting; low blood pressure; headache; low white blood cell count; anemia.</span></div>
+    </div>
+
+    <div class="drug-card anti-infection">
+      <div class="drug-name">Clotrimazole / Nystatin</div>
+      <div class="drug-generic">Mycelex® lozenges / Mycostatin® — Antifungal</div>
+      <div class="field"><strong>Purpose:</strong> <span>Prevents thrush (mouth infection).</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Let lozenges dissolve slowly — do not chew/swallow whole. No eating/drinking for 20–30 min after.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Skin rashes/irritation; nausea; vomiting.</span></div>
+    </div>
+
+    <div class="drug-card anti-infection">
+      <div class="drug-name">Voriconazole / Itraconazole</div>
+      <div class="drug-generic">Vfend® lozenges / Sporanox® — Antifungal</div>
+      <div class="field"><strong>Purpose:</strong> <span>Prevents fungal infections.</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Duration varies from 3 months to 1 year.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Nausea; vomiting; skin rash; skin cancer risk.</span></div>
+    </div>
+
+    <div class="drug-card anti-infection">
+      <div class="drug-name">Atgam® (Intravenous Anti-Rejection)</div>
+      <div class="field"><strong>Purpose:</strong> <span>Given through a vein for recurrent episodes of acute rejection; decreases immune cells targeting the new lung. Requires hospital monitoring.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Fever; muscle pain; headaches; nausea; diarrhea; abdominal cramping; low blood pressure (rare).</span></div>
+    </div>
+
+    <div class="section-divider">Anti-Hypertension Medications</div>
+
+    <div class="drug-card bp">
+      <div class="drug-name">Metoprolol / Amlodipine</div>
+      <div class="drug-generic">Lopressor® / Toprol XL® · Norvasc®</div>
+      <div class="field"><strong>Purpose:</strong> <span>Treats high blood pressure or chest pain; lowers risk of stroke and heart attack.</span></div>
+      <div class="field"><strong>Comments:</strong> <span>Hold if heart rate &lt; 60 or systolic BP &lt; 100.</span></div>
+    </div>
+
+    <div class="section-divider">Diuretics</div>
+
+    <div class="drug-card diuretic">
+      <div class="drug-name">Furosemide</div>
+      <div class="drug-generic">Lasix®</div>
+      <div class="field"><strong>Comments:</strong> <span>Stimulates release of excess body fluid through the kidneys — causes more frequent, larger urination. Also releases potassium — carefully follow potassium replacement instructions.</span></div>
+      <div class="field"><strong>Side effects:</strong> <span>Muscle weakness; dizziness; leg cramps.</span></div>
+    </div>
+
+    <div class="section-divider">Other</div>
+
+    <div class="drug-card">
+      <div class="drug-name">Pantoprazole (Protonix®)</div>
+      <div class="drug-generic">Proton Pump Inhibitor</div>
+      <div class="field"><strong>Purpose:</strong> <span>Treats GERD and esophageal damage by decreasing stomach acid production, helping prevent ulcers and bleeding.</span></div>
+    </div>
+
+    <div class="drug-card">
+      <div class="drug-name">Calcium + Vitamin D + Magnesium Oxide</div>
+      <div class="field"><strong>Purpose:</strong> <span>Prednisone decreases bone density. Calcium lessens osteoporosis risk; Vitamin D helps calcium absorb and strengthens bones. Magnesium oxide serves as an electrolyte replacement.</span></div>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

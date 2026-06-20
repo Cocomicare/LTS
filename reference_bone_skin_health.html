@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bone, Dental & Skin Health</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --warn:#E07B39; --warn-bg:#FDF0E8; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--warn-bg); border-radius:10px; padding:12px 10px; text-align:center; }
+.stat-num { font-family:monospace; font-size:22px; font-weight:700; color:var(--warn); }
+.stat-label { font-size:10.5px; color:#9a5a1f; margin-top:2px; line-height:1.3; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Bone, Dental & Skin Health</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>🦴 Bone Health</h2>
+      <p>Lung transplant recipients are at higher risk for osteoporosis due to steroid use. You'll need regular DEXA scans and Vitamin D level monitoring.</p>
+      <p>Your primary care provider (PCP) or an endocrinologist will help manage your bone health.</p>
+    </div>
+
+    <div class="card">
+      <h2>🦷 Dental Health</h2>
+      <ul>
+        <li>Brush your teeth at least twice a day</li>
+        <li>Avoid dental procedures during the first six months after transplantation</li>
+        <li>Visit your dentist every six months for cleanings</li>
+        <li>Discuss your dental health and plans with your transplant coordinator — prophylactic antibiotics may be necessary prior to planned procedures</li>
+        <li>Inform your dentist about your transplant and associated medications</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>☀️ Skin Health</h2>
+      <p>Compared to the general population, transplant recipients are:</p>
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num">65×</div><div class="stat-label">more likely: squamous cell carcinoma</div></div>
+        <div class="stat-card"><div class="stat-num">10×</div><div class="stat-label">more likely: basal cell carcinoma</div></div>
+        <div class="stat-card"><div class="stat-num">3×</div><div class="stat-label">more likely: melanoma</div></div>
+      </div>
+      <p>Studies estimate <strong>70% of organ transplant patients</strong> will develop skin cancer within 20 years of surgery, because immunosuppressive drugs weaken the body's ability to recover from sun damage. <strong>Sun exposure is the only preventable risk factor for skin cancer.</strong></p>
+      <p>Skin cancer is much more aggressive in transplant recipients, especially lung transplant recipients, due to increased medication dosages.</p>
+      <h2 style="margin-top:16px">Recommendations</h2>
+      <ul>
+        <li>Perform self examinations regularly</li>
+        <li>Wear 55+ SPF sunscreen any time you're in the sun; reapply every 2 hours (every hour if near water)</li>
+        <li>Wear protective clothing: sunglasses, hats, long-sleeve UV-protective clothing</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>🩺 Health Screening</h2>
+      <p>Continue routine health screenings based on your age and gender:</p>
+      <ul>
+        <li><strong>Males:</strong> Prostate exams, PSA tests, colonoscopy</li>
+        <li><strong>Females:</strong> PAP smear, breast exams, mammograms, colonoscopy</li>
+      </ul>
+      <p>Your PCP and other medical specialists will coordinate with the transplant team.</p>
+    </div>
+
+    <div class="card">
+      <h2>Pain Management</h2>
+      <ul>
+        <li>Incisional pain may last for several weeks to months post-surgery; numbness around the incision is common</li>
+        <li>Pain intensity may fluctuate, especially during rehab</li>
+        <li>Avoid NSAIDs, as they affect your renal function</li>
+      </ul>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

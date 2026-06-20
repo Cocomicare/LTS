@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bronchoscopy & Clinic Visits</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --warn:#E07B39; --warn-bg:#FDF0E8; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card h3 { font-size:13px; font-weight:700; margin:12px 0 5px; color:var(--ink); }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.warn-box { background:var(--warn-bg); border:1px solid #f0d8b8; border-radius:8px; padding:12px 14px; margin:10px 0; color:#9a5a1f; line-height:1.5; font-weight:600; }
+.phone { font-family:monospace; font-size:16px; color:var(--accent); font-weight:600; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Bronchoscopy & Clinic Visits</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>🔬 What is a Bronchoscopy?</h2>
+      <p>A bronchoscopy with biopsy is a procedure to monitor your lung health, performed in the Bronchoscopy Suite on the 2nd floor of UF Health Shands Hospital. Telephone: <span class="phone">352.265.0275</span></p>
+      <p>You'll undergo routine bronchoscopies scheduled at <strong>1 month, 3 months, 6 months, 9 months (only if needed), and 1 year</strong> post-surgery, or as indicated by your team.</p>
+      <div class="warn-box">Arrive one hour PRIOR to your scheduled appointment and bring a driver for transportation after the procedure. No exceptions.</div>
+    </div>
+
+    <div class="card">
+      <h2>Preparing for the Procedure</h2>
+      <h3>Morning Procedure</h3>
+      <ul><li>Do not eat or drink after midnight</li><li>Take only blood pressure medication with a sip of water; bring other medications with you</li></ul>
+      <h3>Afternoon Procedure</h3>
+      <ul><li>You may take morning medications early, but must not eat or drink 8 hours prior to procedure time</li></ul>
+    </div>
+
+    <div class="card">
+      <h2>After the Procedure</h2>
+      <ul>
+        <li>Avoid using the FEV1 meter for 3 days</li>
+        <li>Fever is common after the procedure, but contact your coordinator if it reaches 100°F or higher</li>
+      </ul>
+      <h3>Biopsies</h3>
+      <ul>
+        <li>May be taken during the procedure to check for rejection</li>
+        <li><strong>Please notify your team if you are on anticoagulation medications or aspirin</strong></li>
+        <li>If rejection is detected, immunosuppression regimen adjustments and IV medications may be necessary</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Clinic Visits</h2>
+      <ul>
+        <li>Bring your transplant bag, including daily logs of blood pressure, heart rate, temperature, weight, and spirometry for review</li>
+        <li>Additional tests like esophagram, pH probe, and manometry assess for micro-aspiration</li>
+      </ul>
+      <h3>Preparing for Visits</h3>
+      <ul>
+        <li>Blood tests, chest imaging (X-ray or CT), and spirometry monitor kidney, liver, bone marrow, and lung function</li>
+        <li>Labs and chest X-rays are walk-in at UF Health (no appointment needed)</li>
+        <li><strong>It is imperative to take immunosuppressive medications AFTER bloodwork is collected</strong></li>
+        <li>CT scans require an appointment facilitated by radiology and your coordinator</li>
+        <li>At-home spirometry must be performed daily to monitor lung function within the home</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Laboratory Tests</h2>
+      <p>Upon initial discharge, bloodwork is collected at a UF Health Medical Laboratory as prescribed. After returning home, you'll have regular bloodwork at a local Quest or LabCorp, facilitated by your transplant coordinator.</p>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>

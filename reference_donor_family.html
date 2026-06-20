@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Writing to Your Donor Family</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#7B5EA7; --accent-bg:#F0EAFA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; color:var(--accent); }
+.card h3 { font-size:13px; font-weight:700; margin:12px 0 5px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.note-box { background:var(--accent-bg); border-radius:8px; padding:12px 14px; margin:10px 0; line-height:1.55; color:#4a3a6b; }
+.contact-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.contact-row:last-child { border-bottom:none; }
+.contact-label { color:var(--ink3); }
+.contact-val { font-weight:600; text-align:right; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Writing to Your Donor Family</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>How to Address Your Letter</h2>
+      <ul>
+        <li>Address your correspondence to <strong>"Donor Family"</strong></li>
+        <li>Identify yourself only by the organ(s) you received (e.g. "lung recipient")</li>
+        <li>Write your name and transplant date on a <strong>separate sheet</strong> — this will not be sent, it's only used to identify the correct donor family</li>
+        <li>Give that separate sheet, along with your letter, to your coordinator</li>
+        <li>LifeQuest® mails the letter to maintain confidentiality</li>
+      </ul>
+      <h3>Closing your card or letter</h3>
+      <ul>
+        <li>Sign your first name only</li>
+        <li>Do not reveal your address, city, phone number, the name of the transplant center, or your physician</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>What to Include</h2>
+      <h3>About yourself</h3>
+      <ul>
+        <li>Job or occupation</li>
+        <li>Family situation (spouse, children, grandchildren, etc.)</li>
+        <li>Hobbies or interests</li>
+        <li>The donor family's religion is unknown — consider this when making religious comments</li>
+      </ul>
+      <h3>About your transplant experience</h3>
+      <ul>
+        <li>Recognize the donor family and thank them for their gift</li>
+        <li>Describe your wait for a transplant — what it was like for you and your family</li>
+        <li>Explain the improvement and change the transplant brought to your life — what can you do now that you couldn't before?</li>
+        <li>Explain what's happened in your life since transplant — a birthday? A wedding? Becoming a parent or grandparent? A new job or returning to school?</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Hearing From Your Donor Family</h2>
+      <p>You may or may not hear back. Some donor families say writing helps their grieving process; others prefer privacy and choose not to write to recipients.</p>
+      <div class="note-box">Remember, the donor's family may still be coping with their loss. While you may be celebrating the anniversary of your transplant, it's also the anniversary of someone else's loss. Please communicate with sensitivity.</div>
+    </div>
+
+    <div class="card">
+      <h2>Office Contact Information</h2>
+      <div class="contact-row"><span class="contact-label">Phone</span><span class="contact-val">352.265.8940</span></div>
+      <div class="contact-row"><span class="contact-label">Fax</span><span class="contact-val">352.265.8970</span></div>
+      <div class="contact-row"><span class="contact-label">Physical Address</span><span class="contact-val">1600 SW Archer Road<br>Gainesville, FL 32608</span></div>
+      <div class="contact-row"><span class="contact-label">Mailing Address</span><span class="contact-val">PO Box 100223<br>Gainesville, FL 32610-0223</span></div>
+      <div class="contact-row"><span class="contact-label">Website</span><span class="contact-val">UFHealth.org/transplant-center/lung</span></div>
+      <p style="margin-top:10px">Office hours: 8:00 a.m.–4:30 p.m., Monday–Friday. You'll be transferred to the operator and on-call coordinator after hours and on weekends.</p>
+    </div>
+
+    <div class="source-note">Source: UF Health Shands Transplant Center — Lung Transplant Program Post-Transplant Guide for Patients</div>
+  `;
+})();
+</script>
+</body>
+</html>
