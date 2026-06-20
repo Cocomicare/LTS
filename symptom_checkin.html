@@ -151,7 +151,6 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 <!-- CHECK-IN -->
 <div class="page active" id="page-checkin">
   <div id="checkin-nudge" class="nudge none">Loading…</div>
-  <div id="acute-alert" class="acute-alert"></div>
   <div id="baseline-notice" class="baseline-notice" style="display:none">
     📊 <strong>Establishing your baseline</strong> — The first 14 daily check-ins build your personal symptom baseline. Keep logging daily for the most accurate results.
   </div>
@@ -264,6 +263,7 @@ let records = [];           // array of rows from symptom_checkins, newest last
 let realtimeChannel = null;
 let trendChart = null;
 let trendRange = 14;
+const recentLocalWriteIds = new Set(); // ids this tab just wrote, to suppress duplicate/"other device" handling
 
 // ══════════════════════════════════════════════════
 //  INIT
@@ -296,8 +296,12 @@ async function loadRecords() {
 }
 
 function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwnRecentWrite = recentLocalWriteIds.has(id);
+
   if (payload.eventType === 'INSERT') {
-    records.push(payload.new);
+    const exists = records.some(r => r.id === payload.new.id);
+    if (!exists) records.push(payload.new);
   } else if (payload.eventType === 'UPDATE') {
     const i = records.findIndex(r => r.id === payload.new.id);
     if (i >= 0) records[i] = payload.new; else records.push(payload.new);
@@ -309,7 +313,15 @@ function handleRealtimeChange(payload) {
   updateBaselineNotice();
   if (document.getElementById('page-history').classList.contains('active')) renderHistory();
   if (document.getElementById('page-trends').classList.contains('active')) renderTrends();
-  showToast('Updated from another device', 'success');
+
+  if (!isOwnRecentWrite) {
+    showToast('Updated from another device', 'success');
+  }
+}
+
+function markLocalWrite(id) {
+  recentLocalWriteIds.add(id);
+  setTimeout(() => recentLocalWriteIds.delete(id), 5000);
 }
 
 // ══════════════════════════════════════════════════
@@ -348,7 +360,7 @@ function selectEmoji(key, score, idx, silent) {
   const chosen = document.getElementById(`eb-${key}-${idx}`);
   if (chosen) chosen.classList.add('selected');
   selections[key] = score;
-  if (!silent) { updateWellnessPreview(); updateBaselineIndicator(key); checkAcuteAlert(); }
+  if (!silent) { updateWellnessPreview(); updateBaselineIndicator(key); }
 }
 
 // ══════════════════════════════════════════════════
@@ -368,11 +380,7 @@ function updateWellnessPreview() {
   const vals = {};
   SYMPTOMS.forEach(s => { vals[s.key] = selections[s.key] || s.defaultVal; });
   const score = calcWellness(vals);
-  const el = document.getElementById('wellness-number');
-  el.textContent = score;
-  el.className = 'wellness-number' + (score >= 80 ? ' good' : score >= 60 ? '' : score >= 40 ? ' warn' : ' danger');
-  const sub = score >= 85 ? 'Near baseline' : score >= 70 ? 'Minor deviation' : score >= 50 ? 'Notable deviation' : 'Significant deviation';
-  document.getElementById('wellness-sub').textContent = sub;
+  document.getElementById('wellness-number').textContent = score;
 }
 
 // ══════════════════════════════════════════════════
@@ -412,14 +420,7 @@ function updateBaselineNotice() {
 // ══════════════════════════════════════════════════
 //  ACUTE ALERT
 // ══════════════════════════════════════════════════
-function checkAcuteAlert() {
-  const alerts = [];
-  if ((selections.sob || 1) >= 8) alerts.push('⚠️ Significant shortness of breath — contact your care team if this persists');
-  if ((selections.chest || 1) >= 8) alerts.push('⚠️ Significant chest tightness — contact your care team if this is new or worsening');
-  const alertEl = document.getElementById('acute-alert');
-  if (alerts.length) { alertEl.innerHTML = alerts.join('<br>'); alertEl.classList.add('show'); }
-  else alertEl.classList.remove('show');
-}
+// (acute alert feature removed per request)
 
 // ══════════════════════════════════════════════════
 //  NUDGE
@@ -441,7 +442,6 @@ function updateNudge() {
 //  SAVE / RESET — straight to Supabase, no localStorage
 // ══════════════════════════════════════════════════
 async function saveCheckin() {
-  checkAcuteAlert();
   const vals = {};
   SYMPTOMS.forEach(s => { vals[s.key] = selections[s.key] || s.defaultVal; });
   const score = calcWellness(vals);
@@ -461,6 +461,7 @@ async function saveCheckin() {
       const updated = await updateRow('symptom_checkins', existing.id, {
         symptoms: vals, severity_score: score, notes,
       });
+      markLocalWrite(updated.id);
       const i = records.findIndex(r => r.id === existing.id);
       if (i >= 0) records[i] = updated;
     } else {
@@ -471,6 +472,7 @@ async function saveCheckin() {
         notes,
         taken_at: new Date().toISOString(),
       });
+      markLocalWrite(inserted.id);
       records.push(inserted);
     }
     showToast('Check-in saved ✓', 'success');
@@ -490,7 +492,6 @@ function resetCheckin() {
   });
   document.getElementById('checkin-notes').value = '';
   updateWellnessPreview();
-  document.getElementById('acute-alert').classList.remove('show');
 }
 
 // ══════════════════════════════════════════════════
@@ -514,7 +515,6 @@ function renderHistory() {
   if (!recs.length) { el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No check-ins yet</div><div class="empty-sub">Your daily check-ins will appear here.</div></div>`; return; }
   el.innerHTML = recs.map(r => {
     const score = r.severity_score;
-    const scoreColor = score>=80?'var(--good)':score>=60?'var(--sym)':score>=40?'var(--warn)':'var(--danger)';
     const dateObj = new Date(r.taken_at);
     const dateStr = dateObj.toISOString().split('T')[0];
     const timeStr = dateObj.toTimeString().slice(0,5);
@@ -530,7 +530,7 @@ function renderHistory() {
           <div class="hist-time">${timeStr}</div>
         </div>
         <div class="hist-emojis" style="flex:1;padding:0 8px">${emojis}</div>
-        <div class="hist-wellness" style="color:${scoreColor}">${score}</div>
+        <div class="hist-wellness">${score}</div>
         <div class="hist-actions">
           <button class="btn-icon" onclick="deleteRec('${r.id}')" title="Delete">🗑</button>
         </div>
@@ -544,6 +544,7 @@ async function deleteRec(id) {
   if (!confirm('Delete this check-in?')) return;
   try {
     await deleteRow('symptom_checkins', id);
+    markLocalWrite(id);
     records = records.filter(r => r.id !== id);
     renderHistory();
     showToast('Deleted');
