@@ -469,9 +469,11 @@ async function renderTiles() {
       const days = Math.floor((new Date() - new Date(ts)) / 86400000);
       sinceStr = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
       overdue = days >= 3;
-      const displayVal = lastRow.value ?? lastRow.fev1 ?? lastRow.pef ?? lastRow.score ?? lastRow.severity_score ?? null;
+      const displayVal = lastRow.value ?? lastRow.fev1 ?? lastRow.pef ?? lastRow.score ?? lastRow.severity_score
+        ?? (lastRow.session_data && lastRow.session_data.volume_ml) ?? null;
+      const displayUnit = lastRow.unit ?? (lastRow.session_data && lastRow.session_data.volume_ml != null ? 'mL' : null);
       if (displayVal !== null && displayVal !== undefined) {
-        valHtml = `<div class="tile-val">${displayVal}${lastRow.unit ? `<span style="font-size:12px;color:var(--ink3);margin-left:3px">${lastRow.unit}</span>` : ''}</div>`;
+        valHtml = `<div class="tile-val">${displayVal}${displayUnit ? `<span style="font-size:12px;color:var(--ink3);margin-left:3px">${displayUnit}</span>` : ''}</div>`;
       }
     }
 
