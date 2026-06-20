@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LTS Care</title>
+<link rel="manifest" href="manifest.json">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --teal: #0D5C6B; --teal-mid: #1A7A8A; --teal-light:#E0F2F5; --teal-pale:#F0F9FB;
+  --bg:#F8FAFB; --surface:#FFFFFF; --surface2:#EDF2F5; --border:#D4E0E8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --good:#2D9E6B; --good-bg:#E8F7F1; --warn:#E07B39; --warn-bg:#FDF5EE;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --radius:14px; --radius-sm:9px; --shadow-lg:0 8px 40px rgba(13,92,107,0.14);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+
+.screen { display:none; min-height:100vh; }
+.screen.active { display:flex; flex-direction:column; }
+.auth-screen { align-items:center; justify-content:center; padding:24px 20px 48px; background:linear-gradient(160deg,var(--teal-pale) 0%,var(--bg) 60%); overflow-y:auto; }
+
+.auth-card { background:var(--surface); border-radius:20px; box-shadow:var(--shadow-lg); padding:36px 32px 32px; width:100%; max-width:420px; }
+.auth-logo { text-align:center; margin-bottom:28px; }
+.auth-logo-icon { font-size:40px; display:block; margin-bottom:10px; }
+.auth-logo-title { font-family:'DM Serif Display',serif; font-size:26px; color:var(--teal); letter-spacing:-0.5px; display:block; }
+.auth-logo-sub { font-size:12px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.8px; display:block; margin-top:3px; }
+.auth-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--ink); margin-bottom:6px; }
+.auth-subtitle { font-size:13px; color:var(--ink3); margin-bottom:24px; line-height:1.5; }
+
+.form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+.form-label { font-size:12px; font-weight:600; color:var(--ink2); letter-spacing:0.3px; text-transform:uppercase; }
+.pw-wrap { position:relative; }
+.pw-wrap .form-input { padding-right:44px; }
+.pw-toggle { position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--ink3); cursor:pointer; font-size:18px; padding:4px; line-height:1; }
+.form-input { background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:11px 14px; font-family:'DM Sans',sans-serif; font-size:15px; color:var(--ink); transition:all .15s; width:100%; }
+.form-input:focus { outline:none; border-color:var(--teal-mid); background:var(--teal-pale); box-shadow:0 0 0 3px rgba(13,92,107,.1); }
+.form-hint { font-size:12px; color:var(--ink3); }
+
+.btn-primary { width:100%; padding:13px; background:var(--teal); color:#fff; border:none; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; transition:all .15s; margin-top:6px; }
+.btn-primary:hover { background:var(--teal-mid); }
+.btn-primary:disabled { background:var(--border); color:var(--ink3); cursor:not-allowed; }
+.btn-secondary { width:100%; padding:12px; background:none; color:var(--teal); border:1.5px solid var(--teal-light); border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:all .15s; margin-top:8px; }
+.btn-secondary:hover { background:var(--teal-pale); border-color:var(--teal); }
+
+.error-msg { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:var(--radius-sm); padding:10px 14px; font-size:13px; color:var(--danger); margin-bottom:14px; display:none; }
+.error-msg.show { display:block; }
+.success-msg { background:var(--good-bg); border:1px solid #a8dfc5; border-radius:var(--radius-sm); padding:10px 14px; font-size:13px; color:var(--good); margin-bottom:14px; display:none; }
+.success-msg.show { display:block; }
+
+.loading-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:16px; background:var(--bg); }
+.spinner { width:36px; height:36px; border:3px solid var(--teal-light); border-top-color:var(--teal); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text { font-size:14px; color:var(--ink3); }
+
+.dashboard-screen { background:#F0F4F8; }
+.dash-header { background:var(--surface); border-bottom:1px solid var(--border); padding:16px 20px 14px; position:sticky; top:0; z-index:50; }
+.dash-header-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:2px; }
+.dash-app-name { font-family:'DM Serif Display',serif; font-size:22px; color:var(--ink); letter-spacing:-0.5px; }
+.dash-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.6px; }
+.dash-greeting { font-size:13px; color:var(--ink2); margin-top:6px; }
+.dash-greeting strong { color:var(--ink); font-weight:600; }
+.sign-out-btn { background:none; border:1px solid var(--border); color:var(--ink3); padding:6px 14px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; }
+
+.sync-pill { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--ink3); margin-top:8px; }
+.sync-dot { width:7px; height:7px; border-radius:50%; background:var(--good); }
+.sync-dot.syncing { background:var(--warn); animation:pulse 1s infinite; }
+@keyframes pulse { 50% { opacity:.3; } }
+
+.dash-body { padding:16px 16px 40px; max-width:600px; margin:0 auto; }
+.section-label { font-size:12px; font-weight:600; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; margin:18px 4px 10px; }
+.tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:all .15s; -webkit-tap-highlight-color:transparent; }
+.tile:hover { border-color:var(--teal-mid); box-shadow:0 4px 16px rgba(13,92,107,.08); }
+.tile-icon { font-size:22px; display:block; margin-bottom:8px; }
+.tile-name { font-size:13px; font-weight:600; color:var(--ink); margin-bottom:4px; }
+.tile-val { font-size:18px; font-weight:600; color:var(--teal); }
+.tile-empty { font-size:12px; color:var(--ink3); }
+.tile-since { font-size:11px; color:var(--ink3); margin-top:6px; }
+.tile-since.overdue { color:var(--warn); font-weight:600; }
+
+.view-module { display:none; min-height:100vh; flex-direction:column; }
+.view-module.active { display:flex; }
+.module-bar { background:var(--surface); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:60; }
+.module-back { background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink); padding:4px 8px; }
+.module-bar-title { font-weight:600; font-size:15px; flex:1; }
+#module-iframe { flex:1; width:100%; border:none; }
+
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 20px; border-radius:30px; font-size:13px; opacity:0; transition:all .25s; z-index:500; pointer-events:none; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen screen active" id="screen-loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading…</div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen auth-screen" id="screen-login">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="auth-logo-icon">🩺</span>
+      <span class="auth-logo-title">LTS Care</span>
+      <span class="auth-logo-sub">Post-transplant surveillance</span>
+    </div>
+    <div class="auth-title">Welcome back</div>
+    <div class="auth-subtitle">Sign in to access your health data, synced live across all your devices.</div>
+    <div class="error-msg" id="login-error"></div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="login-email" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="pw-wrap">
+        <input type="password" class="form-input" id="login-password" autocomplete="current-password">
+        <button class="pw-toggle" onclick="togglePW('login-password',this)">👁</button>
+      </div>
+    </div>
+    <button class="btn-primary" id="login-btn" onclick="handleLogin()">Sign In</button>
+    <button class="btn-secondary" onclick="showScreen('screen-signup')">Create an account</button>
+    <button class="btn-secondary" onclick="showScreen('screen-reset')" style="border:none;color:var(--ink3);margin-top:4px;">Forgot password?</button>
+  </div>
+</div>
+
+<!-- SIGNUP -->
+<div class="screen auth-screen" id="screen-signup">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="auth-logo-icon">🩺</span>
+      <span class="auth-logo-title">LTS Care</span>
+      <span class="auth-logo-sub">Post-transplant surveillance</span>
+    </div>
+    <div class="auth-title">Create your account</div>
+    <div class="auth-subtitle">Your data is stored securely and synced live across every device you log into.</div>
+    <div class="error-msg" id="signup-error"></div>
+    <div class="form-group">
+      <label class="form-label">Full Name</label>
+      <input type="text" class="form-input" id="signup-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="signup-email" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="pw-wrap">
+        <input type="password" class="form-input" id="signup-password" autocomplete="new-password">
+        <button class="pw-toggle" onclick="togglePW('signup-password',this)">👁</button>
+      </div>
+      <span class="form-hint">At least 8 characters</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirm Password</label>
+      <input type="password" class="form-input" id="signup-confirm">
+    </div>
+    <button class="btn-primary" id="signup-btn" onclick="handleSignup()">Create Account</button>
+    <button class="btn-secondary" onclick="showScreen('screen-login')">Already have an account? Sign in</button>
+  </div>
+</div>
+
+<!-- RESET -->
+<div class="screen auth-screen" id="screen-reset">
+  <div class="auth-card">
+    <div class="auth-title">Reset your password</div>
+    <div class="auth-subtitle">Enter your email and we'll send you a reset link.</div>
+    <div class="error-msg" id="reset-error"></div>
+    <div class="success-msg" id="reset-success">Check your email for a reset link.</div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="reset-email">
+    </div>
+    <button class="btn-primary" onclick="handleReset()">Send Reset Link</button>
+    <button class="btn-secondary" onclick="showScreen('screen-login')">Back to sign in</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="screen dashboard-screen" id="screen-dashboard">
+  <div class="dash-header">
+    <div class="dash-header-top">
+      <div>
+        <div class="dash-app-name">LTS Care</div>
+        <div class="dash-sub">Post-transplant surveillance</div>
+      </div>
+      <button class="sign-out-btn" onclick="handleSignOut()">Sign out</button>
+    </div>
+    <div class="dash-greeting" id="dash-greeting"></div>
+    <div class="sync-pill"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Live synced</span></div>
+  </div>
+  <div class="dash-body">
+    <div class="section-label">Modules</div>
+    <div class="tiles" id="tiles"></div>
+  </div>
+</div>
+
+<!-- MODULE VIEWER -->
+<div class="view-module" id="view-module">
+  <div class="module-bar">
+    <button class="module-back" onclick="goHome()">←</button>
+    <div class="module-bar-title" id="module-bar-title"></div>
+  </div>
+  <iframe id="module-iframe"></iframe>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Supabase SDK + shared client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+// ══════════════════════════════════════════════════
+//  MODULE REGISTRY
+// ══════════════════════════════════════════════════
+const MODULES = [
+  { id:'vitals',   name:'Vital Signs',     icon:'❤️', file:'modules/vital_signs_surveillance.html', table:'vitals_readings',      dateField:'taken_at' },
+  { id:'spiro',    name:'Spirometer',      icon:'🫁', file:'modules/spirometer_surveillance.html',  table:'spirometer_sessions',  dateField:'taken_at' },
+  { id:'peakflow', name:'Peak Flow',       icon:'💨', file:'modules/peak_flow_tracker.html',         table:'peak_flow_sessions',   dateField:'taken_at' },
+  { id:'checkin',  name:'Symptom Check-in',icon:'📋', file:'modules/symptom_checkin.html',           table:'symptom_checkins',     dateField:'taken_at' },
+  { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'modules/Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
+  { id:'health',   name:'Health Index',    icon:'📊', file:'modules/health_index.html',              table:'health_index_history', dateField:'computed_at' },
+];
+
+let currentUser = null;
+
+// ══════════════════════════════════════════════════
+//  INIT / AUTH
+// ══════════════════════════════════════════════════
+async function initAuth() {
+  const { data } = await sb.auth.getSession();
+  if (data.session) {
+    currentUser = data.session.user;
+    await showDashboard();
+  } else {
+    showScreen('screen-login');
+  }
+
+  onAuthChange((session) => {
+    if (session) {
+      currentUser = session.user;
+    } else {
+      currentUser = null;
+      showScreen('screen-login');
+    }
+  });
+}
+
+async function handleLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn   = document.getElementById('login-btn');
+  errEl.classList.remove('show');
+  if (!email || !pass) { showErr(errEl, 'Please fill in all fields.'); return; }
+
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.textContent = 'Sign In'; btn.disabled = false;
+
+  if (error) { showErr(errEl, error.message); return; }
+  currentUser = data.user;
+  await showDashboard();
+}
+
+async function handleSignup() {
+  const name    = document.getElementById('signup-name').value.trim();
+  const email   = document.getElementById('signup-email').value.trim();
+  const pass    = document.getElementById('signup-password').value;
+  const confirm = document.getElementById('signup-confirm').value;
+  const errEl   = document.getElementById('signup-error');
+  const btn     = document.getElementById('signup-btn');
+  errEl.classList.remove('show');
+
+  if (!name || !email || !pass) { showErr(errEl, 'Please fill in all fields.'); return; }
+  if (pass.length < 8) { showErr(errEl, 'Password must be at least 8 characters.'); return; }
+  if (pass !== confirm) { showErr(errEl, 'Passwords do not match.'); return; }
+
+  btn.textContent = 'Creating account…'; btn.disabled = true;
+  const { data, error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { full_name: name } }
+  });
+  btn.textContent = 'Create Account'; btn.disabled = false;
+
+  if (error) { showErr(errEl, error.message); return; }
+
+  if (data.user) {
+    await sb.from('profiles').upsert({ id: data.user.id, full_name: name });
+  }
+
+  showToast('Account created!', 'success');
+
+  if (data.session) {
+    currentUser = data.user;
+    await showDashboard();
+  } else {
+    showToast('Check your email to confirm your account.', 'success');
+    showScreen('screen-login');
+  }
+}
+
+async function handleReset() {
+  const email = document.getElementById('reset-email').value.trim();
+  const errEl = document.getElementById('reset-error');
+  if (!email) { showErr(errEl, 'Please enter your email address.'); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://cocomicare.github.io/LTS/'
+  });
+  if (error) { showErr(errEl, error.message); return; }
+  errEl.classList.remove('show');
+  document.getElementById('reset-success').classList.add('show');
+}
+
+async function handleSignOut() {
+  await sb.auth.signOut();
+  showScreen('screen-login');
+}
+
+// ══════════════════════════════════════════════════
+//  DASHBOARD — live data, no localStorage
+// ══════════════════════════════════════════════════
+async function showDashboard() {
+  showScreen('screen-dashboard');
+  setGreeting();
+  await renderTiles();
+}
+
+function setGreeting() {
+  const h = new Date().getHours();
+  const time = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const name = currentUser?.user_metadata?.full_name?.split(' ')[0] || currentUser?.email?.split('@')[0] || '';
+  document.getElementById('dash-greeting').innerHTML = `${time}${name ? ', <strong>'+name+'</strong>' : ''} 👋`;
+}
+
+async function renderTiles() {
+  const dot = document.getElementById('sync-dot');
+  dot.classList.add('syncing');
+  const container = document.getElementById('tiles');
+  const html = [];
+
+  for (const mod of MODULES) {
+    let lastRow = null;
+    try {
+      const { data } = await sb
+        .from(mod.table)
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order(mod.dateField, { ascending: false })
+        .limit(1);
+      lastRow = data && data[0];
+    } catch (e) { console.warn(mod.table, e.message); }
+
+    let valHtml = '<div class="tile-empty">No data yet</div>';
+    let sinceStr = 'Never logged';
+    let overdue = false;
+
+    if (lastRow) {
+      const ts = lastRow[mod.dateField];
+      const days = Math.floor((new Date() - new Date(ts)) / 86400000);
+      sinceStr = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
+      overdue = days >= 3;
+      const displayVal = lastRow.value ?? lastRow.fev1 ?? lastRow.pef ?? lastRow.score ?? lastRow.severity_score ?? null;
+      if (displayVal !== null && displayVal !== undefined) {
+        valHtml = `<div class="tile-val">${displayVal}${lastRow.unit ? `<span style="font-size:12px;color:var(--ink3);margin-left:3px">${lastRow.unit}</span>` : ''}</div>`;
+      }
+    }
+
+    html.push(`
+      <div class="tile" onclick="openModule('${mod.id}')">
+        <span class="tile-icon">${mod.icon}</span>
+        <div class="tile-name">${mod.name}</div>
+        ${valHtml}
+        <div class="tile-since ${overdue ? 'overdue' : ''}">${overdue ? '⏰ ' : ''}${sinceStr}</div>
+      </div>`);
+  }
+
+  container.innerHTML = html.join('');
+  dot.classList.remove('syncing');
+  document.getElementById('sync-text').textContent = 'Live synced · ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function openModule(id) {
+  const mod = MODULES.find(m => m.id === id);
+  if (!mod) return;
+  document.getElementById('screen-dashboard').style.display = 'none';
+  document.getElementById('view-module').classList.add('active');
+  document.getElementById('module-bar-title').textContent = mod.name;
+  // Modules read/write Supabase directly — no data needs to be pre-loaded here.
+  document.getElementById('module-iframe').src = mod.file + '?v=' + Date.now();
+}
+
+function goHome() {
+  document.getElementById('view-module').classList.remove('active');
+  document.getElementById('screen-dashboard').style.display = '';
+  document.getElementById('module-iframe').src = 'about:blank';
+  renderTiles();
+}
+
+// ══════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+  window.scrollTo(0,0);
+}
+function showErr(el, msg) { el.textContent = msg; el.classList.add('show'); }
+function togglePW(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+function showToast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+initAuth();
+setInterval(() => { if (currentUser) renderTiles(); }, 60000);
+</script>
+</body>
+</html>
