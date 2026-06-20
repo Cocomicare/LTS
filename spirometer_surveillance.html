@@ -33,9 +33,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 .log-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); border-left:4px solid var(--spiro); padding:20px; margin-bottom:16px; }
 .card-title { font-family:'DM Serif Display',serif; font-size:16px; margin-bottom:16px; }
-.big-input-wrap { display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom:16px; }
-.big-input-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin-bottom:4px; }
-.big-input-row { display:flex; align-items:center; gap:10px; }
+.big-input-wrap { display:flex; flex-direction:column; align-items:center; margin-bottom:16px; }
+.big-input-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin-bottom:4px; width:180px; text-align:center; }
+.big-input-box-wrap { position:relative; }
+.big-input-unit { position:absolute; right:-38px; top:50%; transform:translateY(-50%); font-family:'DM Mono',monospace; font-size:18px; color:var(--ink3); }
 .big-input { width:180px; text-align:center; font-family:'DM Mono',monospace; font-size:48px; font-weight:500; padding:16px 12px; border-radius:var(--radius); border:2px solid var(--border); background:var(--bg); color:var(--ink); }
 .big-input:focus { outline:none; border-color:var(--spiro); background:var(--spiro-bg); }
 .big-input-unit { font-family:'DM Mono',monospace; font-size:18px; color:var(--ink3); }
@@ -97,7 +98,7 @@ input:focus { outline:none; border-color:var(--spiro); }
     <div class="card-title" id="log-card-title">Log a Session</div>
     <div class="big-input-wrap">
       <div class="big-input-label">Inspiratory Volume</div>
-      <div class="big-input-row">
+      <div class="big-input-box-wrap">
         <input type="number" class="big-input" id="volume-val" placeholder="—" oninput="onVolInput()">
         <span class="big-input-unit">mL</span>
       </div>
