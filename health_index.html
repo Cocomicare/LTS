@@ -214,11 +214,12 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
     <div class="settings-title">Baseline Window</div>
     <div class="settings-sub">How many days of readings to average for your personal baseline.</div>
     <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
-      <input type="number" id="baseline-days" min="7" max="90" step="7" value="14"
+      <input type="number" id="baseline-days" min="1" max="30" step="1" value="14"
         style="width:70px;text-align:center;font-family:'DM Mono',monospace;font-size:18px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--ink)">
       <span style="font-size:13px;color:var(--ink2)">days</span>
     </div>
     <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('baseline-days').value=7">7d</button>
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('baseline-days').value=14">14d default</button>
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('baseline-days').value=30">30d</button>
       <button class="btn btn-primary btn-sm" onclick="saveBaselineDays()" style="margin-left:auto">Save</button>
@@ -699,7 +700,7 @@ function resetThresholds() {
 
 async function saveBaselineDays() {
   const v = parseInt(document.getElementById('baseline-days').value) || 14;
-  const days = Math.max(7, Math.min(90, v));
+  const days = Math.max(1, Math.min(30, v));
   try {
     settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: getThresholds(), windows: getWindows(), baseline: days });
     showToast(`Baseline window set to ${days} days ✓`, 'success');
