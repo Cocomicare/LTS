@@ -325,7 +325,7 @@ async function refreshAll() {
       rawData[key] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
     });
 
-    computeScore();
+    await computeScore();
   } catch (e) {
     showToast('Sync failed: ' + e.message, 'error');
   } finally {
@@ -384,7 +384,7 @@ function computeParamScore(param, latest, baseline) {
   return Math.max(0, 20 - (pctDev - 15));
 }
 
-function computeScore() {
+async function computeScore() {
   const weights = getWeights();
   const windows = getWindows();
   const today = new Date(); today.setHours(0,0,0,0);
@@ -445,7 +445,7 @@ function computeScore() {
   });
 
   renderDial(finalScore, breakdown, missingCount, []);
-  saveScoreToHistory(finalScore, breakdown);
+  await saveScoreToHistory(finalScore, breakdown);
 }
 
 // ══════════════════════════════════════════════════
@@ -670,7 +670,7 @@ async function saveWeights() {
   try {
     settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: w, thresholds: getThresholds(), windows: getWindows(), baseline: getBaselineDays() });
     showToast('Weights saved ✓', 'success');
-    computeScore();
+    await computeScore();
   } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
 }
 function resetWeights() {
@@ -688,7 +688,7 @@ async function saveThresholds() {
   try {
     settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: t, windows: getWindows(), baseline: getBaselineDays() });
     showToast('Thresholds saved ✓', 'success');
-    computeScore();
+    await computeScore();
   } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
 }
 function resetThresholds() {
@@ -704,7 +704,7 @@ async function saveBaselineDays() {
   try {
     settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: getThresholds(), windows: getWindows(), baseline: days });
     showToast(`Baseline window set to ${days} days ✓`, 'success');
-    computeScore();
+    await computeScore();
   } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
 }
 
@@ -724,7 +724,7 @@ async function saveWindows() {
   try {
     settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: getThresholds(), windows: w, baseline: getBaselineDays() });
     showToast('Measurement windows saved ✓', 'success');
-    computeScore();
+    await computeScore();
   } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
 }
 function resetWindows() {
