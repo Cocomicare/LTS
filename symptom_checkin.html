@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Symptom Check-in</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-client.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --surface2:#E8EFF5; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#3B82C4; --accent2:#E8F1FA;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --sym:#6B4FA8; --sym-bg:#F0EAFA; --sym-mid:#9B7ABF;
+  --radius:12px; --radius-sm:8px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; color:var(--ink); }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.5px; margin-left:8px; }
+
+.tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); padding:0 16px; }
+.tab { padding:11px 14px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; transition:all 0.15s; background:none; border-top:none; border-left:none; border-right:none; }
+.tab.active { color:var(--sym); border-bottom-color:var(--sym); }
+
+.page { display:none; padding:20px 16px 40px; max-width:600px; margin:0 auto; }
+.page.active { display:block; }
+
+.nudge { border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:14px; font-size:13px; font-weight:500; text-align:center; }
+.nudge.ok   { background:var(--good-bg); color:var(--good); }
+.nudge.due  { background:var(--warn-bg); color:var(--warn); }
+.nudge.none { background:var(--surface2); color:var(--ink3); }
+
+.checkin-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:14px; border-left:4px solid var(--sym); }
+.card-date-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.card-title { font-family:'DM Serif Display',serif; font-size:16px; color:var(--ink); }
+.card-date { font-size:13px; color:var(--ink3); font-family:'DM Mono',monospace; }
+
+.symptom-group { margin-bottom:24px; }
+.symptom-group:last-of-type { margin-bottom:4px; }
+.symptom-title { font-size:14px; font-weight:600; color:var(--ink); margin-bottom:3px; }
+.symptom-desc { font-size:12px; color:var(--ink3); margin-bottom:6px; line-height:1.4; font-style:italic; }
+.symptom-question { font-size:13px; color:var(--ink2); margin-bottom:12px; font-weight:500; }
+
+.emoji-grid { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+.emoji-row { display:flex; gap:5px; justify-content:space-between; }
+.emoji-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:8px 2px 6px; border-radius:8px; border:2px solid var(--border);
+  background:var(--bg); cursor:pointer; transition:all 0.15s;
+  -webkit-tap-highlight-color:transparent; font-family:'DM Sans',sans-serif;
+  min-width:0;
+}
+.emoji-btn:active { transform:scale(0.93); }
+.emoji-btn .e { font-size:20px; line-height:1; }
+.emoji-btn .elabel { font-size:8px; color:var(--ink3); text-align:center; line-height:1.2; font-weight:500; text-transform:uppercase; letter-spacing:0.2px; }
+.emoji-btn .enum { font-size:9px; color:var(--ink3); font-family:'DM Mono',monospace; font-weight:500; }
+.emoji-btn.selected { border-color:var(--sym); background:var(--sym-bg); box-shadow:0 2px 8px rgba(107,79,168,0.2); transform:scale(1.08); }
+.emoji-btn.selected .elabel { color:var(--sym); }
+.emoji-btn.selected .enum { color:var(--sym); }
+.emoji-btn.hib.selected { border-color:var(--good); background:var(--good-bg); box-shadow:0 2px 8px rgba(45,158,107,0.2); }
+.emoji-btn.hib.selected .elabel { color:var(--good); }
+.emoji-btn.hib.selected .enum { color:var(--good); }
+
+.baseline-indicator { font-size:11px; color:var(--ink3); margin-top:4px; min-height:16px; }
+
+.wellness-score-wrap { background:linear-gradient(135deg,var(--sym-bg) 0%,#fff 100%); border:1px solid #C8B0E8; border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; }
+.wellness-label { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--sym); margin-bottom:4px; }
+.wellness-desc { font-size:12px; color:var(--ink3); max-width:200px; line-height:1.4; }
+.wellness-number { font-family:'DM Mono',monospace; font-size:48px; font-weight:500; color:var(--sym); line-height:1; text-align:right; }
+.wellness-number.good { color:var(--good); }
+.wellness-number.warn { color:var(--warn); }
+.wellness-number.danger { color:var(--danger); }
+.wellness-sub { font-size:11px; color:var(--ink3); text-align:right; margin-top:3px; }
+
+.acute-alert { display:none; background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:14px; font-size:13px; color:var(--danger); font-weight:500; line-height:1.5; }
+.acute-alert.show { display:block; }
+.baseline-notice { background:var(--accent2); border:1px solid #BDD5EE; border-radius:var(--radius-sm); padding:11px 14px; margin-bottom:14px; font-size:13px; color:var(--accent); line-height:1.5; }
+
+.hist-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:10px; overflow:hidden; }
+.hist-top { display:flex; align-items:center; padding:12px 16px; gap:12px; border-bottom:1px solid var(--border); }
+.hist-date { font-family:'DM Mono',monospace; font-size:13px; font-weight:500; color:var(--ink); }
+.hist-time { font-size:11px; color:var(--ink3); margin-top:1px; }
+.hist-wellness { font-family:'DM Mono',monospace; font-size:28px; font-weight:500; color:var(--sym); flex-shrink:0; }
+.hist-emojis { display:flex; gap:6px; padding:12px 16px; flex-wrap:wrap; }
+.hist-sym { text-align:center; background:var(--bg); border-radius:8px; padding:8px 10px; min-width:52px; }
+.hist-sym-emoji { font-size:20px; line-height:1; }
+.hist-sym-name { font-size:9px; text-transform:uppercase; letter-spacing:0.4px; color:var(--ink3); margin-top:3px; }
+.hist-note { padding:6px 16px 10px; font-size:12px; color:var(--ink3); font-style:italic; border-top:1px solid var(--border); }
+.hist-actions { display:flex; gap:6px; flex-shrink:0; }
+
+.chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:14px; }
+.chart-title { font-size:11px; font-weight:600; color:var(--ink2); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; }
+.chart-wrap { position:relative; height:180px; }
+.trend-filter { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.trend-chip { padding:4px 12px; border-radius:20px; font-size:12px; font-weight:500; border:1.5px solid var(--border); background:var(--bg); color:var(--ink2); cursor:pointer; transition:all 0.15s; }
+.trend-chip.active { background:var(--sym); color:#fff; border-color:var(--sym); }
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; }
+.stat-eyebrow { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink3); margin-bottom:3px; }
+.stat-val { font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--ink); line-height:1; }
+.stat-sub { font-size:11px; color:var(--ink3); margin-top:2px; }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all 0.15s; }
+.btn-primary { background:var(--sym); color:#fff; }
+.btn-primary:hover { background:#5a3f90; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:none; border:1px solid var(--border); color:var(--ink2); }
+.btn-sm { padding:6px 12px; font-size:12px; }
+.btn-icon { width:36px; height:36px; border-radius:8px; border:1px solid var(--border); background:var(--bg); font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.empty-sub { font-size:13px; line-height:1.5; }
+.toast { position:fixed; bottom:20px; right:20px; background:var(--ink); color:#fff; padding:11px 18px; border-radius:var(--radius-sm); font-size:13px; font-weight:500; z-index:999; opacity:0; transform:translateY(8px); transition:all 0.2s; pointer-events:none; }
+.toast.show { opacity:1; transform:translateY(0); }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+.divider { height:1px; background:var(--border); margin:18px 0; }
+.sync-note { font-size:11px; color:var(--ink3); text-align:center; margin-bottom:10px; }
+@media (max-width:480px) { .page { padding:14px 12px 40px; } .emoji-btn .e { font-size:22px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Symptom Check-in</span>
+    <span class="logo-sub">Daily Wellness</span>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm" onclick="showTab('history')">History</button>
+    <button class="btn btn-primary btn-sm" onclick="showTab('checkin')">+ Check-in</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('checkin')" id="tab-checkin">Today</button>
+  <button class="tab" onclick="showTab('history')" id="tab-history">History</button>
+  <button class="tab" onclick="showTab('trends')" id="tab-trends">Trends</button>
+</div>
+
+<!-- CHECK-IN -->
+<div class="page active" id="page-checkin">
+  <div id="checkin-nudge" class="nudge none">Loading…</div>
+  <div id="acute-alert" class="acute-alert"></div>
+  <div id="baseline-notice" class="baseline-notice" style="display:none">
+    📊 <strong>Establishing your baseline</strong> — The first 14 daily check-ins build your personal symptom baseline. Keep logging daily for the most accurate results.
+  </div>
+
+  <div class="wellness-score-wrap" id="wellness-score-wrap">
+    <div>
+      <div class="wellness-label">Subjective Wellness</div>
+      <div class="wellness-desc">Composite of all 6 symptoms — feeds into your Health Index</div>
+    </div>
+    <div>
+      <div class="wellness-number" id="wellness-number">—</div>
+      <div class="wellness-sub" id="wellness-sub">Score out of 100</div>
+    </div>
+  </div>
+
+  <div class="checkin-card">
+    <div class="card-date-row">
+      <div class="card-title">How are you feeling today?</div>
+      <div class="card-date" id="checkin-date-display"></div>
+    </div>
+    <div id="symptom-groups-container"></div>
+
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Notes (optional)</label>
+      <textarea id="checkin-notes" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%;resize:vertical;min-height:68px" placeholder="Any other symptoms, observations, or context worth noting…"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="resetCheckin()">Reset</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveCheckin()">Save Check-in</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
+  <div id="history-content"></div>
+</div>
+
+<!-- TRENDS -->
+<div class="page" id="page-trends">
+  <div id="trends-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  SYMPTOM DEFINITIONS
+// ══════════════════════════════════════════════════
+const SYMPTOMS = [
+  { key:'sob', name:'Shortness of Breath', icon:'😮‍💨', higherBetter:true, defaultVal:10,
+    options:[
+      { e:'🚨', label:'Severe', score:1 }, { e:'😱', label:'Very bad', score:2 },
+      { e:'😰', label:'Struggling', score:3 }, { e:'😥', label:'Quite hard', score:4 },
+      { e:'😤', label:'Noticeable', score:5 }, { e:'😟', label:'Mild-mod', score:6 },
+      { e:'😮‍💨', label:'Mild', score:7 }, { e:'🙁', label:'Slight', score:8 },
+      { e:'😌', label:'Barely', score:9 }, { e:'🫁', label:'Easy', score:10 },
+    ]},
+  { key:'fatigue', name:'Fatigue', icon:'⚡', higherBetter:true, defaultVal:10,
+    options:[
+      { e:'🪫', label:'Depleted', score:1 }, { e:'😵', label:'Wiped out', score:2 },
+      { e:'😩', label:'Exhausted', score:3 }, { e:'😫', label:'Very tired', score:4 },
+      { e:'😴', label:'Tired', score:5 }, { e:'😪', label:'Dragging', score:6 },
+      { e:'😊', label:'Okay', score:7 }, { e:'🙂', label:'Pretty good', score:8 },
+      { e:'😁', label:'Good', score:9 }, { e:'⚡', label:'Full energy', score:10 },
+    ]},
+  { key:'stamina', name:'Stamina', icon:'🏃‍♀️', higherBetter:true, defaultVal:10,
+    options:[
+      { e:'🛑', label:'Bedbound', score:1 }, { e:'🪑', label:'Chair only', score:2 },
+      { e:'😓', label:'Few steps', score:3 }, { e:'🐢', label:'Very slow', score:4 },
+      { e:'🚶', label:'Short walk', score:5 }, { e:'🚶‍♀️', label:'Moderate', score:6 },
+      { e:'🧍', label:'Good pace', score:7 }, { e:'💪', label:'Active', score:8 },
+      { e:'🏃', label:'Near normal', score:9 }, { e:'🏃‍♀️', label:'Full normal', score:10 },
+    ]},
+  { key:'cough', name:'Cough', icon:'🗣️', higherBetter:true, defaultVal:10,
+    options:[
+      { e:'🤧', label:'Severe', score:1 }, { e:'😷', label:'Very bad', score:2 },
+      { e:'😮‍💨', label:'Frequent', score:3 }, { e:'😣', label:'Often', score:4 },
+      { e:'🗣️', label:'Moderate', score:5 }, { e:'😐', label:'Occasional', score:6 },
+      { e:'🙂', label:'Bit more', score:7 }, { e:'😌', label:'Slight', score:8 },
+      { e:'😶', label:'Barely', score:9 }, { e:'✅', label:'My normal', score:10 },
+    ]},
+  { key:'chest', name:'Chest Tightness', icon:'💜', higherBetter:true, defaultVal:10,
+    options:[
+      { e:'😣', label:'Painful', score:1 }, { e:'😖', label:'Very bad', score:2 },
+      { e:'😬', label:'Bad', score:3 }, { e:'😟', label:'Quite tight', score:4 },
+      { e:'🫀', label:'Noticeable', score:5 }, { e:'😐', label:'Moderate', score:6 },
+      { e:'💛', label:'Mild', score:7 }, { e:'🙂', label:'Slight', score:8 },
+      { e:'😌', label:'Barely', score:9 }, { e:'❤️', label:'None', score:10 },
+    ]},
+  { key:'wellbeing', name:'General Wellbeing', icon:'✨', higherBetter:true, defaultVal:10,
+    options:[
+      { e:'😞', label:'Very unwell', score:1 }, { e:'😢', label:'Quite bad', score:2 },
+      { e:'😕', label:'Poor', score:3 }, { e:'😟', label:'Below par', score:4 },
+      { e:'😐', label:'Okay', score:5 }, { e:'🙂', label:'Alright', score:6 },
+      { e:'😊', label:'Good', score:7 }, { e:'😄', label:'Pretty good', score:8 },
+      { e:'🌟', label:'Great', score:9 }, { e:'✨', label:'Excellent', score:10 },
+    ]},
+];
+const SYM_WEIGHTS = { sob:30, fatigue:20, stamina:20, cough:12, chest:10, wellbeing:8 };
+const selections = {};
+
+// ══════════════════════════════════════════════════
+//  STATE — live in-memory only, sourced from Supabase
+// ══════════════════════════════════════════════════
+let currentUser = null;
+let records = [];           // array of rows from symptom_checkins, newest last
+let realtimeChannel = null;
+let trendChart = null;
+let trendRange = 14;
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+(async function init() {
+  document.getElementById('checkin-date-display').textContent =
+    new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+
+  renderSymptomGroups();
+
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+
+  await loadRecords();
+  updateWellnessPreview();
+  updateNudge();
+  updateBaselineNotice();
+
+  // Live sync: any insert/update/delete from ANY device updates this view instantly
+  realtimeChannel = subscribeToTable('symptom_checkins', currentUser.id, (payload) => {
+    handleRealtimeChange(payload);
+  });
+})();
+
+async function loadRecords() {
+  records = await fetchRows('symptom_checkins', currentUser.id, 'taken_at', true);
+}
+
+function handleRealtimeChange(payload) {
+  if (payload.eventType === 'INSERT') {
+    records.push(payload.new);
+  } else if (payload.eventType === 'UPDATE') {
+    const i = records.findIndex(r => r.id === payload.new.id);
+    if (i >= 0) records[i] = payload.new; else records.push(payload.new);
+  } else if (payload.eventType === 'DELETE') {
+    records = records.filter(r => r.id !== payload.old.id);
+  }
+  records.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+  updateNudge();
+  updateBaselineNotice();
+  if (document.getElementById('page-history').classList.contains('active')) renderHistory();
+  if (document.getElementById('page-trends').classList.contains('active')) renderTrends();
+  showToast('Updated from another device', 'success');
+}
+
+// ══════════════════════════════════════════════════
+//  EMOJI PICKER RENDER
+// ══════════════════════════════════════════════════
+function renderSymptomGroups() {
+  const container = document.getElementById('symptom-groups-container');
+  container.innerHTML = SYMPTOMS.map(s => `
+    <div class="symptom-group" id="sg-${s.key}">
+      <div class="symptom-title">${s.icon} ${s.name}</div>
+      <div class="emoji-grid" id="er-${s.key}"></div>
+      <div class="baseline-indicator" id="bi-${s.key}"></div>
+    </div>
+    <div class="divider"></div>`).join('');
+  SYMPTOMS.forEach(s => renderEmojiRow(s));
+}
+
+function renderEmojiRow(sym) {
+  const container = document.getElementById('er-' + sym.key);
+  if (!container) return;
+  const row1 = sym.options.slice(0, 5);
+  const row2 = sym.options.slice(5, 10);
+  function makeBtn(opt, i) {
+    return `<button class="emoji-btn ${sym.higherBetter ? 'hib' : ''}" id="eb-${sym.key}-${i}" onclick="selectEmoji('${sym.key}', ${opt.score}, ${i})">
+      <span class="e">${opt.e}</span><span class="enum">${opt.score}</span><span class="elabel">${opt.label}</span>
+    </button>`;
+  }
+  container.innerHTML = `<div class="emoji-row">${row1.map((o,i)=>makeBtn(o,i)).join('')}</div><div class="emoji-row">${row2.map((o,i)=>makeBtn(o,i+5)).join('')}</div>`;
+  const defaultIdx = sym.options.findIndex(o => o.score === sym.defaultVal);
+  if (defaultIdx >= 0) selectEmoji(sym.key, sym.defaultVal, defaultIdx, true);
+}
+
+function selectEmoji(key, score, idx, silent) {
+  const sym = SYMPTOMS.find(s => s.key === key);
+  sym.options.forEach((_, i) => { const btn = document.getElementById(`eb-${key}-${i}`); if (btn) btn.classList.remove('selected'); });
+  const chosen = document.getElementById(`eb-${key}-${idx}`);
+  if (chosen) chosen.classList.add('selected');
+  selections[key] = score;
+  if (!silent) { updateWellnessPreview(); updateBaselineIndicator(key); checkAcuteAlert(); }
+}
+
+// ══════════════════════════════════════════════════
+//  WELLNESS SCORE
+// ══════════════════════════════════════════════════
+function calcWellness(vals) {
+  let total = 0;
+  SYMPTOMS.forEach(s => {
+    const v = vals[s.key] || 5;
+    const norm = s.higherBetter ? v/10 : (11-v)/10;
+    total += norm * SYM_WEIGHTS[s.key];
+  });
+  return Math.round(total);
+}
+
+function updateWellnessPreview() {
+  const vals = {};
+  SYMPTOMS.forEach(s => { vals[s.key] = selections[s.key] || s.defaultVal; });
+  const score = calcWellness(vals);
+  const el = document.getElementById('wellness-number');
+  el.textContent = score;
+  el.className = 'wellness-number' + (score >= 80 ? ' good' : score >= 60 ? '' : score >= 40 ? ' warn' : ' danger');
+  const sub = score >= 85 ? 'Near baseline' : score >= 70 ? 'Minor deviation' : score >= 50 ? 'Notable deviation' : 'Significant deviation';
+  document.getElementById('wellness-sub').textContent = sub;
+}
+
+// ══════════════════════════════════════════════════
+//  BASELINE (computed live from `records`)
+// ══════════════════════════════════════════════════
+const BASELINE_DAYS = 14;
+function getBaseline() {
+  if (!records.length) return null;
+  const recent = records.slice(-BASELINE_DAYS);
+  if (recent.length < 3) return null;
+  const bl = {};
+  SYMPTOMS.forEach(s => {
+    const vals = recent.map(r => r.symptoms && r.symptoms[s.key]).filter(v => v != null);
+    bl[s.key] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+  });
+  return bl;
+}
+
+function updateBaselineIndicator(key) {
+  const bl = getBaseline(); if (!bl) return;
+  const el = document.getElementById('bi-' + key); if (!el) return;
+  const blVal = bl[key]; if (!blVal) return;
+  const cur = selections[key];
+  const sym = SYMPTOMS.find(s=>s.key===key);
+  const diff = cur - blVal;
+  const absDiff = Math.abs(diff).toFixed(1);
+  if (Math.abs(diff) < 0.5) { el.textContent = `↔ At your baseline (${blVal.toFixed(1)})`; el.style.color = 'var(--ink3)'; return; }
+  const worse = sym.higherBetter ? diff < 0 : diff > 0;
+  el.textContent = `${worse ? '↓' : '↑'} ${absDiff} from your baseline (${blVal.toFixed(1)})`;
+  el.style.color = worse ? 'var(--danger)' : 'var(--good)';
+}
+
+function updateBaselineNotice() {
+  document.getElementById('baseline-notice').style.display = records.length < BASELINE_DAYS ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════════
+//  ACUTE ALERT
+// ══════════════════════════════════════════════════
+function checkAcuteAlert() {
+  const alerts = [];
+  if ((selections.sob || 1) >= 8) alerts.push('⚠️ Significant shortness of breath — contact your care team if this persists');
+  if ((selections.chest || 1) >= 8) alerts.push('⚠️ Significant chest tightness — contact your care team if this is new or worsening');
+  const alertEl = document.getElementById('acute-alert');
+  if (alerts.length) { alertEl.innerHTML = alerts.join('<br>'); alertEl.classList.add('show'); }
+  else alertEl.classList.remove('show');
+}
+
+// ══════════════════════════════════════════════════
+//  NUDGE
+// ══════════════════════════════════════════════════
+function updateNudge() {
+  const el = document.getElementById('checkin-nudge');
+  if (!records.length) { el.className='nudge none'; el.textContent='Complete your first symptom check-in to start tracking'; return; }
+  const last = records[records.length-1];
+  const lastDate = new Date(last.taken_at);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const lastDay = new Date(lastDate); lastDay.setHours(0,0,0,0);
+  if (lastDay.getTime() === today.getTime()) { el.className='nudge ok'; el.textContent="✓ Today's check-in is saved"; return; }
+  const days = Math.floor((today - lastDay) / 86400000);
+  if (days === 1) { el.className='nudge due'; el.textContent='⏰ Yesterday was your last check-in — log today to keep your streak'; }
+  else { el.className='nudge due'; el.textContent=`⏰ Last check-in was ${days} days ago — log today`; }
+}
+
+// ══════════════════════════════════════════════════
+//  SAVE / RESET — straight to Supabase, no localStorage
+// ══════════════════════════════════════════════════
+async function saveCheckin() {
+  checkAcuteAlert();
+  const vals = {};
+  SYMPTOMS.forEach(s => { vals[s.key] = selections[s.key] || s.defaultVal; });
+  const score = calcWellness(vals);
+  const notes = document.getElementById('checkin-notes').value.trim();
+  const btn = document.getElementById('save-btn');
+
+  // If there's already a check-in for today, update it instead of duplicating
+  const today = new Date(); today.setHours(0,0,0,0);
+  const existing = records.find(r => {
+    const d = new Date(r.taken_at); d.setHours(0,0,0,0);
+    return d.getTime() === today.getTime();
+  });
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    if (existing) {
+      const updated = await updateRow('symptom_checkins', existing.id, {
+        symptoms: vals, severity_score: score, notes,
+      });
+      const i = records.findIndex(r => r.id === existing.id);
+      if (i >= 0) records[i] = updated;
+    } else {
+      const inserted = await insertRow('symptom_checkins', {
+        user_id: currentUser.id,
+        symptoms: vals,
+        severity_score: score,
+        notes,
+        taken_at: new Date().toISOString(),
+      });
+      records.push(inserted);
+    }
+    showToast('Check-in saved ✓', 'success');
+    updateNudge(); updateBaselineNotice();
+    document.getElementById('checkin-notes').value = '';
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Check-in';
+  }
+}
+
+function resetCheckin() {
+  SYMPTOMS.forEach(s => {
+    const idx = s.options.findIndex(o => o.score === s.defaultVal);
+    if (idx >= 0) selectEmoji(s.key, s.defaultVal, idx, true);
+  });
+  document.getElementById('checkin-notes').value = '';
+  updateWellnessPreview();
+  document.getElementById('acute-alert').classList.remove('show');
+}
+
+// ══════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('page-'+name).classList.add('active');
+  if (name==='history') renderHistory();
+  if (name==='trends')  renderTrends();
+}
+
+// ══════════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════════
+function renderHistory() {
+  const recs = records.slice().reverse();
+  const el = document.getElementById('history-content');
+  if (!recs.length) { el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No check-ins yet</div><div class="empty-sub">Your daily check-ins will appear here.</div></div>`; return; }
+  el.innerHTML = recs.map(r => {
+    const score = r.severity_score;
+    const scoreColor = score>=80?'var(--good)':score>=60?'var(--sym)':score>=40?'var(--warn)':'var(--danger)';
+    const dateObj = new Date(r.taken_at);
+    const dateStr = dateObj.toISOString().split('T')[0];
+    const timeStr = dateObj.toTimeString().slice(0,5);
+    const emojis = SYMPTOMS.map(s => {
+      const val = r.symptoms ? r.symptoms[s.key] : null;
+      const opt = s.options.find(o=>o.score===val) || s.options[Math.floor((val||5)/2)-1] || s.options[0];
+      return `<div class="hist-sym"><div class="hist-sym-emoji">${opt?opt.e:s.icon}</div><div class="hist-sym-name">${s.name.split(' ')[0]}</div></div>`;
+    }).join('');
+    return `<div class="hist-card">
+      <div class="hist-top">
+        <div class="hist-date-block">
+          <div class="hist-date">${dateStr}</div>
+          <div class="hist-time">${timeStr}</div>
+        </div>
+        <div class="hist-emojis" style="flex:1;padding:0 8px">${emojis}</div>
+        <div class="hist-wellness" style="color:${scoreColor}">${score}</div>
+        <div class="hist-actions">
+          <button class="btn-icon" onclick="deleteRec('${r.id}')" title="Delete">🗑</button>
+        </div>
+      </div>
+      ${r.notes ? `<div class="hist-note">"${r.notes}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function deleteRec(id) {
+  if (!confirm('Delete this check-in?')) return;
+  try {
+    await deleteRow('symptom_checkins', id);
+    records = records.filter(r => r.id !== id);
+    renderHistory();
+    showToast('Deleted');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  TRENDS
+// ══════════════════════════════════════════════════
+function renderTrends() {
+  const el = document.getElementById('trends-content');
+  if (records.length < 2) { el.innerHTML=`<div class="empty"><div class="empty-icon">📈</div><div class="empty-title">Not enough data yet</div><div class="empty-sub">Log at least 2 check-ins to see trends.</div></div>`; return; }
+  const scores = records.map(r=>r.severity_score).filter(Boolean);
+  const avg = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+  const best = Math.max(...scores); const worst = Math.min(...scores);
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-eyebrow">Average</div><div class="stat-val">${avg}</div><div class="stat-sub">Wellness score</div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Best</div><div class="stat-val" style="color:var(--good)">${best}</div><div class="stat-sub">out of 100</div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Lowest</div><div class="stat-val" style="color:var(--danger)">${worst}</div><div class="stat-sub">out of 100</div></div>
+    </div>
+    <div class="trend-filter">
+      <button class="trend-chip ${trendRange===7?'active':''}" onclick="setRange(7)">7 days</button>
+      <button class="trend-chip ${trendRange===14?'active':''}" onclick="setRange(14)">14 days</button>
+      <button class="trend-chip ${trendRange===30?'active':''}" onclick="setRange(30)">30 days</button>
+      <button class="trend-chip ${trendRange===9999?'active':''}" onclick="setRange(9999)">All</button>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Wellness Score Over Time</div>
+      <div class="chart-wrap"><canvas id="trend-canvas"></canvas></div>
+    </div>`;
+  drawChart();
+}
+
+function setRange(r) { trendRange=r; renderTrends(); }
+function drawChart() {
+  const data = records.slice(-trendRange);
+  if (trendChart) trendChart.destroy();
+  const ctx = document.getElementById('trend-canvas');
+  if (!ctx) return;
+  trendChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:data.map(r=>new Date(r.taken_at).toISOString().slice(5,10)), datasets:[{ label:'Wellness', data:data.map(r=>r.severity_score), borderColor:'#6B4FA8', backgroundColor:'rgba(107,79,168,0.1)', tension:0.3, pointRadius:4, pointBackgroundColor:'#6B4FA8', fill:true }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ min:0, max:100, grid:{color:'#E8EFF5'} }, x:{ grid:{display:false} } } }
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.className='toast'+(type?' '+type:'');
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ t.classList.add('show'); }); });
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+// Clean up the realtime subscription if this iframe is ever torn down
+window.addEventListener('beforeunload', () => {
+  if (realtimeChannel) sb.removeChannel(realtimeChannel);
+});
+</script>
+</body>
+</html>
