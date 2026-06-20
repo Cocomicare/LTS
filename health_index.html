@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health Index</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --surface2:#E8EFF5; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#3B82C4; --accent2:#E8F1FA;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --radius:12px; --radius-sm:8px;
+  --zone-green:#2D9E6B; --zone-amber:#E0A030; --zone-orange:#E07B39; --zone-red:#C94040;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); padding:0 16px; }
+.tab { padding:11px 16px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.page { display:none; padding:20px 16px 40px; max-width:600px; margin:0 auto; }
+.page.active { display:block; }
+
+.dial-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px 20px 20px; margin-bottom:16px; text-align:center; position:relative; }
+.dial-title { font-family:'DM Serif Display',serif; font-size:15px; margin-bottom:4px; }
+.dial-subtitle { font-size:12px; color:var(--ink3); margin-bottom:20px; }
+.dial-wrap { position:relative; width:240px; height:135px; margin:0 auto 12px; }
+.dial-svg { width:100%; height:100%; overflow:visible; }
+.dial-score-wrap { position:absolute; bottom:-8px; left:50%; transform:translateX(-50%); text-align:center; }
+.dial-score { font-family:'DM Mono',monospace; font-size:52px; font-weight:500; line-height:1; transition:color .5s; }
+.dial-score-label { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.6px; margin-top:4px; }
+.zone-label { font-size:10px; font-weight:600; }
+.dial-status { display:inline-block; padding:5px 18px; border-radius:20px; font-size:13px; font-weight:600; margin-top:48px; }
+.status-green { background:var(--good-bg); color:var(--good); }
+.status-amber { background:#FEF9E7; color:var(--zone-amber); }
+.status-orange { background:var(--warn-bg); color:var(--warn); }
+.status-red { background:var(--danger-bg); color:var(--danger); }
+.dial-freshness { font-size:11px; color:var(--ink3); margin-top:8px; line-height:1.5; }
+
+.breakdown-toggle { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px; font-size:13px; color:var(--accent); cursor:pointer; font-weight:500; }
+.breakdown-arrow { transition:transform .2s; }
+.breakdown-arrow.open { transform:rotate(180deg); }
+.breakdown-panel { display:none; margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+.breakdown-panel.open { display:block; }
+.param-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+.param-row:last-child { border-bottom:none; }
+.param-icon { font-size:16px; flex-shrink:0; width:24px; text-align:center; }
+.param-info { flex:1; }
+.param-name { font-size:13px; font-weight:500; }
+.param-detail { font-size:11px; color:var(--ink3); margin-top:1px; }
+.param-bar-bg { height:6px; background:var(--surface2); border-radius:3px; overflow:hidden; width:80px; }
+.param-bar-fill { height:100%; border-radius:3px; transition:width .5s; }
+.param-score { font-family:'DM Mono',monospace; font-size:13px; font-weight:500; width:44px; text-align:right; flex-shrink:0; }
+.param-weight { font-size:10px; color:var(--ink3); text-align:right; width:28px; flex-shrink:0; }
+.param-missing { font-size:10px; color:var(--ink3); background:var(--surface2); padding:1px 6px; border-radius:8px; flex-shrink:0; white-space:nowrap; }
+
+.trend-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:14px; }
+.trend-title { font-size:11px; font-weight:600; color:var(--ink2); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.trend-wrap { position:relative; height:160px; }
+
+.settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; }
+.settings-title { font-family:'DM Serif Display',serif; font-size:15px; margin-bottom:4px; }
+.settings-sub { font-size:13px; color:var(--ink3); margin-bottom:18px; line-height:1.5; }
+.weight-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.weight-row:last-of-type { border-bottom:none; }
+.weight-icon { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
+.weight-name { font-size:13px; font-weight:500; flex:1; }
+.weight-input { width:64px; text-align:center; font-family:'DM Mono',monospace; font-size:16px; font-weight:500; padding:6px 8px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--bg); color:var(--ink); }
+.weight-input:focus { outline:none; border-color:var(--accent); }
+.weight-pct { font-size:12px; color:var(--ink3); width:14px; }
+.weight-total { display:flex; justify-content:space-between; align-items:center; padding:12px 0 4px; margin-top:4px; border-top:1px solid var(--border); }
+.weight-total-label { font-size:13px; font-weight:600; color:var(--ink2); }
+.weight-total-val { font-family:'DM Mono',monospace; font-size:18px; font-weight:500; }
+.weight-total-val.ok { color:var(--good); }
+.weight-total-val.over { color:var(--danger); }
+.weight-total-val.under { color:var(--warn); }
+.threshold-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+.threshold-group { display:flex; flex-direction:column; gap:4px; }
+.threshold-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+.threshold-input { text-align:center; font-family:'DM Mono',monospace; font-size:15px; font-weight:500; padding:7px 6px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--bg); color:var(--ink); width:100%; }
+.threshold-input:focus { outline:none; border-color:var(--accent); }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all .15s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-ghost { background:none; border:1px solid var(--border); color:var(--ink2); }
+.btn-sm { padding:6px 12px; font-size:12px; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.toast { position:fixed; bottom:20px; right:20px; background:var(--ink); color:#fff; padding:11px 18px; border-radius:var(--radius-sm); font-size:13px; font-weight:500; z-index:999; opacity:0; transform:translateY(8px); transition:all .2s; pointer-events:none; }
+.toast.show { opacity:1; transform:translateY(0); }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+.info-note { background:var(--accent2); border:1px solid #BDD5EE; border-radius:var(--radius-sm); padding:11px 14px; font-size:13px; color:var(--accent); margin-bottom:14px; line-height:1.5; }
+@media (max-width:480px) { .page { padding:14px 12px 40px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Health Index</span>
+    <span class="logo-sub">Composite Score</span>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm" onclick="showTab('settings')">⚙️ Settings</button>
+    <button class="btn btn-primary btn-sm" id="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('index')" id="tab-index">Index</button>
+  <button class="tab" onclick="showTab('trend')" id="tab-trend">Trend</button>
+  <button class="tab" onclick="showTab('settings')" id="tab-settings">Settings</button>
+</div>
+
+<!-- INDEX -->
+<div class="page active" id="page-index">
+  <div class="dial-card">
+    <div class="dial-title">Composite Health Index</div>
+    <div class="dial-subtitle">Weighted score across all surveillance parameters</div>
+    <div class="dial-wrap">
+      <svg class="dial-svg" viewBox="0 0 240 135" id="dial-svg">
+        <path id="arc-bg-red" fill="none" stroke="#FAEAEA" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-bg-orange" fill="none" stroke="#FDF0E8" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-bg-amber" fill="none" stroke="#FEF9E7" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-bg-green" fill="none" stroke="#E8F7F1" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-fill" fill="none" stroke="#2D9E6B" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="120" cy="130" r="5" fill="var(--ink3)"/>
+        <text x="14" y="132" class="zone-label" fill="var(--zone-red)" text-anchor="middle">0</text>
+        <text x="52" y="55" class="zone-label" fill="var(--zone-orange)" text-anchor="middle">50</text>
+        <text x="120" y="30" class="zone-label" fill="var(--zone-amber)" text-anchor="middle">70</text>
+        <text x="188" y="55" class="zone-label" fill="var(--zone-green)" text-anchor="middle">85</text>
+        <text x="226" y="132" class="zone-label" fill="var(--zone-green)" text-anchor="middle">100</text>
+      </svg>
+      <div class="dial-score-wrap">
+        <div class="dial-score" id="dial-score">—</div>
+        <div class="dial-score-label">out of 100</div>
+      </div>
+    </div>
+    <div class="dial-status" id="dial-status">Calculating…</div>
+    <div class="dial-freshness" id="dial-freshness"></div>
+
+    <div class="breakdown-toggle" onclick="toggleBreakdown()">
+      <span id="breakdown-toggle-label">Show parameter breakdown</span>
+      <span class="breakdown-arrow" id="breakdown-arrow">▼</span>
+    </div>
+    <div class="breakdown-panel" id="breakdown-panel">
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;line-height:1.5;padding:8px 10px;background:var(--bg);border-radius:8px">
+        <strong style="color:var(--ink2)">Score</strong> = how close today's reading is to this parameter's personal baseline (0–100). 100 = at baseline.
+      </div>
+      <div id="breakdown-rows"></div>
+      <div style="display:flex;justify-content:space-between;padding-top:10px;font-size:11px;color:var(--ink3)">
+        <span>★ = highest impact on score</span>
+        <span id="score-basis"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-note">
+    💡 This score synthesizes your most recent readings across all monitored parameters.
+    <strong>This score does not replace clinical judgment — always contact your transplant team with concerns.</strong>
+  </div>
+</div>
+
+<!-- TREND -->
+<div class="page" id="page-trend">
+  <div class="trend-card">
+    <div class="trend-title">Composite Score Over Time</div>
+    <div class="trend-wrap"><canvas id="trend-chart"></canvas></div>
+  </div>
+  <div id="trend-stats"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="settings-card">
+    <div class="settings-title">Parameter Weights</div>
+    <div class="settings-sub">Weights must add up to exactly 100%.</div>
+    <div id="weight-rows"></div>
+    <div class="weight-total">
+      <span class="weight-total-label">Total weight</span>
+      <span class="weight-total-val" id="weight-total-val">100%</span>
+    </div>
+    <div style="font-size:11px;color:var(--ink3);margin-bottom:14px" id="weight-warning"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="resetWeights()">Reset to defaults</button>
+      <button class="btn btn-primary" onclick="saveWeights()">Save Weights</button>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-title">Score Zone Thresholds</div>
+    <div class="settings-sub">Boundaries between score zones (0–100).</div>
+    <div class="threshold-row">
+      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-red)">🔴 Critical below</div><input type="number" class="threshold-input" id="th-red" value="85"></div>
+      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-orange)">🟠 Concern below</div><input type="number" class="threshold-input" id="th-orange" value="90"></div>
+      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-amber)">🟡 Watch below</div><input type="number" class="threshold-input" id="th-amber" value="95"></div>
+      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-green)">🟢 Good and above</div><input type="number" class="threshold-input" id="th-green" value="95" disabled></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-ghost btn-sm" onclick="resetThresholds()">Reset</button>
+      <button class="btn btn-primary" onclick="saveThresholds()">Save Thresholds</button>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-title">Baseline Window</div>
+    <div class="settings-sub">How many days of readings to average for your personal baseline.</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
+      <input type="number" id="baseline-days" min="7" max="90" step="7" value="14"
+        style="width:70px;text-align:center;font-family:'DM Mono',monospace;font-size:18px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--ink)">
+      <span style="font-size:13px;color:var(--ink2)">days</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('baseline-days').value=14">14d default</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('baseline-days').value=30">30d</button>
+      <button class="btn btn-primary btn-sm" onclick="saveBaselineDays()" style="margin-left:auto">Save</button>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-title">Measurement Windows</div>
+    <div class="settings-sub">Days before a parameter's reading is excluded as stale.</div>
+    <div id="window-rows" style="margin-top:12px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost btn-sm" onclick="resetWindows()">Reset to defaults</button>
+      <button class="btn btn-primary" onclick="saveWindows()">Save Windows</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  PARAMETER DEFINITIONS — each maps to a Supabase source
+// ══════════════════════════════════════════════════
+const PARAMS = [
+  { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:10, maxAgeDays:2, direction:'higher_better',
+    desc:'Subjective wellness score', source:'symptoms' },
+  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:22, maxAgeDays:2, direction:'higher_better',
+    desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
+  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:15, maxAgeDays:2, direction:'higher_better',
+    desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
+  { key:'pef', name:'PEF', icon:'💨', unit:'L/min', weight:10, maxAgeDays:2, direction:'higher_better',
+    desc:'Peak expiratory flow', source:'peakflow', field:'pef' },
+  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:18, maxAgeDays:2, direction:'higher_better',
+    desc:'Inspiratory volume — complements peak flow', source:'spiro' },
+  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:7, maxAgeDays:2, direction:'stable',
+    desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
+  { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:6, maxAgeDays:7, direction:'stable',
+    desc:'Tacrolimus side effect marker', source:'vitals', vitalType:'bp_systolic' },
+  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:13, maxAgeDays:3, direction:'lower_better',
+    desc:'Key infection indicator', source:'vitals', vitalType:'temp' },
+  { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:6, maxAgeDays:14, direction:'stable',
+    desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
+];
+const NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'pef', 'hr'];
+
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let currentUser = null;
+let settingsRow = null;     // health_index_settings row
+let historyRows = [];       // health_index_history rows
+let rawData = {};           // param.key -> array of {date, value} sorted asc
+
+function getWeights() {
+  const saved = (settingsRow && settingsRow.weights) || {};
+  const w = {}; PARAMS.forEach(p => w[p.key] = saved[p.key] ?? p.weight); return w;
+}
+function getThresholds() {
+  const saved = (settingsRow && settingsRow.thresholds) || {};
+  return { red:85, orange:90, amber:95, ...saved };
+}
+function getWindows() {
+  const saved = (settingsRow && settingsRow.windows) || {};
+  const w = {}; PARAMS.forEach(p => w[p.key] = saved[p.key] ?? p.maxAgeDays); return w;
+}
+function getBaselineDays() { return (settingsRow && settingsRow.baseline) || 14; }
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+(async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+  await refreshAll();
+})();
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.textContent = '⟳ Syncing…';
+  try {
+    const [settingsRes, historyRes, symptomRows, vitalsRows, peakflowRows, spiroRows] = await Promise.all([
+      sb.from('health_index_settings').select('*').eq('user_id', currentUser.id).maybeSingle(),
+      sb.from('health_index_history').select('*').eq('user_id', currentUser.id).order('computed_at', { ascending: true }),
+      sb.from('symptom_checkins').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
+      sb.from('vitals_readings').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
+      sb.from('peak_flow_sessions').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
+      sb.from('spirometer_sessions').select('*').eq('user_id', currentUser.id).order('taken_at', { ascending: true }),
+    ]);
+
+    settingsRow = settingsRes.data || null;
+    historyRows = historyRes.data || [];
+
+    rawData.symptoms = (symptomRows.data || []).map(r => ({ date: r.taken_at, value: r.severity_score }));
+    rawData.fev1 = (peakflowRows.data || []).filter(r => r.fev1 != null).map(r => ({ date: r.taken_at, value: Number(r.fev1) }));
+    rawData.pef  = (peakflowRows.data || []).filter(r => r.pef  != null).map(r => ({ date: r.taken_at, value: Number(r.pef) }));
+    rawData.spiro = (spiroRows.data || []).filter(r => r.session_data && r.session_data.volume_ml != null)
+      .map(r => ({ date: r.taken_at, value: Number(r.session_data.volume_ml) }));
+    ['spo2','hr','bp_systolic','temp','wt'].forEach(vt => {
+      const key = vt === 'bp_systolic' ? 'bp' : vt;
+      rawData[key] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
+    });
+
+    computeScore();
+  } catch (e) {
+    showToast('Sync failed: ' + e.message, 'error');
+  } finally {
+    if (btn) btn.textContent = '↻ Refresh';
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  BASELINE + SCORING
+// ══════════════════════════════════════════════════
+function rollingBaseline(recs, days) {
+  if (!recs.length) return null;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+  const windowRecs = recs.filter(r => new Date(r.date) >= cutoff);
+  const useRecs = windowRecs.length > 0 ? windowRecs : recs;
+  const vals = useRecs.map(r => r.value).filter(v => v != null && !isNaN(v));
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+function computeParamScore(param, latest, baseline) {
+  if (latest === null || latest === undefined) return null;
+  const base = (baseline != null && baseline !== 0) ? baseline : latest;
+  if (base === 0) return 75;
+
+  if (param.key === 'spo2') {
+    const pctDev = ((base - latest) / base) * 100;
+    if (pctDev <= 0) return 100;
+    if (pctDev <= 0.5) return 95;
+    if (pctDev <= 1.0) return 85;
+    if (pctDev <= 2.0) return 65;
+    if (pctDev <= 3.0) return 40;
+    return Math.max(0, 20 - (pctDev - 3) * 5);
+  }
+  if (param.direction === 'higher_better') {
+    const ratio = latest / base;
+    if (ratio >= 0.98) return 100;
+    if (ratio >= 0.95) return 85;
+    if (ratio >= 0.90) return 65;
+    if (ratio >= 0.85) return 40;
+    return Math.max(0, Math.round(ratio * 47));
+  }
+  if (param.direction === 'lower_better') {
+    const pctDev = Math.abs((latest - base) / base) * 100;
+    if (pctDev <= 0.5) return 100;
+    if (pctDev <= 1.0) return 85;
+    if (pctDev <= 1.5) return 65;
+    if (pctDev <= 2.5) return 40;
+    return Math.max(0, 20 - pctDev * 4);
+  }
+  // stable / target_range
+  const pctDev = Math.abs((latest - base) / base) * 100;
+  if (pctDev <= 2) return 100;
+  if (pctDev <= 5) return 85;
+  if (pctDev <= 10) return 65;
+  if (pctDev <= 15) return 40;
+  return Math.max(0, 20 - (pctDev - 15));
+}
+
+function computeScore() {
+  const weights = getWeights();
+  const windows = getWindows();
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  let weightedSum = 0, totalWeight = 0, missingCount = 0;
+  const breakdown = [];
+  const missingRequired = [];
+
+  PARAMS.forEach(param => {
+    const w = weights[param.key] || 0;
+    if (w === 0) return;
+
+    const recs = rawData[param.key] || [];
+    const latestRec = recs.length ? recs[recs.length-1] : null;
+    const latest = latestRec ? latestRec.value : null;
+    const baseline = rollingBaseline(recs, getBaselineDays());
+    const latestDate = latestRec ? new Date(latestRec.date) : null;
+    if (latestDate) latestDate.setHours(0,0,0,0);
+
+    const maxAge = windows[param.key] || param.maxAgeDays || 7;
+    const cutoff = new Date(today); cutoff.setDate(today.getDate() - maxAge);
+    const daysAgo = latestDate ? Math.floor((today - latestDate) / 86400000) : null;
+
+    let freshness = 'ok';
+    if (!latestDate || latest === null) {
+      freshness = 'missing'; missingCount++;
+      if (NONNEGOTIABLES.includes(param.key)) missingRequired.push(param.name);
+    } else if (latestDate < cutoff) {
+      freshness = 'missing'; missingCount++;
+      if (NONNEGOTIABLES.includes(param.key)) missingRequired.push(param.name + ' (expired)');
+    }
+
+    if (freshness === 'missing') {
+      breakdown.push({ param, score:null, latest, baseline, w, freshness, daysAgo });
+      return;
+    }
+
+    const score = computeParamScore(param, latest, baseline);
+    totalWeight += w;
+    weightedSum += score * w;
+    breakdown.push({ param, score, latest, baseline, w, freshness, daysAgo });
+  });
+
+  if (missingRequired.length > 0) {
+    renderDial(null, breakdown, missingCount, missingRequired);
+    return;
+  }
+
+  let finalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null;
+  if (finalScore !== null) finalScore = Math.max(0, Math.min(100, finalScore));
+
+  breakdown.sort((a,b) => {
+    if (a.score !== null && b.score === null) return -1;
+    if (a.score === null && b.score !== null) return 1;
+    const impA = a.score !== null ? (100 - a.score) * a.w : 0;
+    const impB = b.score !== null ? (100 - b.score) * b.w : 0;
+    return impB - impA;
+  });
+
+  renderDial(finalScore, breakdown, missingCount, []);
+  saveScoreToHistory(finalScore, breakdown);
+}
+
+// ══════════════════════════════════════════════════
+//  DIAL RENDER
+// ══════════════════════════════════════════════════
+function getZoneColor(score, thresholds) {
+  if (score >= thresholds.amber) return 'var(--zone-green)';
+  if (score >= thresholds.orange) return 'var(--zone-amber)';
+  if (score >= thresholds.red) return 'var(--zone-orange)';
+  return 'var(--zone-red)';
+}
+
+function renderDial(score, breakdown, missingCount, missingRequired) {
+  const thresholds = getThresholds();
+  const cx = 120, cy = 130, r = 90;
+  function arcPath(startAngle, endAngle) {
+    const s = (startAngle * Math.PI) / 180, e = (endAngle * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(Math.PI - s), y1 = cy - r * Math.sin(Math.PI - s);
+    const x2 = cx + r * Math.cos(Math.PI - e), y2 = cy - r * Math.sin(Math.PI - e);
+    const large = (endAngle - startAngle) > 180 ? 1 : 0;
+    return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+  }
+  function scoreToAngle(s) { return (s / 100) * 180; }
+
+  document.getElementById('arc-bg-red').setAttribute('d', arcPath(0, scoreToAngle(thresholds.red)));
+  document.getElementById('arc-bg-orange').setAttribute('d', arcPath(scoreToAngle(thresholds.red), scoreToAngle(thresholds.orange)));
+  document.getElementById('arc-bg-amber').setAttribute('d', arcPath(scoreToAngle(thresholds.orange), scoreToAngle(thresholds.amber)));
+  document.getElementById('arc-bg-green').setAttribute('d', arcPath(scoreToAngle(thresholds.amber), 180));
+
+  const fillEl = document.getElementById('arc-fill');
+  if (score !== null && score > 0) {
+    fillEl.setAttribute('d', arcPath(0, scoreToAngle(Math.min(score, 99.5))));
+    fillEl.setAttribute('stroke', getZoneColor(score, thresholds));
+    fillEl.style.display = 'block';
+  } else {
+    fillEl.style.display = 'none';
+  }
+
+  const scoreEl = document.getElementById('dial-score');
+  if (score !== null) {
+    scoreEl.textContent = score; scoreEl.style.color = getZoneColor(score, thresholds); scoreEl.style.fontSize = '';
+  } else if (missingRequired.length > 0) {
+    scoreEl.textContent = '?'; scoreEl.style.color = 'var(--ink3)'; scoreEl.style.fontSize = '48px';
+  } else {
+    scoreEl.textContent = '—'; scoreEl.style.color = 'var(--ink3)';
+  }
+
+  const statusEl = document.getElementById('dial-status');
+  if (missingRequired.length > 0) {
+    statusEl.textContent = '⚠️ Insufficient data — score unavailable'; statusEl.className = 'dial-status status-amber';
+  } else if (score === null) {
+    statusEl.textContent = 'No data yet — log readings to generate score'; statusEl.className = 'dial-status status-amber';
+  } else if (score >= thresholds.amber) {
+    statusEl.textContent = '✓ All parameters near baseline'; statusEl.className = 'dial-status status-green';
+  } else if (score >= thresholds.orange) {
+    statusEl.textContent = '👀 Watch closely — mild deviation'; statusEl.className = 'dial-status status-amber';
+  } else if (score >= thresholds.red) {
+    statusEl.textContent = '⚠️ Notable deviation — review parameters'; statusEl.className = 'dial-status status-orange';
+  } else {
+    statusEl.textContent = '🚨 Significant deviation — contact transplant team'; statusEl.className = 'dial-status status-red';
+  }
+
+  const freshEl = document.getElementById('dial-freshness');
+  const activeParams = breakdown.filter(b=>b.score!==null).length;
+  if (missingRequired.length > 0) {
+    freshEl.innerHTML = `<strong style="color:var(--warn)">Required readings missing or expired:</strong><br>${missingRequired.join(' · ')}`;
+  } else if (missingCount > 0) {
+    freshEl.innerHTML = `Score based on ${activeParams} of ${breakdown.length} parameters · ${missingCount} excluded`;
+  } else {
+    freshEl.innerHTML = 'All parameters have recent readings ✓';
+  }
+
+  const rowsEl = document.getElementById('breakdown-rows');
+  rowsEl.innerHTML = breakdown.map((b,i) => {
+    const { param, score, latest, baseline, w, freshness, daysAgo } = b;
+    const barColor = score !== null ? getZoneColor(score, thresholds) : 'var(--ink3)';
+    const barWidth = score !== null ? score : 0;
+    const isTopImpact = i === 0 && score !== null && score < 90;
+    const sinceText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo !== null ? `${daysAgo}d ago` : '—';
+    const baselineText = baseline !== null ? `Baseline: ${baseline.toFixed(1)} ${param.unit}` : 'Building baseline…';
+    const latestText = latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged';
+    return `
+    <div class="param-row" style="${freshness==='missing'?'opacity:0.45':''}">
+      <div class="param-icon">${param.icon}</div>
+      <div class="param-info">
+        <div class="param-name">${param.name} ${isTopImpact ? '<span style="color:var(--warn);font-size:11px">★ highest impact</span>' : ''}</div>
+        <div class="param-detail">${latestText} · ${baselineText} · ${sinceText}</div>
+        <div class="param-bar-bg" style="margin-top:5px"><div class="param-bar-fill" style="width:${barWidth}%;background:${barColor}"></div></div>
+      </div>
+      <div class="param-score" style="color:${barColor}">${score !== null ? score : '—'}</div>
+      <div class="param-weight">${w}%</div>
+      ${freshness === 'missing' ? `<span class="param-missing">Excluded</span>` : ''}
+    </div>`;
+  }).join('');
+
+  const activePct = Math.round(breakdown.filter(b=>b.score!==null).reduce((a,b)=>a+b.w,0));
+  document.getElementById('score-basis').textContent = `Score based on ${activePct}% of total weight · ${getBaselineDays()}-day baseline window`;
+}
+
+function toggleBreakdown() {
+  const panel = document.getElementById('breakdown-panel');
+  const arrow = document.getElementById('breakdown-arrow');
+  const label = document.getElementById('breakdown-toggle-label');
+  const isOpen = panel.classList.toggle('open');
+  arrow.classList.toggle('open', isOpen);
+  label.textContent = isOpen ? 'Hide parameter breakdown' : 'Show parameter breakdown';
+}
+
+// ══════════════════════════════════════════════════
+//  HISTORY & TREND
+// ══════════════════════════════════════════════════
+async function saveScoreToHistory(score, breakdown) {
+  if (score === null) return;
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const existing = historyRows.find(h => {
+    const d = new Date(h.computed_at); d.setHours(0,0,0,0);
+    return d.getTime() === todayStart.getTime();
+  });
+  const components = {};
+  breakdown.forEach(b => { components[b.param.key] = b.score; });
+
+  try {
+    if (existing) {
+      if (existing.score !== score) {
+        await updateRow('health_index_history', existing.id, { score, components });
+        existing.score = score; existing.components = components;
+      }
+    } else {
+      const inserted = await insertRow('health_index_history', {
+        user_id: currentUser.id, score, components, computed_at: new Date().toISOString(),
+      });
+      historyRows.push(inserted);
+    }
+  } catch (e) { /* non-fatal — score still displays even if history save fails */ }
+}
+
+let trendChart = null;
+function renderTrend() {
+  const thresholds = getThresholds();
+  const el = document.getElementById('trend-stats');
+  if (trendChart) { try{trendChart.destroy();}catch(e){} trendChart = null; }
+
+  if (historyRows.length < 2) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-title">Not enough history yet</div><div class="empty-sub">The score is recorded each time you open the Index tab. Check back after a few days.</div></div>`;
+    return;
+  }
+  const sorted = historyRows.slice().sort((a,b) => new Date(a.computed_at) - new Date(b.computed_at));
+  const labels = sorted.map(h => new Date(h.computed_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const scores = sorted.map(h => h.score);
+  const avg = scores.reduce((a,b)=>a+b,0)/scores.length;
+  const latest = scores[scores.length-1];
+  const pct = parseFloat(((latest-avg)/avg*100).toFixed(1));
+  const sign = pct>=0?'+':'';
+  const vsBg = pct<=-5?'var(--danger-bg)':pct>=5?'var(--good-bg)':'var(--surface2)';
+  const vsColor = pct<=-5?'var(--danger)':pct>=5?'var(--good)':'var(--ink2)';
+  const vsNote = pct<=-5?'⚠️ Below running average':pct>=5?'✅ Above running average':'Near running average';
+
+  el.innerHTML = `
+    <div style="background:${vsBg};border:1px solid var(--border);border-radius:var(--radius);padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${vsColor};margin-bottom:2px">Latest vs Running Avg</div>
+        <div style="font-size:12px;color:var(--ink2)">${vsNote}</div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:30px;font-weight:500;color:${vsColor}">${sign}${pct}%</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);margin-bottom:3px">Latest</div>
+        <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:${getZoneColor(latest,thresholds)}">${latest}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);margin-bottom:3px">Running Avg</div>
+        <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--ink)">${avg.toFixed(1)}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);margin-bottom:3px">Days tracked</div>
+        <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--ink)">${historyRows.length}</div>
+      </div>
+    </div>`;
+
+  const runAvg = scores.map((_,i)=>parseFloat((scores.slice(0,i+1).reduce((a,b)=>a+b,0)/(i+1)).toFixed(1)));
+  trendChart = new Chart(document.getElementById('trend-chart'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'Health Index', data:scores, borderColor:'#3B82C4', backgroundColor:'rgba(59,130,196,0.08)', borderWidth:2.5, pointBackgroundColor:scores.map(s=>getZoneColor(s,thresholds)), pointRadius:5, fill:true, tension:0.3 },
+      { label:'Running Avg', data:runAvg, borderColor:'#8A9EAF', borderDash:[6,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.3 }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, labels:{font:{family:'DM Sans',size:11},color:'#4A5E72',usePointStyle:true,pointStyle:'line',boxWidth:28,padding:12} } },
+      scales:{ x:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:9},color:'#8A9EAF',maxTicksLimit:10}},
+               y:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:10},color:'#8A9EAF'},min:0,max:100} }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════════
+function buildWeightRows() {
+  const weights = getWeights();
+  document.getElementById('weight-rows').innerHTML = PARAMS.map(p => `
+    <div class="weight-row">
+      <div class="weight-icon">${p.icon}</div>
+      <div style="flex:1"><div class="weight-name">${p.name}</div><div style="font-size:11px;color:var(--ink3)">${p.desc}</div></div>
+      <input type="number" class="weight-input" id="w-${p.key}" value="${weights[p.key]}" min="0" max="100" oninput="updateWeightTotal()">
+      <div class="weight-pct">%</div>
+    </div>`).join('');
+  updateWeightTotal();
+}
+function updateWeightTotal() {
+  let total = 0;
+  PARAMS.forEach(p => { const v = parseInt(document.getElementById('w-'+p.key)?.value||0); total += isNaN(v)?0:v; });
+  const el = document.getElementById('weight-total-val');
+  el.textContent = total + '%';
+  el.className = 'weight-total-val ' + (total===100?'ok':total>100?'over':'under');
+  document.getElementById('weight-warning').textContent = total !== 100 ? `Weights must total exactly 100%. Currently ${total>100?total-100+'% over':100-total+'% under'}.` : '';
+}
+async function saveWeights() {
+  let total = 0; const w = {};
+  PARAMS.forEach(p => { const v = parseInt(document.getElementById('w-'+p.key)?.value||0); w[p.key]=isNaN(v)?0:v; total+=w[p.key]; });
+  if (total !== 100) { showToast('Weights must total exactly 100%', 'error'); return; }
+  try {
+    settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: w, thresholds: getThresholds(), windows: getWindows(), baseline: getBaselineDays() });
+    showToast('Weights saved ✓', 'success');
+    computeScore();
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+}
+function resetWeights() {
+  PARAMS.forEach(p => { const el = document.getElementById('w-'+p.key); if (el) el.value = p.weight; });
+  updateWeightTotal();
+  showToast('Reset to clinical defaults');
+}
+
+async function saveThresholds() {
+  const t = {
+    red: parseInt(document.getElementById('th-red').value) || 85,
+    orange: parseInt(document.getElementById('th-orange').value) || 90,
+    amber: parseInt(document.getElementById('th-amber').value) || 95,
+  };
+  try {
+    settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: t, windows: getWindows(), baseline: getBaselineDays() });
+    showToast('Thresholds saved ✓', 'success');
+    computeScore();
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+}
+function resetThresholds() {
+  document.getElementById('th-red').value = 85;
+  document.getElementById('th-orange').value = 90;
+  document.getElementById('th-amber').value = 95;
+  showToast('Reset to defaults');
+}
+
+async function saveBaselineDays() {
+  const v = parseInt(document.getElementById('baseline-days').value) || 14;
+  const days = Math.max(7, Math.min(90, v));
+  try {
+    settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: getThresholds(), windows: getWindows(), baseline: days });
+    showToast(`Baseline window set to ${days} days ✓`, 'success');
+    computeScore();
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+}
+
+function buildWindowRows() {
+  const windows = getWindows();
+  document.getElementById('window-rows').innerHTML = PARAMS.map(p => `
+    <div class="weight-row">
+      <div class="weight-icon">${p.icon}</div>
+      <div style="flex:1"><div class="weight-name">${p.name}</div><div style="font-size:11px;color:var(--ink3)">${p.desc}</div></div>
+      <input type="number" class="weight-input" id="win-${p.key}" value="${windows[p.key]}" min="1" max="90" style="width:52px">
+      <div class="weight-pct" style="width:30px;font-size:12px">days</div>
+    </div>`).join('');
+}
+async function saveWindows() {
+  const w = {};
+  PARAMS.forEach(p => { const v = parseInt(document.getElementById('win-'+p.key)?.value||p.maxAgeDays); w[p.key]=isNaN(v)||v<1?p.maxAgeDays:v; });
+  try {
+    settingsRow = await upsertByUser('health_index_settings', currentUser.id, { weights: getWeights(), thresholds: getThresholds(), windows: w, baseline: getBaselineDays() });
+    showToast('Measurement windows saved ✓', 'success');
+    computeScore();
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+}
+function resetWindows() {
+  PARAMS.forEach(p => { const el = document.getElementById('win-'+p.key); if (el) el.value = p.maxAgeDays; });
+  showToast('Reset to defaults');
+}
+
+// ══════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'trend') renderTrend();
+  if (name === 'settings') {
+    buildWeightRows();
+    buildWindowRows();
+    document.getElementById('baseline-days').value = getBaselineDays();
+    const t = getThresholds();
+    document.getElementById('th-red').value = t.red;
+    document.getElementById('th-orange').value = t.orange;
+    document.getElementById('th-amber').value = t.amber;
+  }
+}
+
+function showToast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast show'+(type?' '+type:'');
+  setTimeout(()=>el.className='toast', 2800);
+}
+</script>
+</body>
+</html>
