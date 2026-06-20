@@ -221,12 +221,12 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
 //  MODULE REGISTRY
 // ══════════════════════════════════════════════════
 const MODULES = [
-  { id:'vitals',   name:'Vital Signs',     icon:'❤️', file:'modules/vital_signs_surveillance.html', table:'vitals_readings',      dateField:'taken_at' },
-  { id:'spiro',    name:'Spirometer',      icon:'🫁', file:'modules/spirometer_surveillance.html',  table:'spirometer_sessions',  dateField:'taken_at' },
-  { id:'peakflow', name:'Peak Flow',       icon:'💨', file:'modules/peak_flow_tracker.html',         table:'peak_flow_sessions',   dateField:'taken_at' },
-  { id:'checkin',  name:'Symptom Check-in',icon:'📋', file:'modules/symptom_checkin.html',           table:'symptom_checkins',     dateField:'taken_at' },
-  { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'modules/Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
-  { id:'health',   name:'Health Index',    icon:'📊', file:'modules/health_index.html',              table:'health_index_history', dateField:'computed_at' },
+  { id:'vitals',   name:'Vital Signs',     icon:'❤️', file:'vital_signs_surveillance.html', table:'vitals_readings',      dateField:'taken_at' },
+  { id:'spiro',    name:'Spirometer',      icon:'🫁', file:'spirometer_surveillance.html',  table:'spirometer_sessions',  dateField:'taken_at' },
+  { id:'peakflow', name:'Peak Flow',       icon:'💨', file:'peak_flow_tracker.html',         table:'peak_flow_sessions',   dateField:'taken_at' },
+  { id:'checkin',  name:'Symptom Check-in',icon:'📋', file:'symptom_checkin.html',           table:'symptom_checkins',     dateField:'taken_at' },
+  { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
+  { id:'health',   name:'Health Index',    icon:'📊', file:'health_index.html',              table:'health_index_history', dateField:'computed_at' },
 ];
 
 let currentUser = null;
