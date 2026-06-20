@@ -136,14 +136,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
     <span class="logo-title">Symptom Check-in</span>
     <span class="logo-sub">Daily Wellness</span>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-ghost btn-sm" onclick="showTab('history')">History</button>
-    <button class="btn btn-primary btn-sm" onclick="showTab('checkin')">+ Check-in</button>
-  </div>
 </header>
 
 <div class="tabs">
-  <button class="tab active" onclick="showTab('checkin')" id="tab-checkin">Today</button>
+  <button class="tab active" onclick="showTab('checkin')" id="tab-checkin">Check-in</button>
   <button class="tab" onclick="showTab('history')" id="tab-history">History</button>
   <button class="tab" onclick="showTab('trends')" id="tab-trends">Trends</button>
 </div>
@@ -167,8 +163,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   </div>
 
   <div class="checkin-card">
-    <div class="card-date-row">
-      <div class="card-title" id="checkin-card-title">How are you feeling right now?</div>
+    <div class="card-date-row" style="justify-content:flex-end">
       <div class="card-date" id="checkin-date-display"></div>
     </div>
     <div style="display:flex;gap:12px;margin-bottom:18px">
@@ -513,7 +508,6 @@ function editCheckin(id) {
     if (idx >= 0) selectEmoji(s.key, val, idx, true);
   });
   updateWellnessPreview();
-  document.getElementById('checkin-card-title').textContent = 'Editing check-in';
   document.getElementById('save-btn').textContent = 'Update Check-in';
   showTab('checkin');
   window.scrollTo(0,0);
@@ -527,7 +521,6 @@ function resetCheckin() {
   document.getElementById('checkin-notes').value = '';
   updateWellnessPreview();
   editingId = null;
-  document.getElementById('checkin-card-title').textContent = 'How are you feeling right now?';
   document.getElementById('save-btn').textContent = 'Save Check-in';
   const now = new Date();
   document.getElementById('checkin-date').value = now.toISOString().slice(0,10);
