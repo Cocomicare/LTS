@@ -71,6 +71,25 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
 @keyframes pulse { 50% { opacity:.3; } }
 
 .dash-body { padding:16px 16px 40px; max-width:600px; margin:0 auto; }
+
+.hero-score-card { border-radius:20px; padding:22px 22px 20px; margin-bottom:18px; position:relative; overflow:hidden; cursor:pointer; transition:transform .15s; color:#fff; }
+.hero-score-card:active { transform:scale(0.985); }
+.hero-score-card.zone-green  { background:linear-gradient(135deg,#1F8A5C 0%,#2D9E6B 60%,#3FB87E 100%); }
+.hero-score-card.zone-amber  { background:linear-gradient(135deg,#C98A1E 0%,#E0A030 60%,#EDB85A 100%); }
+.hero-score-card.zone-orange { background:linear-gradient(135deg,#C25F1F 0%,#E07B39 60%,#ED9760 100%); }
+.hero-score-card.zone-red    { background:linear-gradient(135deg,#A52E2E 0%,#C94040 60%,#DB6868 100%); }
+.hero-score-card.zone-none   { background:linear-gradient(135deg,#5B6B7A 0%,#778899 60%,#94A4B2 100%); }
+.hero-eyebrow { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; opacity:.85; margin-bottom:2px; }
+.hero-top { display:flex; align-items:flex-start; justify-content:space-between; }
+.hero-score-row { display:flex; align-items:baseline; gap:6px; margin-top:6px; }
+.hero-score-num { font-family:'DM Mono',monospace; font-size:56px; font-weight:500; line-height:1; letter-spacing:-1px; }
+.hero-score-max { font-size:15px; opacity:.75; font-weight:400; }
+.hero-status { font-size:13px; font-weight:500; margin-top:6px; opacity:.95; }
+.hero-updated { font-size:11px; opacity:.7; margin-top:10px; }
+.hero-chevron { font-size:20px; opacity:.7; margin-top:4px; }
+.hero-empty-icon { font-size:30px; margin-bottom:6px; }
+.hero-empty-text { font-size:13px; opacity:.9; line-height:1.4; }
+
 .section-label { font-size:12px; font-weight:600; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; margin:18px 4px 10px; }
 .tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:all .15s; -webkit-tap-highlight-color:transparent; }
@@ -197,6 +216,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
     <div class="sync-pill"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Live synced</span></div>
   </div>
   <div class="dash-body">
+    <div id="hero-score-container"></div>
     <div class="section-label">Modules</div>
     <div class="tiles" id="tiles"></div>
   </div>
@@ -330,7 +350,63 @@ async function handleSignOut() {
 async function showDashboard() {
   showScreen('screen-dashboard');
   setGreeting();
+  await renderHeroScore();
   await renderTiles();
+}
+
+async function renderHeroScore() {
+  const container = document.getElementById('hero-score-container');
+  try {
+    const [settingsRes, historyRes] = await Promise.all([
+      sb.from('health_index_settings').select('*').eq('user_id', currentUser.id).maybeSingle(),
+      sb.from('health_index_history').select('*').eq('user_id', currentUser.id).order('computed_at', { ascending: false }).limit(1),
+    ]);
+    const thresholds = { red:85, orange:90, amber:95, ...((settingsRes.data && settingsRes.data.thresholds) || {}) };
+    const latest = historyRes.data && historyRes.data[0];
+
+    if (!latest) {
+      container.innerHTML = `
+        <div class="hero-score-card zone-none" onclick="openModule('health')">
+          <div class="hero-eyebrow">Composite Health Index</div>
+          <div class="hero-empty-icon">📊</div>
+          <div class="hero-empty-text">No score yet — log a few readings across your modules, then open Health Index to generate your first composite score.</div>
+        </div>`;
+      return;
+    }
+
+    const score = latest.score;
+    const zone = score >= thresholds.amber ? 'green' : score >= thresholds.orange ? 'amber' : score >= thresholds.red ? 'orange' : 'red';
+    const statusText = {
+      green:  '✓ All parameters near baseline',
+      amber:  '👀 Mild deviation — watch closely',
+      orange: '⚠️ Notable deviation — review parameters',
+      red:    '🚨 Significant deviation — contact your care team',
+    }[zone];
+
+    const computedDate = new Date(latest.computed_at);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cd = new Date(computedDate); cd.setHours(0,0,0,0);
+    const days = Math.floor((today - cd) / 86400000);
+    const updatedStr = days === 0 ? 'Updated today' : days === 1 ? 'Updated yesterday' : `Updated ${days} days ago`;
+
+    container.innerHTML = `
+      <div class="hero-score-card zone-${zone}" onclick="openModule('health')">
+        <div class="hero-top">
+          <div>
+            <div class="hero-eyebrow">Composite Health Index</div>
+            <div class="hero-score-row">
+              <span class="hero-score-num">${score}</span>
+              <span class="hero-score-max">/ 100</span>
+            </div>
+            <div class="hero-status">${statusText}</div>
+          </div>
+          <div class="hero-chevron">→</div>
+        </div>
+        <div class="hero-updated">${updatedStr} · Tap for full breakdown</div>
+      </div>`;
+  } catch (e) {
+    container.innerHTML = '';
+  }
 }
 
 function setGreeting() {
@@ -401,6 +477,7 @@ function goHome() {
   document.getElementById('view-module').classList.remove('active');
   document.getElementById('screen-dashboard').style.display = '';
   document.getElementById('module-iframe').src = 'about:blank';
+  renderHeroScore();
   renderTiles();
 }
 
@@ -430,7 +507,7 @@ function showToast(msg, type='') {
 //  INIT
 // ══════════════════════════════════════════════════
 initAuth();
-setInterval(() => { if (currentUser) renderTiles(); }, 60000);
+setInterval(() => { if (currentUser) { renderHeroScore(); renderTiles(); } }, 60000);
 </script>
 </body>
 </html>
