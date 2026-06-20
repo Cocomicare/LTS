@@ -168,8 +168,18 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
   <div class="checkin-card">
     <div class="card-date-row">
-      <div class="card-title">How are you feeling today?</div>
+      <div class="card-title" id="checkin-card-title">How are you feeling right now?</div>
       <div class="card-date" id="checkin-date-display"></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:18px">
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Date</label>
+        <input type="date" id="checkin-date" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%">
+      </div>
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Time</label>
+        <input type="time" id="checkin-time" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%">
+      </div>
     </div>
     <div id="symptom-groups-container"></div>
 
@@ -263,14 +273,18 @@ let records = [];           // array of rows from symptom_checkins, newest last
 let realtimeChannel = null;
 let trendChart = null;
 let trendRange = 14;
+let editingId = null;       // set when editing an existing check-in instead of creating new
 const recentLocalWriteIds = new Set(); // ids this tab just wrote, to suppress duplicate/"other device" handling
 
 // ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
 (async function init() {
+  const now = new Date();
   document.getElementById('checkin-date-display').textContent =
-    new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+    now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById('checkin-date').value = now.toISOString().slice(0,10);
+  document.getElementById('checkin-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
 
   renderSymptomGroups();
 
@@ -446,43 +460,63 @@ async function saveCheckin() {
   SYMPTOMS.forEach(s => { vals[s.key] = selections[s.key] || s.defaultVal; });
   const score = calcWellness(vals);
   const notes = document.getElementById('checkin-notes').value.trim();
+  const date = document.getElementById('checkin-date').value;
+  const time = document.getElementById('checkin-time').value || '00:00';
   const btn = document.getElementById('save-btn');
 
-  // If there's already a check-in for today, update it instead of duplicating
-  const today = new Date(); today.setHours(0,0,0,0);
-  const existing = records.find(r => {
-    const d = new Date(r.taken_at); d.setHours(0,0,0,0);
-    return d.getTime() === today.getTime();
-  });
+  if (!date) { showToast('Please select a date', 'error'); return; }
+  const taken_at = new Date(`${date}T${time}:00`).toISOString();
 
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
   try {
-    if (existing) {
-      const updated = await updateRow('symptom_checkins', existing.id, {
-        symptoms: vals, severity_score: score, notes,
+    if (editingId) {
+      const updated = await updateRow('symptom_checkins', editingId, {
+        symptoms: vals, severity_score: score, notes, taken_at,
       });
       markLocalWrite(updated.id);
-      const i = records.findIndex(r => r.id === existing.id);
+      const i = records.findIndex(r => r.id === editingId);
       if (i >= 0) records[i] = updated;
+      showToast('Check-in updated ✓', 'success');
     } else {
       const inserted = await insertRow('symptom_checkins', {
         user_id: currentUser.id,
         symptoms: vals,
         severity_score: score,
         notes,
-        taken_at: new Date().toISOString(),
+        taken_at,
       });
       markLocalWrite(inserted.id);
       records.push(inserted);
+      showToast('Check-in saved ✓', 'success');
     }
-    showToast('Check-in saved ✓', 'success');
+    records.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
     updateNudge(); updateBaselineNotice();
-    document.getElementById('checkin-notes').value = '';
+    resetCheckin();
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Save Check-in';
+    btn.disabled = false; btn.textContent = editingId ? 'Update Check-in' : 'Save Check-in';
   }
+}
+
+function editCheckin(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  editingId = id;
+  const d = new Date(r.taken_at);
+  document.getElementById('checkin-date').value = d.toISOString().slice(0,10);
+  document.getElementById('checkin-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('checkin-notes').value = r.notes || '';
+  SYMPTOMS.forEach(s => {
+    const val = r.symptoms ? r.symptoms[s.key] : s.defaultVal;
+    const idx = s.options.findIndex(o => o.score === val);
+    if (idx >= 0) selectEmoji(s.key, val, idx, true);
+  });
+  updateWellnessPreview();
+  document.getElementById('checkin-card-title').textContent = 'Editing check-in';
+  document.getElementById('save-btn').textContent = 'Update Check-in';
+  showTab('checkin');
+  window.scrollTo(0,0);
 }
 
 function resetCheckin() {
@@ -492,6 +526,12 @@ function resetCheckin() {
   });
   document.getElementById('checkin-notes').value = '';
   updateWellnessPreview();
+  editingId = null;
+  document.getElementById('checkin-card-title').textContent = 'How are you feeling right now?';
+  document.getElementById('save-btn').textContent = 'Save Check-in';
+  const now = new Date();
+  document.getElementById('checkin-date').value = now.toISOString().slice(0,10);
+  document.getElementById('checkin-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
 }
 
 // ══════════════════════════════════════════════════
@@ -532,6 +572,7 @@ function renderHistory() {
         <div class="hist-emojis" style="flex:1;padding:0 8px">${emojis}</div>
         <div class="hist-wellness">${score}</div>
         <div class="hist-actions">
+          <button class="btn-icon" onclick="editCheckin('${r.id}')" title="Edit">✏️</button>
           <button class="btn-icon" onclick="deleteRec('${r.id}')" title="Delete">🗑</button>
         </div>
       </div>
