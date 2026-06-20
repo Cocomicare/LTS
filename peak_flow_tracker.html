@@ -170,6 +170,7 @@ let currentUser = null;
 let sessions = [];          // rows from peak_flow_sessions, sorted by taken_at asc
 let realtimeChannel = null;
 let pefChart = null, fev1Chart = null;
+let editingId = null;       // set when editing an existing reading instead of creating new
 const recentLocalWriteIds = new Set();
 
 function markLocalWrite(id) {
@@ -264,6 +265,8 @@ function initForm() {
   document.getElementById('pefVal').value = '';
   document.getElementById('fev1Val').value = '';
   document.getElementById('saveBtn').disabled = true;
+  document.getElementById('saveBtn').textContent = 'Save Reading';
+  editingId = null;
 }
 
 function onValInput() {
@@ -288,26 +291,38 @@ async function saveSession() {
 
   const taken_at = new Date(`${date}T${time}:00`).toISOString();
   const btn = document.getElementById('saveBtn');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
 
   try {
-    const inserted = await insertRow('peak_flow_sessions', {
-      user_id: currentUser.id,
-      pef: isNaN(pef) ? null : pef,
-      fev1: isNaN(fev1) ? null : fev1,
-      taken_at,
-      // notes aren't a column on this table per schema; store in personal_best/zone? -> no, skip if not present
-    });
-    markLocalWrite(inserted.id);
-    sessions.push(inserted);
-    sessions.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
-    showToast('Reading saved ✓','success');
+    if (editingId) {
+      const updated = await updateRow('peak_flow_sessions', editingId, {
+        pef: isNaN(pef) ? null : pef,
+        fev1: isNaN(fev1) ? null : fev1,
+        taken_at,
+      });
+      markLocalWrite(updated.id);
+      const i = sessions.findIndex(s => s.id === updated.id);
+      if (i >= 0) sessions[i] = updated;
+      sessions.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+      showToast('Reading updated ✓','success');
+    } else {
+      const inserted = await insertRow('peak_flow_sessions', {
+        user_id: currentUser.id,
+        pef: isNaN(pef) ? null : pef,
+        fev1: isNaN(fev1) ? null : fev1,
+        taken_at,
+      });
+      markLocalWrite(inserted.id);
+      sessions.push(inserted);
+      sessions.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+      showToast('Reading saved ✓','success');
+    }
     clearForm();
     showTab('history');
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Save Reading';
+    btn.disabled = false; btn.textContent = editingId ? 'Update Reading' : 'Save Reading';
   }
 }
 
@@ -329,11 +344,27 @@ function renderHistory() {
     return `<div class="hist-row">
       <div class="hist-top">
         <div class="hist-date">${fmtDate(s.taken_at)}<br><span style="font-size:11px">${fmtTime(s.taken_at)||sinceStr}</span></div>
-        <button class="del-btn" onclick="deleteSession('${s.id}')">🗑</button>
+        <div class="hist-note" style="flex:1"></div>
+        <button class="del-btn" onclick="editSession('${s.id}')" title="Edit">✏️</button>
+        <button class="del-btn" onclick="deleteSession('${s.id}')" title="Delete">🗑</button>
       </div>
       <div class="hist-vals">${pefHtml}${fev1Html}</div>
     </div>`;
   }).join('');
+}
+
+function editSession(id) {
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  editingId = id;
+  const d = new Date(s.taken_at);
+  document.getElementById('sessionDate').value = d.toISOString().slice(0,10);
+  document.getElementById('sessionTime').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('pefVal').value = s.pef ?? '';
+  document.getElementById('fev1Val').value = s.fev1 ?? '';
+  document.getElementById('saveBtn').disabled = false;
+  document.getElementById('saveBtn').textContent = 'Update Reading';
+  showTab('log');
 }
 
 async function deleteSession(id) {
