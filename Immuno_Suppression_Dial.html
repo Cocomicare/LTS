@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transplant Medication Balance Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Code+Pro:wght@300;400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface2: #f0ede8;
+  --border: #ddd8d0;
+  --text: #1a1612;
+  --muted: #7a7570;
+  --green: #1a9e4f;
+  --yellow: #c47d00;
+  --orange: #c05c00;
+  --red: #c0392b;
+  --blue: #2471a3;
+  --teal: #148a74;
+  --gold: #9a6f00;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Libre Baskerville', Georgia, serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px 48px;
+}
+
+/* subtle grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+* { position: relative; z-index: 1; }
+
+header {
+  text-align: center;
+  margin-bottom: 32px;
+  animation: fadeDown 0.7s ease both;
+}
+
+header h1 {
+  font-size: clamp(1.3rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+header h1 em {
+  font-style: italic;
+  color: var(--gold);
+}
+
+header p {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── MASTER DIAL ── */
+.master-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 36px;
+  animation: fadeDown 0.8s 0.1s ease both;
+}
+
+.master-label {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.dial-container {
+  position: relative;
+  width: 220px;
+  height: 220px;
+}
+
+#masterCanvas {
+  width: 220px;
+  height: 220px;
+  display: block;
+}
+
+.dial-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -38%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.dial-value .num {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  transition: color 0.3s;
+}
+
+.dial-value .unit {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.dial-value .state-label {
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-top: 6px;
+  transition: color 0.3s;
+}
+
+/* drag hint */
+.drag-hint {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 10px;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+/* ── GAUGES GRID ── */
+.gauges {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: min(960px, 96vw);
+  animation: fadeUp 0.9s 0.2s ease both;
+}
+
+.gauge-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border-color 0.4s;
+  min-width: 0;
+}
+
+.gauge-card canvas {
+  width: 100% !important;
+  max-width: 140px;
+  height: auto !important;
+}
+
+.gauge-card .g-title {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.gauge-card canvas {
+  display: block;
+}
+
+.gauge-card .g-value {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 10px;
+  transition: color 0.3s;
+  letter-spacing: 0.04em;
+}
+
+.gauge-card .g-desc {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 6px;
+  min-height: 2.2em;
+  line-height: 1.4;
+  transition: color 0.3s;
+}
+
+/* ── CAUSE-EFFECT ARROWS ── */
+.arrows-row {
+  width: min(960px, 96vw);
+  margin: 20px auto 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  animation: fadeUp 0.9s 0.35s ease both;
+}
+
+.arrow-card {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: 3px solid transparent;
+  transition: border-color 0.3s;
+}
+
+.arrow-card .arrow-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  transition: transform 0.3s;
+}
+
+.arrow-card .arrow-text {
+  font-size: 0.84rem;
+  color: var(--text);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* ── SWEET SPOT BAR ── */
+.sweet-spot-wrap {
+  width: min(960px, 96vw);
+  margin: 24px auto 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  animation: fadeUp 1s 0.45s ease both;
+}
+
+.ss-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.ss-title {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ss-score {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.ss-track {
+  height: 12px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: visible;
+  position: relative;
+}
+
+.ss-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.35s cubic-bezier(.4,0,.2,1), background 0.35s;
+  position: relative;
+}
+
+/* sweet spot window overlay */
+.ss-window {
+  position: absolute;
+  top: -3px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid rgba(46,204,113,0.5);
+  background: rgba(46,204,113,0.08);
+  pointer-events: none;
+  /* 40-70% range */
+  left: 40%;
+  width: 30%;
+}
+
+.ss-message {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--muted);
+  margin-top: 10px;
+  min-height: 1.2em;
+  transition: color 0.3s;
+}
+
+.ss-zone-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.ss-zone-labels span {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.footnote {
+  width: min(960px, 96vw);
+  margin: 24px auto 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+  text-align: center;
+  line-height: 1.7;
+  animation: fadeUp 1s 0.55s ease both;
+}
+
+/* ── CLINICAL REFERENCE ── */
+.ref-wrap {
+  width: min(960px, 96vw);
+  margin: 32px auto 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  animation: fadeUp 1s 0.6s ease both;
+}
+
+.ref-header {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px 0;
+}
+
+.ref-title {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.ref-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.ref-tab {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.ref-tab:hover { background: var(--border); color: var(--text); }
+.ref-tab.active { background: var(--surface); color: var(--gold); border-top: 2px solid var(--gold); }
+
+.ref-panel {
+  display: none;
+  padding: 20px;
+}
+.ref-panel.active { display: block; }
+
+.ref-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.ref-card {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 16px;
+  border-left: 3px solid var(--border);
+}
+
+.ref-card.urgent { border-left-color: #e74c3c; }
+
+.ref-card-title {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.ref-card ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ref-card ul li {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.5;
+  padding-left: 14px;
+  position: relative;
+}
+
+.ref-card ul li::before {
+  content: '·';
+  position: absolute;
+  left: 2px;
+  color: var(--gold);
+  opacity: 0.8;
+}
+
+.ref-card ul li strong {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.ref-card ul li em {
+  color: var(--muted);
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .ref-grid { grid-template-columns: 1fr; }
+  .ref-tabs { gap: 2px; }
+  .ref-tab { font-size: 0.65rem; padding: 6px 10px; }
+}
+
+@keyframes fadeDown {
+  from { opacity:0; transform: translateY(-16px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(16px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+@media (max-width: 600px) {
+  .gauges { grid-template-columns: repeat(2, 1fr); }
+  .arrows-row { grid-template-columns: repeat(2, 1fr); }
+  .dial-container { width: 180px; height: 180px; }
+  #masterCanvas { width: 180px; height: 180px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lung Transplant <em>Medication Balance</em> Dashboard</h1>
+  <p>Drag the dial · one input · four consequences</p>
+</header>
+
+<!-- MASTER DIAL -->
+<div class="master-wrap">
+  <div class="master-label">Immunosuppression Dose Level</div>
+  <div class="dial-container" id="dialContainer">
+    <canvas id="masterCanvas" width="220" height="220"></canvas>
+    <div class="dial-value">
+      <div class="num" id="dialNum">50</div>
+      <div class="unit">dose level</div>
+      <div class="state-label" id="dialState">Moderate</div>
+    </div>
+  </div>
+  <div class="drag-hint">↺ drag to rotate · or click &amp; drag left/right</div>
+</div>
+
+<!-- FOUR GAUGES -->
+<div class="gauges">
+  <div class="gauge-card" id="gc-reject">
+    <div class="g-title">Rejection<br>Risk</div>
+    <canvas id="g-reject" width="140" height="80"></canvas>
+    <div class="g-value" id="gv-reject">—</div>
+    <div class="g-desc" id="gd-reject"></div>
+  </div>
+  <div class="gauge-card" id="gc-immtox">
+    <div class="g-title">Anti-Rejection Drug<br>Toxicity</div>
+    <canvas id="g-immtox" width="140" height="80"></canvas>
+    <div class="g-value" id="gv-immtox">—</div>
+    <div class="g-desc" id="gd-immtox"></div>
+  </div>
+  <div class="gauge-card" id="gc-antitox">
+    <div class="g-title">Antimicrobial Drug<br>Toxicity</div>
+    <canvas id="g-antitox" width="140" height="80"></canvas>
+    <div class="g-value" id="gv-antitox">—</div>
+    <div class="g-desc" id="gd-antitox"></div>
+  </div>
+  <div class="gauge-card" id="gc-infect">
+    <div class="g-title">Infection<br>Risk</div>
+    <canvas id="g-infect" width="140" height="80"></canvas>
+    <div class="g-value" id="gv-infect">—</div>
+    <div class="g-desc" id="gd-infect"></div>
+  </div>
+</div>
+
+<!-- ARROW EXPLANATIONS -->
+<div class="arrows-row">
+  <div class="arrow-card" id="ar-reject">
+    <div class="arrow-icon" id="ai-reject">↓</div>
+    <div class="arrow-text" id="at-reject">Tacrolimus · CellCept · Prednisone suppress the immune system → lower chance the body attacks the new lung</div>
+  </div>
+  <div class="arrow-card" id="ar-immtox">
+    <div class="arrow-icon" id="ai-immtox">↑</div>
+    <div class="arrow-text" id="at-immtox">Higher Tacrolimus → nephrotoxicity, Mg²⁺ loss. Higher Prednisone → glucose spikes, bone loss, skin fragility</div>
+  </div>
+  <div class="arrow-card" id="ar-antitox">
+    <div class="arrow-icon" id="ai-antitox">↑</div>
+    <div class="arrow-text" id="at-antitox">Higher infection risk → more agents deployed: Valganciclovir · Posaconazole · Atovaquone · Amikacin · Rifabutin · Clofazimine · Amphotericin B</div>
+  </div>
+  <div class="arrow-card" id="ar-infect">
+    <div class="arrow-icon" id="ai-infect">↑</div>
+    <div class="arrow-text" id="at-infect">As rejection risk falls, infection risk rises — suppressed immunity opens the door to CMV, Aspergillus, PCP, NTM</div>
+  </div>
+</div>
+
+<!-- SWEET SPOT BAR -->
+<div class="sweet-spot-wrap">
+  <div class="ss-header">
+    <div class="ss-title">Overall Balance Score</div>
+    <div class="ss-score" id="ss-score">—</div>
+  </div>
+  <div class="ss-track">
+    <div class="ss-fill" id="ss-fill" style="width:50%"></div>
+    <div class="ss-window" title="Target therapeutic window (40–70)"></div>
+  </div>
+  <div class="ss-zone-labels">
+    <span>← Rejection danger</span>
+    <span>Target window</span>
+    <span>Toxicity danger →</span>
+  </div>
+  <div class="ss-message" id="ss-msg"></div>
+</div>
+
+<!-- CLINICAL REFERENCE TABS -->
+<div class="ref-wrap">
+  <div class="ref-header">
+    <div class="ref-title">Clinical Reference · From Cocomi's Care Team</div>
+    <div class="ref-tabs">
+      <button class="ref-tab active" data-tab="watchfor">⚠ Watch For</button>
+      <button class="ref-tab" data-tab="drugs">💊 The Drugs</button>
+      <button class="ref-tab" data-tab="toxicity">⚗ Drug Side Effects</button>
+      <button class="ref-tab" data-tab="lung">🫁 The New Lung</button>
+      <button class="ref-tab" data-tab="home">🏠 Home Care</button>
+    </div>
+  </div>
+
+  <!-- WATCH FOR -->
+  <div class="ref-panel active" id="tab-watchfor">
+    <div class="ref-grid">
+      <div class="ref-card urgent">
+        <div class="ref-card-title">🌡 Call the Team Immediately If</div>
+        <ul>
+          <li>Fever over <strong>100°F</strong> — always the first sign of either rejection or infection</li>
+          <li>Cough that is new, worsening, or producing <strong>thick, dark, or foul-smelling sputum</strong></li>
+          <li>Shortness of breath or falling <strong>O₂ saturation</strong></li>
+          <li>Spirometry reading <strong>drops 10% or more</strong> from personal baseline</li>
+          <li>Chest pain, swelling in legs, or sudden weight gain</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🔬 Signs of Rejection</div>
+        <ul>
+          <li>Shortness of breath, decreased spirometry readings</li>
+          <li>Fever — may be absent with heavy immunosuppression</li>
+          <li>"Flu-like" symptoms or minor changes in how breathing feels</li>
+          <li>Pain over the incision site</li>
+          <li>Note: <em>rejection signs can be very subtle — spirometry catches it early</em></li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🦠 Signs of Infection</div>
+        <ul>
+          <li>Fever, chills, fatigue, malaise</li>
+          <li>Change in sputum color or smell</li>
+          <li>Increased cough frequency or effort</li>
+          <li>Key pathogens to know: <strong>CMV</strong> (cytomegalovirus), <strong>PCP</strong> pneumonia, <strong>Aspergillus</strong> (fungal)</li>
+          <li>Immunosuppressed patients are highly vulnerable — act fast, don't wait</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">📉 Watch: Magnesium Levels</div>
+        <ul>
+          <li>Anti-rejection drugs (tacrolimus) cause <strong>dangerous magnesium loss</strong></li>
+          <li>Low mag symptoms: irregular heartbeat, muscle weakness, irritability, seizures</li>
+          <li>Low mag raises infection risk AND cardiovascular risk</li>
+          <li>Ask the team about Cocomi's magnesium at <strong>every check-in</strong></li>
+          <li>Dietary sources: green leafy vegetables, nuts, beans, seeds</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE DRUGS -->
+  <div class="ref-panel" id="tab-drugs">
+    <div class="ref-grid">
+      <div class="ref-card">
+        <div class="ref-card-title">💊 Anti-Rejection Drugs (Immunosuppressants)</div>
+        <ul>
+          <li><strong>Tacrolimus (FK506)</strong> — calcineurin inhibitor, the gold standard. Blood levels checked every 12 hours initially, then after labs. <em>Never miss a dose.</em></li>
+          <li><strong>Mycophenolate mofetil (CellCept)</strong> — taken precisely 12 hours apart, often after lab tests</li>
+          <li><strong>Prednisone/Steroids</strong> — take with food at the same time daily. Stress taking them with food (check specific drug)</li>
+          <li>Extended-release tacrolimus (Astagraf XL, Envarsus XR) — once-daily; do not crush or chew</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🛡 Antimicrobial Prophylaxis Drugs</div>
+        <ul>
+          <li><strong>Valganciclovir</strong> — prevents CMV (cytomegalovirus), a major post-transplant threat</li>
+          <li><strong>TMP-SMX (Bactrim)</strong> — prevents PCP pneumonia</li>
+          <li><strong>Fluconazole / Voriconazole</strong> — antifungal coverage; voriconazole for higher-risk periods</li>
+          <li>As immunosuppression dose rises, more of these drugs are added — this is the <em>antimicrobial drug toxicity</em> the gauges show</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">⏰ Medication Timing Rules</div>
+        <ul>
+          <li>Tacrolimus and mycophenolate: <strong>exactly 12 hours apart</strong></li>
+          <li>Steroids: <strong>same time daily, always with food</strong></li>
+          <li>Non-adherence is a <strong>major cause of late rejection</strong></li>
+          <li>Blood trough levels are checked regularly — these tell the team if the dose is right</li>
+          <li>Never adjust doses on your own — always contact the team first</li>
+        </ul>
+      </div>
+      <div class="ref-card urgent">
+        <div class="ref-card-title">🚫 Critical Avoids</div>
+        <ul>
+          <li><strong>Grapefruit & grapefruit juice</strong> — dangerously increases tacrolimus levels in the blood</li>
+          <li><strong>Pomegranate, starfruit, Seville oranges</strong> — same effect</li>
+          <li><strong>Herbal supplements</strong> — many interact with immunosuppressants (St. John's Wort especially)</li>
+          <li><strong>Live vaccines</strong> — contraindicated; consult the transplant team before any vaccine</li>
+          <li><strong>NSAIDs (ibuprofen, naproxen)</strong> — can worsen kidney toxicity from calcineurin inhibitors</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOXICITY -->
+  <div class="ref-panel" id="tab-toxicity">
+    <div class="ref-grid">
+      <div class="ref-card">
+        <div class="ref-card-title">🦴 Bone & Metabolic Effects (Anti-Rejection Drugs)</div>
+        <ul>
+          <li><strong>Osteoporosis</strong> — 5× increased fracture risk in transplant recipients. DXA scan and spine x-rays at 3 and 6 months post-transplant</li>
+          <li><strong>Bone loss</strong> occurs most rapidly in the first 3–6 months</li>
+          <li><strong>Diabetes</strong> — hyperglycemia very common post-transplant; monitor glucose. Screen at 45 days post-transplant</li>
+          <li><strong>Skin thinning & fragility</strong> — use high-SPF sunscreen daily; increased skin cancer risk</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🫘 Kidney & Blood Pressure Effects</div>
+        <ul>
+          <li><strong>Nephrotoxicity</strong> — tacrolimus (calcineurin inhibitors) can damage kidneys over time; creatinine monitored closely</li>
+          <li><strong>Hypertension</strong> — reported in 50–80% of solid organ transplant patients post-transplant</li>
+          <li>Target blood pressure: <strong>130/80 mmHg</strong></li>
+          <li>Hypertension + tacrolimus together accelerate kidney decline — both must be managed</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">⚗ Antimicrobial Drug Burden</div>
+        <ul>
+          <li>Voriconazole and valganciclovir add significant <strong>liver and kidney load</strong></li>
+          <li>EBV-positive PTLD (lymphoma) is a known complication of intensive immunosuppression</li>
+          <li>CMV infection itself damages the transplanted lung and increases rejection risk</li>
+          <li>The team weighs: <em>how much infection prophylaxis is needed vs how much toxicity can be tolerated</em> — this is the antimicrobial gauge</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🧠 Neurological & Other Effects</div>
+        <ul>
+          <li>Tacrolimus can cause <strong>tremors, headaches, and nerve sensitivity</strong></li>
+          <li>Low magnesium (from tacrolimus) worsens neurological symptoms</li>
+          <li>Steroids can cause <strong>mood changes, insomnia, and weight gain</strong></li>
+          <li>Low magnesium impairs insulin secretion → raises diabetes risk further</li>
+          <li>NK cell proliferation suppressed by low magnesium → 15% higher severe infection risk</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE NEW LUNG -->
+  <div class="ref-panel" id="tab-lung">
+    <div class="ref-grid">
+      <div class="ref-card urgent">
+        <div class="ref-card-title">🫁 The Denervated Lung — Critical Concept</div>
+        <ul>
+          <li>The new lung has <strong>no nerve connection to the brain</strong></li>
+          <li>Cocomi will <strong>not feel the urge to cough</strong> the way a normal lung signals it</li>
+          <li>She will <strong>not feel the urge to breathe deeply</strong> as a reflex</li>
+          <li>Deep breathing and coughing must be <strong>deliberate, conscious habits</strong> — not reflexes</li>
+          <li>She must be instructed to cough voluntarily every 1–2 hours to clear secretions</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">📊 Spirometry — The Early Warning System</div>
+        <ul>
+          <li>Daily or twice-daily home spirometry is required to monitor for chronic rejection (BOS/CLAD)</li>
+          <li>Spirometry catches early signs of rejection <strong>before symptoms appear</strong></li>
+          <li>A drop of 10% or more from personal baseline = call the team</li>
+          <li>Consistent daily readings build a personal baseline — consistency matters more than any single number</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">😮‍💨 Secretion Management</div>
+        <ul>
+          <li>Watch for thick, dark, or foul-smelling sputum — this indicates infection</li>
+          <li>Forced Expiratory Volume (FEV) spirometry helps monitor for clearance</li>
+          <li>Airway complications (primary graft dysfunction) can present as severe hypoxemia in first 72 hours</li>
+          <li>Daily mobilization and early ambulation help prevent secretion buildup</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🩸 Clot Risk (VTE)</div>
+        <ul>
+          <li>Post-transplant patients are at <strong>high risk for blood clots</strong> (venous thromboembolism)</li>
+          <li>Ensure early ambulation — movement is protective</li>
+          <li>Anticoagulants like Enoxaparin may be used; monitor blood counts</li>
+          <li>Report leg swelling, chest pain, or sudden shortness of breath immediately</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME CARE -->
+  <div class="ref-panel" id="tab-home">
+    <div class="ref-grid">
+      <div class="ref-card urgent">
+        <div class="ref-card-title">🏠 Daily Home Priorities</div>
+        <ul>
+          <li><strong>Spirometry</strong> twice daily — log every reading, watch for downward trends</li>
+          <li><strong>Temperature check</strong> daily — fever over 100°F means call immediately</li>
+          <li><strong>Weight</strong> daily — sudden gain can signal fluid retention or organ stress</li>
+          <li><strong>Medications exactly on schedule</strong> — tacrolimus and mycophenolate 12 hours apart, steroids with food</li>
+          <li><strong>Blood pressure</strong> — target below 130/80; track and report changes</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🧼 Infection Prevention at Home</div>
+        <ul>
+          <li><strong>Strict hand hygiene</strong> — the single most effective protection</li>
+          <li>Mask in public — no exceptions during high-risk period</li>
+          <li>No fresh flowers or plants in the room — soil and pollen carry fungal spores</li>
+          <li>Avoid sick visitors — even a cold is dangerous with suppressed immunity</li>
+          <li>CHG bathing, peri-care routines as directed by the care team</li>
+          <li>No raw or unwashed foods — high-SPF foods diet strictly followed</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">☀️ Skin & Cancer Vigilance</div>
+        <ul>
+          <li>Immunosuppression increases skin cancer risk significantly</li>
+          <li>Apply <strong>high-SPF sunscreen daily</strong>, even on cloudy days</li>
+          <li>Avoid prolonged sun exposure</li>
+          <li>Report any new or changing skin lesions to the team</li>
+          <li>Annual dermatology screening recommended long-term</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title">🥗 Diet & Lifestyle</div>
+        <ul>
+          <li><strong>No grapefruit, pomegranate, or starfruit</strong> — ever</li>
+          <li>Magnesium-rich foods: green leafy vegetables, nuts, beans, seeds</li>
+          <li>No raw or undercooked meats, unpasteurized dairy, or unwashed produce</li>
+          <li>Glucose monitoring if hyperglycemia develops — diet matters for steroid-induced diabetes</li>
+          <li>Adequate hydration supports kidney function under tacrolimus load</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="footnote">
+  Conceptual learning tool for Cocomi's care journey — not a clinical protocol.<br>
+  The UF Health Shands team continuously fine-tunes these variables using tacrolimus levels, biopsies, cultures, and organ function labs.
+</p>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+const SWEET_LO = 38, SWEET_HI = 65;
+
+// Each gauge: label, color at max, value function of dose (0-100), description fn
+const GAUGES = [
+  {
+    id: 'reject',
+    color: (v) => interpColor(v, [[0,'#1a9e4f'],[35,'#1a9e4f'],[60,'#e67e22'],[100,'#c0392b']]),
+    valueFn: d => Math.round(100 - d),
+    labelFn: v => v < 25 ? 'Very Low' : v < 45 ? 'Low' : v < 65 ? 'Moderate' : v < 80 ? 'High' : 'Critical',
+    descFn: (d,v) => d < 30 ? 'Under-suppressed — new lung vulnerable to immune attack. Tacrolimus trough levels likely too low.'
+                   : d < 45 ? 'Borderline — team watching spirometry closely for early rejection. Tacrolimus (1.5mg AM+PM) + CellCept (1,000mg BID) + Prednisone (20mg) active.'
+                   : d < 70 ? 'Well-controlled — Tacrolimus, CellCept & Prednisone holding rejection at bay. Spirometry baseline stable.'
+                   : 'Deeply suppressed — rejection very unlikely. Full triple therapy: Tacrolimus · CellCept · Prednisone at high exposure.',
+    cardColor: (v) => v < 35 ? '#1a9e4f' : v < 60 ? '#e67e22' : '#c0392b',
+  },
+  {
+    id: 'immtox',
+    color: (v) => interpColor(v, [[0,'#1a9e4f'],[35,'#1a9e4f'],[60,'#e67e22'],[100,'#c0392b']]),
+    valueFn: d => Math.round(d * 0.85),
+    labelFn: v => v < 25 ? 'Minimal' : v < 45 ? 'Low–Mod' : v < 65 ? 'Moderate' : v < 80 ? 'High' : 'Severe',
+    descFn: (d,v) => d < 30 ? 'Low drug burden. Minimal side-effect pressure from Tacrolimus & Prednisone at this level.'
+                   : d < 50 ? 'Mild burden. Monitor: blood glucose (Prednisone), creatinine (Tacrolimus), bone density. Vitamin D-3 & ferrous sulfate helping offset.'
+                   : d < 70 ? 'Moderate. Active concerns: nephrotoxicity from Tacrolimus, steroid-induced glucose spikes, bone loss. Mg²⁺ replacement (MgSO₄ IV PRN) ongoing. Ca²⁺ & K⁺ PRN replacement active.'
+                   : 'High burden. Significant tacrolimus nephrotoxicity risk, osteoporosis acceleration, hyperglycemia. Propranolol managing BP. Pregabalin (Lyrica) added for nerve pain. Ursodiol protecting liver.',
+    cardColor: (v) => v < 35 ? '#1a9e4f' : v < 60 ? '#e67e22' : '#c0392b',
+  },
+  {
+    id: 'antitox',
+    color: (v) => interpColor(v, [[0,'#1a9e4f'],[35,'#1a9e4f'],[60,'#e67e22'],[100,'#c0392b']]),
+    valueFn: d => Math.round(Math.pow(d/100, 0.65) * 95 * 0.9),
+    labelFn: v => v < 25 ? 'Minimal' : v < 45 ? 'Low–Mod' : v < 65 ? 'Moderate' : v < 80 ? 'High' : 'Severe',
+    descFn: (d,v) => d < 30 ? 'Low antimicrobial burden at this suppression level. Fewer prophylactic agents needed.'
+                   : d < 50 ? 'Standard coverage active: Valganciclovir (CMV) · Atovaquone (PCP) · Posaconazole (fungal) · Azithromycin.'
+                   : d < 70 ? 'Expanded coverage: Valganciclovir · Posaconazole · Atovaquone · Azithromycin · Amikacin nebulization · Rifabutin · Clofazimine. Kidney & liver load significant.'
+                   : 'Maximum coverage: full regimen active including Amphotericin B nebulization (weekly). Liver enzymes, creatinine & CBC monitored closely. Phosphorus & potassium replacement PRN.',
+    cardColor: (v) => v < 35 ? '#1a9e4f' : v < 60 ? '#e67e22' : '#c0392b',
+  },
+  {
+    id: 'infect',
+    color: (v) => interpColor(v, [[0,'#1a9e4f'],[35,'#1a9e4f'],[60,'#e67e22'],[100,'#c0392b']]),
+    valueFn: d => Math.round(d * 0.95),
+    labelFn: v => v < 25 ? 'Very Low' : v < 45 ? 'Low–Mod' : v < 65 ? 'Moderate' : v < 80 ? 'High' : 'Critical',
+    descFn: (d,v) => d < 30 ? 'Low infection risk. Immune system still partially active. Fewer prophylactic drugs required.'
+                   : d < 50 ? 'Moderate risk. CHG bathing, strict hand hygiene, mask in public active. Watch for fever >100°F, sputum changes.'
+                   : d < 70 ? 'Elevated risk. Key threats: CMV (→Valganciclovir), Aspergillus (→Posaconazole/Amphotericin B), PCP (→Atovaquone), NTM (→Rifabutin+Clofazimine+Amikacin). Spirometry twice daily.'
+                   : 'High vulnerability. All prophylactic agents at full deployment. Isolate from sick contacts. Report ANY fever, cough change, or sputum color change to Shands immediately.',
+    cardColor: (v) => v < 35 ? '#1a9e4f' : v < 60 ? '#e67e22' : '#c0392b',
+  }
+];
+
+// ── COLOR INTERPOLATION ──────────────────────────────────────
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+function rgbToHex(r,g,b) {
+  return '#'+[r,g,b].map(x=>Math.round(x).toString(16).padStart(2,'0')).join('');
+}
+function interpColor(val, stops) {
+  // stops: [[value, hex], ...]
+  for(let i=0;i<stops.length-1;i++){
+    const [v0,c0] = stops[i], [v1,c1] = stops[i+1];
+    if(val <= v1) {
+      const t = (val-v0)/(v1-v0);
+      const [r0,g0,b0] = hexToRgb(c0);
+      const [r1,g1,b1] = hexToRgb(c1);
+      return rgbToHex(r0+(r1-r0)*t, g0+(g1-g0)*t, b0+(b1-b0)*t);
+    }
+  }
+  return stops[stops.length-1][1];
+}
+
+// ── DRAW MASTER DIAL ────────────────────────────────────────
+function drawMasterDial(dose) {
+  const canvas = document.getElementById('masterCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2 + 10;
+  const R = 85;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Background arc track
+  const startA = Math.PI * 0.75;
+  const endA   = Math.PI * 2.25;
+
+  // Track shadow/glow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, startA, endA);
+  ctx.strokeStyle = '#e8e3da';
+  ctx.lineWidth = 18;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  // Sweet spot highlight on track
+  const ssLo = startA + (SWEET_LO/100)*(endA-startA);
+  const ssHi = startA + (SWEET_HI/100)*(endA-startA);
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, ssLo, ssHi);
+  ctx.strokeStyle = 'rgba(26,158,79,0.2)';
+  ctx.lineWidth = 18;
+  ctx.lineCap = 'butt';
+  ctx.stroke();
+
+  // Tick marks
+  for(let i=0;i<=10;i++){
+    const a = startA + (i/10)*(endA-startA);
+    const inner = i%5===0 ? R-14 : R-9;
+    const outer = R+3;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*inner, cy+Math.sin(a)*inner);
+    ctx.lineTo(cx+Math.cos(a)*outer, cy+Math.sin(a)*outer);
+    ctx.strokeStyle = i%5===0 ? '#bbb5aa' : '#d8d3cc';
+    ctx.lineWidth = i%5===0 ? 2 : 1;
+    ctx.stroke();
+  }
+
+  // Filled arc up to dose
+  const fillEnd = startA + (dose/100)*(endA-startA);
+  const dialColor = interpColor(dose, [
+    [0,'#c0392b'],[25,'#e67e22'],[38,'#1a9e4f'],[55,'#1a9e4f'],[68,'#e67e22'],[100,'#c0392b']
+  ]);
+
+  // Glow effect
+  ctx.save();
+  ctx.shadowColor = dialColor;
+  ctx.shadowBlur = 16;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, startA, fillEnd);
+  ctx.strokeStyle = dialColor;
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  // Needle
+  const needleA = startA + (dose/100)*(endA-startA);
+  const needleLen = R - 6;
+  ctx.save();
+  ctx.shadowColor = dialColor;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(needleA)*needleLen, cy + Math.sin(needleA)*needleLen);
+  ctx.strokeStyle = '#2a2520';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 7, 0, Math.PI*2);
+  ctx.fillStyle = '#2a2520';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI*2);
+  ctx.fillStyle = dialColor;
+  ctx.fill();
+
+  // Sweet spot label
+  const midSS = (ssLo+ssHi)/2;
+  ctx.font = '500 9px Source Code Pro, monospace';
+  ctx.fillStyle = 'rgba(26,158,79,0.7)';
+  ctx.textAlign = 'center';
+  ctx.fillText('TARGET', cx+Math.cos(midSS)*(R+22), cy+Math.sin(midSS)*(R+22));
+
+  // Dial number color
+  document.getElementById('dialNum').style.color = dialColor;
+  document.getElementById('dialState').style.color = dialColor;
+}
+
+// ── DRAW GAUGE (half-arc) ────────────────────────────────────
+function drawGauge(canvasId, value, color) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H - 8;
+  const R = 54;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Track
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, Math.PI, 0);
+  ctx.strokeStyle = '#e8e3da';
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Fill
+  const fillEnd = Math.PI + (value/100)*Math.PI;
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, Math.PI, fillEnd);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 10;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  // Needle
+  const needleA = Math.PI + (value/100)*Math.PI;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(needleA)*(R-4), cy + Math.sin(needleA)*(R-4));
+  ctx.strokeStyle = '#2a2520';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI*2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// ── MASTER UPDATE ────────────────────────────────────────────
+let dose = 50;
+
+function update() {
+  drawMasterDial(dose);
+
+  const stateLabel = dose < 25 ? 'Very Low' : dose < 40 ? 'Low' : dose < 60 ? 'Moderate' : dose < 78 ? 'High' : 'Very High';
+  document.getElementById('dialNum').textContent = dose;
+  document.getElementById('dialState').textContent = stateLabel;
+
+  GAUGES.forEach(g => {
+    const val = g.valueFn(dose);
+    const color = g.color(val);
+    drawGauge('g-'+g.id, val, color);
+    document.getElementById('gv-'+g.id).textContent = g.labelFn(val);
+    document.getElementById('gv-'+g.id).style.color = color;
+    document.getElementById('gd-'+g.id).textContent = g.descFn(dose, val);
+    document.getElementById('gc-'+g.id).style.borderColor = color+'44';
+
+    // Arrow cards
+    document.getElementById('ar-'+g.id).style.borderColor = color;
+  });
+
+  // Sweet spot score — peaks at dose 52
+  const dist = Math.abs(dose - 52);
+  const score = Math.max(0, Math.round(100 - dist * 2.2));
+  const scoreColor = score >= 70 ? '#2ecc71' : score >= 45 ? '#f39c12' : '#e74c3c';
+  const fillPct = dose; // bar follows the dial directly
+  document.getElementById('ss-fill').style.width = fillPct + '%';
+  document.getElementById('ss-fill').style.background =
+    dose < SWEET_LO ? '#e74c3c' :
+    dose <= SWEET_HI ? '#2ecc71' : '#e74c3c';
+  document.getElementById('ss-score').textContent = score + ' / 100';
+  document.getElementById('ss-score').style.color = scoreColor;
+  document.getElementById('ss-msg').textContent =
+    dose < SWEET_LO
+      ? 'Below target window — rejection risk is the primary concern at this dose level.'
+      : dose <= SWEET_HI
+      ? 'Within target window — the team is balancing protection against toxicity effectively.'
+      : 'Above target window — drug toxicity burden is the primary concern at this dose level.';
+  document.getElementById('ss-msg').style.color = scoreColor;
+}
+
+// ── DIAL INTERACTION ─────────────────────────────────────────
+const dialContainer = document.getElementById('dialContainer');
+let dragging = false, lastX = 0, lastAngle = 0;
+
+function getAngle(e, el) {
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  const px = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
+  const py = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
+  return Math.atan2(py, px) * 180 / Math.PI;
+}
+
+dialContainer.addEventListener('mousedown', e => {
+  dragging = true;
+  lastX = e.clientX;
+  lastAngle = getAngle(e, dialContainer);
+  e.preventDefault();
+});
+dialContainer.addEventListener('touchstart', e => {
+  dragging = true;
+  lastX = e.touches[0].clientX;
+  lastAngle = getAngle(e, dialContainer);
+}, {passive:true});
+
+window.addEventListener('mousemove', e => {
+  if(!dragging) return;
+  const dx = e.clientX - lastX;
+  lastX = e.clientX;
+  dose = Math.max(0, Math.min(100, dose + dx * 0.6));
+  dose = Math.round(dose);
+  update();
+});
+window.addEventListener('touchmove', e => {
+  if(!dragging) return;
+  const dx = e.touches[0].clientX - lastX;
+  lastX = e.touches[0].clientX;
+  dose = Math.max(0, Math.min(100, dose + dx * 0.6));
+  dose = Math.round(dose);
+  update();
+}, {passive:true});
+
+window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('touchend', () => dragging = false);
+
+// Also allow clicking on the track arc area
+dialContainer.addEventListener('click', e => {
+  const rect = dialContainer.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2 + 10;
+  const px = e.clientX - cx, py = e.clientY - cy;
+  const angle = Math.atan2(py, px); // -π to π
+  // map from dial start (0.75π) to end (2.25π)
+  const startA = Math.PI * 0.75;
+  const endA   = Math.PI * 2.25;
+  const range  = endA - startA;
+  let a = angle < 0 ? angle + 2*Math.PI : angle;
+  // normalize to 0..1 within arc
+  let t = (a - startA) / range;
+  if(t >= 0 && t <= 1) {
+    dose = Math.round(t * 100);
+    update();
+  }
+});
+
+// ── AUTH GATE ──────────────────────────────────────────────
+// This module is purely educational/illustrative — it does not
+// read or write any data — but we still confirm the person is
+// logged in before showing it, consistent with the other modules.
+(async function gate() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted);font-family:\'Libre Baskerville\',serif;"><div style="font-size:32px;margin-bottom:12px;">🔒</div><div style="font-size:18px;color:var(--text);margin-bottom:6px;">Please log in</div><div>Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+  update();
+})();
+
+// ── TAB SWITCHING ────────────────────────────────────────────
+document.querySelectorAll('.ref-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ref-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ref-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
