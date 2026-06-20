@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post-Transplant Reference Guide</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --teal:#0D5C6B; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.intro { font-size:13px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
+.ref-tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:12px; margin-bottom:8px; -webkit-tap-highlight-color:transparent; }
+.ref-tile:hover { border-color:var(--teal); box-shadow:0 4px 16px rgba(13,92,107,.08); }
+.ref-tile-icon { font-size:22px; flex-shrink:0; }
+.ref-tile-name { font-size:14px; font-weight:600; color:var(--ink); }
+.ref-tile-desc { font-size:12px; color:var(--ink3); margin-top:2px; }
+.ref-tile-chevron { color:var(--ink3); font-size:16px; margin-left:auto; flex-shrink:0; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-title">Post-Transplant Reference Guide</div>
+  <div class="logo-sub">Education & Reference</div>
+</header>
+<div class="page">
+  <div class="intro">Information from your UF Health Shands transplant team. Tap a topic to read.</div>
+  <div id="content"></div>
+</div>
+
+<script>
+const ITEMS = [
+  { name:'Immunosuppression Balance', icon:'💊', desc:'Interactive dial: infection risk vs. rejection risk', file:'Immuno_Suppression_Dial.html' },
+  { name:'General Discharge Instructions', icon:'📓', desc:'Daily monitoring, precautions, when to call', file:'reference_discharge_instructions.html' },
+  { name:'Medications Guide', icon:'💉', desc:'Full drug list, purpose & side effects', file:'reference_medications.html' },
+  { name:'Safe Over-the-Counter Medications', icon:'🧴', desc:'Searchable: safe vs. avoid by symptom', file:'reference_otc_medications.html' },
+  { name:'Nutrition & Healthy Eating', icon:'🥗', desc:'Guidelines, easy health tips, cholesterol', file:'reference_nutrition.html' },
+  { name:'Diabetes Management', icon:'🩸', desc:'Risk factors, hypo/hyperglycemia, injections', file:'reference_diabetes.html' },
+  { name:'Exercise Guidelines', icon:'🏋️', desc:'Lifting limits, rehab, walking expectations', file:'reference_exercise.html' },
+  { name:'Returning to Normal Life', icon:'🏡', desc:"Do's and Don'ts after transplant", file:'reference_normal_life.html' },
+  { name:'Bronchoscopy & Clinic Visits', icon:'🔬', desc:'What to expect, prep instructions', file:'reference_bronchoscopy.html' },
+  { name:'Bone, Dental & Skin Health', icon:'☀️', desc:'Screening schedules, sun protection', file:'reference_bone_skin_health.html' },
+  { name:'Immunizations', icon:'💉', desc:'Live vaccine restrictions & guidance', file:'reference_immunizations.html' },
+  { name:'Writing to Your Donor Family', icon:'💌', desc:'Guidance, sample content, contact info', file:'reference_donor_family.html' },
+];
+
+(async function init() {
+  const user = await getCurrentUser();
+  const content = document.getElementById('content');
+  if (!user) {
+    content.innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  content.innerHTML = ITEMS.map(item => `
+    <div class="ref-tile" onclick="window.location.href='${item.file}'">
+      <span class="ref-tile-icon">${item.icon}</span>
+      <div>
+        <div class="ref-tile-name">${item.name}</div>
+        <div class="ref-tile-desc">${item.desc}</div>
+      </div>
+      <span class="ref-tile-chevron">→</span>
+    </div>`).join('');
+})();
+</script>
+</body>
+</html>

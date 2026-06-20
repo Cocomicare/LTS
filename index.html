@@ -226,8 +226,15 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
     <div class="section-label">Modules</div>
     <div class="tiles" id="tiles"></div>
 
-    <div class="section-label">Post-Transplant Reference Guide</div>
-    <div id="reference-tiles"></div>
+    <div class="section-label">Reference</div>
+    <div class="ref-tile" onclick="openModule('refhub')">
+      <span class="ref-tile-icon">📖</span>
+      <div>
+        <div class="ref-tile-name">Post-Transplant Reference Guide</div>
+        <div class="ref-tile-desc">Medications, nutrition, exercise, immunizations & more</div>
+      </div>
+      <span class="ref-tile-chevron">→</span>
+    </div>
   </div>
 </div>
 
@@ -263,36 +270,9 @@ const MODULES = [
 // 'immuno' is excluded — it lives in the Reference Guide section instead.
 const TRACKING_TILE_IDS = ['vitals','spiro','peakflow','checkin'];
 
-// Educational / reference content — no data logging, just informational tools.
-// Add more entries here as additional guide content is uploaded.
-const REFERENCE_ITEMS = [
-  { id:'immuno',     name:'Immunosuppression Balance', icon:'💊', desc:'Interactive dial: infection risk vs. rejection risk' },
-  { id:'discharge',  name:'General Discharge Instructions', icon:'📓', desc:'Daily monitoring, precautions, when to call' },
-  { id:'meds-guide', name:'Medications Guide', icon:'💉', desc:'Full drug list, purpose & side effects' },
-  { id:'otc',        name:'Safe Over-the-Counter Medications', icon:'🧴', desc:'Searchable: safe vs. avoid by symptom' },
-  { id:'nutrition',  name:'Nutrition & Healthy Eating', icon:'🥗', desc:'Guidelines, easy health tips, cholesterol' },
-  { id:'diabetes',   name:'Diabetes Management', icon:'🩸', desc:'Risk factors, hypo/hyperglycemia, injections' },
-  { id:'exercise',   name:'Exercise Guidelines', icon:'🏋️', desc:'Lifting limits, rehab, walking expectations' },
-  { id:'normal-life',name:'Returning to Normal Life', icon:'🏡', desc:"Do's and Don'ts after transplant" },
-  { id:'bronch',     name:'Bronchoscopy & Clinic Visits', icon:'🔬', desc:'What to expect, prep instructions' },
-  { id:'bone-skin',  name:'Bone, Dental & Skin Health', icon:'☀️', desc:'Screening schedules, sun protection' },
-  { id:'vaccines',   name:'Immunizations', icon:'💉', desc:'Live vaccine restrictions & guidance' },
-  { id:'donor',      name:'Writing to Your Donor Family', icon:'💌', desc:'Guidance, sample content, contact info' },
-];
-
+// Educational / reference content now lives behind a single hub page.
 const REFERENCE_FILES = {
-  immuno: 'Immuno_Suppression_Dial.html',
-  discharge: 'reference_discharge_instructions.html',
-  'meds-guide': 'reference_medications.html',
-  otc: 'reference_otc_medications.html',
-  nutrition: 'reference_nutrition.html',
-  diabetes: 'reference_diabetes.html',
-  exercise: 'reference_exercise.html',
-  'normal-life': 'reference_normal_life.html',
-  bronch: 'reference_bronchoscopy.html',
-  'bone-skin': 'reference_bone_skin_health.html',
-  vaccines: 'reference_immunizations.html',
-  donor: 'reference_donor_family.html',
+  refhub: 'reference_hub.html',
 };
 
 let currentUser = null;
@@ -398,7 +378,6 @@ async function showDashboard() {
   setGreeting();
   await renderHeroScore();
   await renderTiles();
-  renderReferenceTiles();
 }
 
 async function renderHeroScore() {
@@ -510,24 +489,10 @@ async function renderTiles() {
   document.getElementById('sync-text').textContent = 'Live synced · ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 }
 
-function renderReferenceTiles() {
-  const container = document.getElementById('reference-tiles');
-  container.innerHTML = REFERENCE_ITEMS.map(item => `
-    <div class="ref-tile" onclick="openModule('${item.id}')">
-      <span class="ref-tile-icon">${item.icon}</span>
-      <div>
-        <div class="ref-tile-name">${item.name}</div>
-        <div class="ref-tile-desc">${item.desc}</div>
-      </div>
-      <span class="ref-tile-chevron">→</span>
-    </div>`).join('');
-}
-
 function openModule(id) {
   const mod = MODULES.find(m => m.id === id);
-  const refItem = REFERENCE_ITEMS.find(r => r.id === id);
-  const name = mod ? mod.name : (refItem ? refItem.name : null);
-  const file = mod ? mod.file : (refItem ? REFERENCE_FILES[id] : null);
+  const file = mod ? mod.file : REFERENCE_FILES[id];
+  const name = mod ? mod.name : (id === 'refhub' ? 'Reference Guide' : null);
   if (!file) return;
   document.getElementById('screen-dashboard').style.display = 'none';
   document.getElementById('view-module').classList.add('active');
