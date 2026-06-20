@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vital Signs</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --surface2:#E8EFF5; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#3B82C4; --accent2:#E8F1FA;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --radius:12px; --radius-sm:8px;
+  --spo2-color:#3B82C4; --hr-color:#C94040; --bp-color:#7B5EA7; --wt-color:#E07B39; --temp-color:#2D9E6B;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:18px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.5px; margin-left:8px; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; border:none; font-family:'DM Sans',sans-serif; transition:all .15s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:none; border:1.5px solid var(--border); color:var(--ink2); }
+
+.nav-tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); padding:0 16px; overflow-x:auto; scrollbar-width:none; }
+.nav-tabs::-webkit-scrollbar { display:none; }
+.nav-tab { padding:11px 14px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; transition:all .15s; background:none; border-top:none; border-left:none; border-right:none; flex-shrink:0; }
+.nav-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+.page { display:none; padding:20px; max-width:640px; margin:0 auto; }
+.page.active { display:block; }
+
+.dash-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.dash-tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:all .15s; position:relative; overflow:hidden; }
+.dash-tile:hover { border-color:var(--accent); }
+.dash-tile::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+.dash-tile.spo2::before { background:var(--spo2-color); } .dash-tile.hr::before { background:var(--hr-color); }
+.dash-tile.bp::before { background:var(--bp-color); } .dash-tile.wt::before { background:var(--wt-color); } .dash-tile.temp::before { background:var(--temp-color); }
+.dash-tile-eyebrow { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin-bottom:6px; padding-left:8px; }
+.dash-tile-val { font-family:'DM Mono',monospace; font-size:26px; font-weight:500; color:var(--ink); line-height:1; padding-left:8px; }
+.dash-tile-unit { font-size:12px; color:var(--ink3); margin-left:3px; }
+.dash-tile-since { font-size:11px; color:var(--ink3); margin-top:4px; padding-left:8px; }
+.dash-tile-status { display:inline-block; font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; margin-top:5px; margin-left:8px; }
+.status-ok { background:var(--good-bg); color:var(--good); }
+.status-warn { background:var(--warn-bg); color:var(--warn); }
+.status-high { background:var(--danger-bg); color:var(--danger); }
+.status-low { background:var(--accent2); color:var(--accent); }
+.status-none { background:var(--surface2); color:var(--ink3); }
+
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; }
+.card-title { font-family:'DM Serif Display',serif; font-size:15px; margin-bottom:14px; }
+.vital-input-card { border-left:4px solid var(--border); }
+.vital-input-card.spo2 { border-left-color:var(--spo2-color); } .vital-input-card.hr { border-left-color:var(--hr-color); }
+.vital-input-card.bp { border-left-color:var(--bp-color); } .vital-input-card.wt { border-left-color:var(--wt-color); } .vital-input-card.temp { border-left-color:var(--temp-color); }
+
+.big-inputs { display:flex; gap:12px; align-items:flex-start; margin-bottom:8px; }
+.big-input-group { display:flex; flex-direction:column; gap:4px; flex:1; }
+.big-input-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; color:var(--ink3); text-align:center; }
+.big-input { width:100%; text-align:center; font-family:'DM Mono',monospace; font-size:32px; font-weight:500; padding:14px 8px; border-radius:var(--radius); border:2px solid var(--border); background:var(--bg); color:var(--ink); transition:all .15s; }
+.big-input:focus { outline:none; border-color:var(--accent); background:var(--accent2); }
+.bp-slash { font-family:'DM Mono',monospace; font-size:32px; color:var(--ink3); padding-top:18px; flex-shrink:0; }
+
+.form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.form-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px; }
+label { font-size:11px; font-weight:500; color:var(--ink2); letter-spacing:.3px; text-transform:uppercase; }
+input[type="date"], input[type="time"] { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); width:100%; }
+input:focus { outline:none; border-color:var(--accent); }
+
+.sync-note { font-size:11px; color:var(--ink3); text-align:center; margin-bottom:10px; }
+.hist-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:12px; }
+.hist-date { font-size:12px; color:var(--ink3); min-width:90px; }
+.hist-val { font-family:'DM Mono',monospace; font-size:21px; font-weight:500; color:var(--ink); flex:1; letter-spacing:-0.3px; }
+.hist-actions { display:flex; gap:6px; }
+.icon-btn { background:none; border:none; color:var(--ink3); cursor:pointer; font-size:15px; padding:4px; }
+.icon-btn:hover { color:var(--accent); }
+
+.chart-wrap { position:relative; height:200px; }
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; }
+.stat-eyebrow { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin-bottom:3px; }
+.stat-val { font-family:'DM Mono',monospace; font-size:21px; font-weight:500; color:var(--ink); letter-spacing:-0.3px; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px; z-index:999; opacity:0; transition:all .25s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+@media (max-width:480px) { .page { padding:14px; } .dash-grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Vital Signs</span>
+    <span class="logo-sub">Surveillance</span>
+  </div>
+  <button class="btn btn-ghost" onclick="showPage('dashboard')">⌂ Dashboard</button>
+</header>
+
+<div class="nav-tabs">
+  <button class="nav-tab active" id="tab-dashboard" onclick="showPage('dashboard')">Overview</button>
+  <button class="nav-tab" id="tab-spo2" onclick="showPage('spo2')">SpO₂</button>
+  <button class="nav-tab" id="tab-hr" onclick="showPage('hr')">Heart Rate</button>
+  <button class="nav-tab" id="tab-bp" onclick="showPage('bp')">Blood Pressure</button>
+  <button class="nav-tab" id="tab-wt" onclick="showPage('wt')">Weight</button>
+  <button class="nav-tab" id="tab-temp" onclick="showPage('temp')">Temperature</button>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div class="dash-grid" id="dash-grid"></div>
+</div>
+
+<!-- PER-VITAL PAGES generated by JS -->
+<div id="vital-pages"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  VITAL DEFINITIONS
+// ══════════════════════════════════════════════════
+const VITALS = ['spo2','hr','bp','wt','temp'];
+const VITAL_META = {
+  spo2: { name:'SpO₂', unit:'%', icon:'🩸', isBP:false },
+  hr:   { name:'Heart Rate', unit:'bpm', icon:'❤️', isBP:false },
+  bp:   { name:'Blood Pressure', unit:'mmHg', icon:'💜', isBP:true },
+  wt:   { name:'Weight', unit:'lbs', icon:'🟠', isBP:false },
+  temp: { name:'Temperature', unit:'°F', icon:'🌡️', isBP:false },
+};
+
+// Fixed clinical thresholds (no custom settings panel for this trial)
+function getStatus(vital, value, value2) {
+  if (vital === 'spo2') return value < 92 ? 'status-low' : value < 95 ? 'status-warn' : 'status-ok';
+  if (vital === 'hr')   return value < 50 ? 'status-low' : value > 110 ? 'status-high' : 'status-ok';
+  if (vital === 'bp')   return (value >= 140 || value2 >= 90) ? 'status-high' : (value < 90 || value2 < 60) ? 'status-low' : 'status-ok';
+  if (vital === 'wt')   return 'status-ok';
+  if (vital === 'temp') return value >= 100.4 ? 'status-high' : value < 97 ? 'status-low' : 'status-ok';
+  return 'status-none';
+}
+function statusLabel(cls) {
+  return { 'status-ok':'Normal', 'status-warn':'Watch', 'status-high':'High', 'status-low':'Low', 'status-none':'' }[cls] || '';
+}
+
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let currentUser = null;
+let readings = [];          // all rows from vitals_readings for this user
+let realtimeChannel = null;
+const charts = {};
+const recentLocalWriteIds = new Set();
+function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
+
+// Helper: rows for a given simple vital, or paired sys/dia rows for bp
+function rowsFor(vital) {
+  if (vital === 'bp') return readings.filter(r => r.vital_type === 'bp_systolic' || r.vital_type === 'bp_diastolic');
+  return readings.filter(r => r.vital_type === vital);
+}
+// Group bp rows into {taken_at, sys, dia, sysId, diaId} pairs
+function pairedBP() {
+  const map = {};
+  readings.filter(r => r.vital_type === 'bp_systolic' || r.vital_type === 'bp_diastolic').forEach(r => {
+    const key = r.taken_at;
+    if (!map[key]) map[key] = { taken_at: key };
+    if (r.vital_type === 'bp_systolic') { map[key].sys = r.value; map[key].sysId = r.id; }
+    else { map[key].dia = r.value; map[key].diaId = r.id; }
+  });
+  return Object.values(map).filter(p => p.sys != null && p.dia != null).sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+}
+function simpleRows(vital) {
+  return readings.filter(r => r.vital_type === vital).sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD PER-VITAL PAGE MARKUP
+// ══════════════════════════════════════════════════
+function buildVitalPages() {
+  const container = document.getElementById('vital-pages');
+  container.innerHTML = VITALS.map(v => {
+    const m = VITAL_META[v];
+    const inputsHtml = m.isBP
+      ? `<div class="big-inputs">
+           <div class="big-input-group"><div class="big-input-label">Systolic</div><input type="number" class="big-input" id="${v}-sys" placeholder="—" oninput="onVitalInput('${v}')"></div>
+           <div class="bp-slash">/</div>
+           <div class="big-input-group"><div class="big-input-label">Diastolic</div><input type="number" class="big-input" id="${v}-dia" placeholder="—" oninput="onVitalInput('${v}')"></div>
+         </div>`
+      : `<div class="big-inputs">
+           <div class="big-input-group"><div class="big-input-label">${m.name} (${m.unit})</div><input type="number" step="0.1" class="big-input" id="${v}-val" placeholder="—" oninput="onVitalInput('${v}')"></div>
+         </div>`;
+    return `
+    <div class="page" id="page-${v}">
+      <div class="card vital-input-card ${v}">
+        <div class="card-title">${m.icon} Log ${m.name}</div>
+        ${inputsHtml}
+        <div class="form-row" style="margin-top:14px">
+          <div class="form-group"><label>Date</label><input type="date" id="${v}-date"></div>
+          <div class="form-group"><label>Time</label><input type="time" id="${v}-time"></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="clearVitalForm('${v}')">Clear</button>
+          <button class="btn btn-primary" id="${v}-save-btn" onclick="saveVital('${v}')" disabled>Save Reading</button>
+        </div>
+      </div>
+
+      <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
+
+      <div class="stat-row" id="${v}-stats"></div>
+
+      <div class="card">
+        <div class="card-title">Trend</div>
+        <div class="chart-wrap"><canvas id="${v}-chart"></canvas></div>
+      </div>
+
+      <div id="${v}-history"></div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+(async function init() {
+  buildVitalPages();
+  VITALS.forEach(initVitalDateTime);
+
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+
+  readings = await fetchRows('vitals_readings', currentUser.id, 'taken_at', true);
+  renderDashboard();
+
+  realtimeChannel = subscribeToTable('vitals_readings', currentUser.id, handleRealtimeChange);
+})();
+
+function initVitalDateTime(vital) {
+  const now = new Date();
+  document.getElementById(vital+'-date').value = now.toISOString().slice(0,10);
+  document.getElementById(vital+'-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+}
+
+function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwnRecentWrite = recentLocalWriteIds.has(id);
+
+  if (payload.eventType === 'INSERT') {
+    if (!readings.some(r => r.id === payload.new.id)) readings.push(payload.new);
+  } else if (payload.eventType === 'UPDATE') {
+    const i = readings.findIndex(r => r.id === payload.new.id);
+    if (i >= 0) readings[i] = payload.new; else readings.push(payload.new);
+  } else if (payload.eventType === 'DELETE') {
+    readings = readings.filter(r => r.id !== payload.old.id);
+  }
+
+  renderDashboard();
+  VITALS.forEach(v => {
+    if (document.getElementById('page-'+v).classList.contains('active')) renderVitalPage(v);
+  });
+
+  if (!isOwnRecentWrite) showToast('Updated from another device', 'success');
+}
+
+// ══════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  else renderVitalPage(name);
+}
+
+// ══════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════
+function renderDashboard() {
+  const grid = document.getElementById('dash-grid');
+  grid.innerHTML = VITALS.map(v => {
+    const m = VITAL_META[v];
+    let valHtml = `<div class="dash-tile-val" style="color:var(--ink3);font-size:14px">No data yet</div>`;
+    let sinceHtml = '';
+    let statusHtml = '';
+    if (v === 'bp') {
+      const pairs = pairedBP();
+      if (pairs.length) {
+        const last = pairs[pairs.length-1];
+        const cls = getStatus('bp', last.sys, last.dia);
+        valHtml = `<div class="dash-tile-val">${last.sys}/${last.dia}<span class="dash-tile-unit">mmHg</span></div>`;
+        sinceHtml = `<div class="dash-tile-since">${sinceStr(last.taken_at)}</div>`;
+        statusHtml = `<span class="dash-tile-status ${cls}">${statusLabel(cls)}</span>`;
+      }
+    } else {
+      const rows = simpleRows(v);
+      if (rows.length) {
+        const last = rows[rows.length-1];
+        const cls = getStatus(v, last.value);
+        valHtml = `<div class="dash-tile-val">${last.value}<span class="dash-tile-unit">${m.unit}</span></div>`;
+        sinceHtml = `<div class="dash-tile-since">${sinceStr(last.taken_at)}</div>`;
+        statusHtml = `<span class="dash-tile-status ${cls}">${statusLabel(cls)}</span>`;
+      }
+    }
+    return `<div class="dash-tile ${v}" onclick="showPage('${v}')">
+      <div class="dash-tile-eyebrow">${m.icon} ${m.name}</div>
+      ${valHtml}
+      ${sinceHtml}
+      ${statusHtml}
+    </div>`;
+  }).join('');
+}
+
+function sinceStr(iso) {
+  const d = new Date(iso); d.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = Math.floor((today - d) / 86400000);
+  return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
+}
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtTime(iso) { return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+
+// ══════════════════════════════════════════════════
+//  FORM
+// ══════════════════════════════════════════════════
+function onVitalInput(vital) {
+  const m = VITAL_META[vital];
+  const btn = document.getElementById(vital+'-save-btn');
+  if (m.isBP) {
+    const sys = parseFloat(document.getElementById(vital+'-sys').value);
+    const dia = parseFloat(document.getElementById(vital+'-dia').value);
+    btn.disabled = isNaN(sys) || isNaN(dia);
+  } else {
+    const val = parseFloat(document.getElementById(vital+'-val').value);
+    btn.disabled = isNaN(val);
+  }
+}
+
+function clearVitalForm(vital) {
+  const m = VITAL_META[vital];
+  if (m.isBP) { document.getElementById(vital+'-sys').value=''; document.getElementById(vital+'-dia').value=''; }
+  else { document.getElementById(vital+'-val').value=''; }
+  initVitalDateTime(vital);
+  document.getElementById(vital+'-save-btn').disabled = true;
+  delete editState[vital];
+}
+
+const editState = {}; // vital -> {sysId, diaId} or {id} when editing existing reading
+
+async function saveVital(vital) {
+  const m = VITAL_META[vital];
+  const date = document.getElementById(vital+'-date').value;
+  const time = document.getElementById(vital+'-time').value || '00:00';
+  if (!date) { showToast('Please select a date', 'error'); return; }
+  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const btn = document.getElementById(vital+'-save-btn');
+  const editing = editState[vital];
+
+  btn.disabled = true; btn.textContent = editing ? 'Updating…' : 'Saving…';
+  try {
+    if (m.isBP) {
+      const sys = parseFloat(document.getElementById(vital+'-sys').value);
+      const dia = parseFloat(document.getElementById(vital+'-dia').value);
+      if (isNaN(sys) || isNaN(dia)) { showToast('Enter both systolic and diastolic', 'error'); return; }
+      if (editing) {
+        const updSys = await updateRow('vitals_readings', editing.sysId, { value: sys, taken_at });
+        const updDia = await updateRow('vitals_readings', editing.diaId, { value: dia, taken_at });
+        markLocalWrite(updSys.id); markLocalWrite(updDia.id);
+        [updSys, updDia].forEach(u => { const i = readings.findIndex(r=>r.id===u.id); if (i>=0) readings[i]=u; });
+        showToast('Reading updated ✓', 'success');
+      } else {
+        const insSys = await insertRow('vitals_readings', { user_id: currentUser.id, vital_type:'bp_systolic', value: sys, unit:'mmHg', taken_at });
+        const insDia = await insertRow('vitals_readings', { user_id: currentUser.id, vital_type:'bp_diastolic', value: dia, unit:'mmHg', taken_at });
+        markLocalWrite(insSys.id); markLocalWrite(insDia.id);
+        readings.push(insSys, insDia);
+        showToast('Reading saved ✓', 'success');
+      }
+    } else {
+      const val = parseFloat(document.getElementById(vital+'-val').value);
+      if (isNaN(val)) { showToast('Enter a value', 'error'); return; }
+      if (editing) {
+        const upd = await updateRow('vitals_readings', editing.id, { value: val, taken_at });
+        markLocalWrite(upd.id);
+        const i = readings.findIndex(r=>r.id===upd.id); if (i>=0) readings[i]=upd;
+        showToast('Reading updated ✓', 'success');
+      } else {
+        const ins = await insertRow('vitals_readings', { user_id: currentUser.id, vital_type: vital, value: val, unit: m.unit, taken_at });
+        markLocalWrite(ins.id);
+        readings.push(ins);
+        showToast('Reading saved ✓', 'success');
+      }
+    }
+    clearVitalForm(vital);
+    renderDashboard();
+    renderVitalPage(vital);
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Save Reading';
+    onVitalInput(vital);
+  }
+}
+
+function editReading(vital, key) {
+  const m = VITAL_META[vital];
+  if (m.isBP) {
+    const pairs = pairedBP();
+    const p = pairs.find(x => x.taken_at === key);
+    if (!p) return;
+    editState[vital] = { sysId: p.sysId, diaId: p.diaId };
+    document.getElementById(vital+'-sys').value = p.sys;
+    document.getElementById(vital+'-dia').value = p.dia;
+    const d = new Date(p.taken_at);
+    document.getElementById(vital+'-date').value = d.toISOString().slice(0,10);
+    document.getElementById(vital+'-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  } else {
+    const row = readings.find(r => r.id === key);
+    if (!row) return;
+    editState[vital] = { id: row.id };
+    document.getElementById(vital+'-val').value = row.value;
+    const d = new Date(row.taken_at);
+    document.getElementById(vital+'-date').value = d.toISOString().slice(0,10);
+    document.getElementById(vital+'-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+  document.getElementById(vital+'-save-btn').disabled = false;
+  document.getElementById(vital+'-save-btn').textContent = 'Update Reading';
+  showPage(vital);
+  window.scrollTo(0,0);
+}
+
+async function deleteReading(vital, key) {
+  if (!confirm('Delete this reading?')) return;
+  const m = VITAL_META[vital];
+  try {
+    if (m.isBP) {
+      const pairs = pairedBP();
+      const p = pairs.find(x => x.taken_at === key);
+      if (!p) return;
+      await deleteRow('vitals_readings', p.sysId);
+      await deleteRow('vitals_readings', p.diaId);
+      markLocalWrite(p.sysId); markLocalWrite(p.diaId);
+      readings = readings.filter(r => r.id !== p.sysId && r.id !== p.diaId);
+    } else {
+      await deleteRow('vitals_readings', key);
+      markLocalWrite(key);
+      readings = readings.filter(r => r.id !== key);
+    }
+    renderDashboard();
+    renderVitalPage(vital);
+    showToast('Deleted');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  PER-VITAL PAGE RENDER (stats, chart, history)
+// ══════════════════════════════════════════════════
+function renderVitalPage(vital) {
+  const m = VITAL_META[vital];
+  const statsEl = document.getElementById(vital+'-stats');
+  const histEl = document.getElementById(vital+'-history');
+
+  if (m.isBP) {
+    const pairs = pairedBP();
+    if (!pairs.length) {
+      statsEl.innerHTML = '';
+      histEl.innerHTML = `<div class="empty"><div class="empty-icon">${m.icon}</div><div class="empty-title">No readings yet</div></div>`;
+      drawChart(vital, [], []); return;
+    }
+    const sysVals = pairs.map(p=>p.sys), diaVals = pairs.map(p=>p.dia);
+    const last = pairs[pairs.length-1];
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-eyebrow">Latest</div><div class="stat-val">${last.sys}/${last.dia}</div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Avg Sys</div><div class="stat-val">${Math.round(avg(sysVals))}</div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Avg Dia</div><div class="stat-val">${Math.round(avg(diaVals))}</div></div>`;
+    histEl.innerHTML = pairs.slice().reverse().map(p => `
+      <div class="hist-row">
+        <div class="hist-date">${fmtDate(p.taken_at)}<br><span style="font-size:11px">${fmtTime(p.taken_at)}</span></div>
+        <div class="hist-val">${p.sys}/${p.dia} <span style="font-size:12px;color:var(--ink3)">mmHg</span></div>
+        <div class="hist-actions">
+          <button class="icon-btn" onclick="editReading('${vital}','${p.taken_at}')" title="Edit">✏️</button>
+          <button class="icon-btn" onclick="deleteReading('${vital}','${p.taken_at}')" title="Delete">🗑</button>
+        </div>
+      </div>`).join('');
+    drawChart(vital, pairs.map(p=>fmtDate(p.taken_at)), [
+      { label:'Systolic', data:sysVals, color:'#7B5EA7' },
+      { label:'Diastolic', data:diaVals, color:'#B89AD8' },
+    ]);
+  } else {
+    const rows = simpleRows(vital);
+    if (!rows.length) {
+      statsEl.innerHTML = '';
+      histEl.innerHTML = `<div class="empty"><div class="empty-icon">${m.icon}</div><div class="empty-title">No readings yet</div></div>`;
+      drawChart(vital, [], []); return;
+    }
+    const vals = rows.map(r=>Number(r.value));
+    const last = rows[rows.length-1];
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-eyebrow">Latest</div><div class="stat-val">${last.value}</div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Average</div><div class="stat-val">${(avg(vals)).toFixed(1)}</div></div>
+      <div class="stat-card"><div class="stat-eyebrow">Best/Recent</div><div class="stat-val">${Math.max(...vals)}</div></div>`;
+    histEl.innerHTML = rows.slice().reverse().map(r => `
+      <div class="hist-row">
+        <div class="hist-date">${fmtDate(r.taken_at)}<br><span style="font-size:11px">${fmtTime(r.taken_at)}</span></div>
+        <div class="hist-val">${r.value} <span style="font-size:12px;color:var(--ink3)">${m.unit}</span></div>
+        <div class="hist-actions">
+          <button class="icon-btn" onclick="editReading('${vital}','${r.id}')" title="Edit">✏️</button>
+          <button class="icon-btn" onclick="deleteReading('${vital}','${r.id}')" title="Delete">🗑</button>
+        </div>
+      </div>`).join('');
+    drawChart(vital, rows.map(r=>fmtDate(r.taken_at)), [
+      { label: m.name, data: vals, color: chartColor(vital) },
+    ]);
+  }
+}
+
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function chartColor(v) { return { spo2:'#3B82C4', hr:'#C94040', wt:'#E07B39', temp:'#2D9E6B' }[v] || '#3B82C4'; }
+
+function drawChart(vital, labels, datasets) {
+  if (charts[vital]) { charts[vital].destroy(); charts[vital] = null; }
+  const ctx = document.getElementById(vital+'-chart');
+  if (!ctx || !labels.length) return;
+  charts[vital] = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets: datasets.map(d => ({
+      label:d.label, data:d.data, borderColor:d.color, backgroundColor:d.color+'20',
+      tension:0.3, pointRadius:4, borderWidth:2, fill:datasets.length===1,
+    })) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display: datasets.length>1 } },
+      scales:{ y:{ grid:{color:'#E8EAF0'} }, x:{ grid:{display:false} } }
+    }
+  });
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+window.addEventListener('beforeunload', () => { if (realtimeChannel) sb.removeChannel(realtimeChannel); });
+</script>
+</body>
+</html>
