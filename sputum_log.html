@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sputum Log</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --surface2:#E8EFF5; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#3B6E5C; --accent-bg:#E8F2EE;
+  --radius:12px; --radius-sm:8px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.5px; margin-left:8px; }
+.tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); padding:0 16px; }
+.tab { padding:11px 14px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.page { display:none; padding:20px 16px 40px; max-width:600px; margin:0 auto; }
+.page.active { display:block; }
+.sync-note { font-size:11px; color:var(--ink3); text-align:center; margin-bottom:10px; }
+
+.checkin-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:14px; border-left:4px solid var(--accent); }
+.card-date-row { display:flex; align-items:center; justify-content:flex-end; margin-bottom:16px; }
+.card-date { font-size:13px; color:var(--ink3); font-family:'DM Mono',monospace; }
+
+.scale-group { margin-bottom:24px; }
+.scale-title { font-size:14px; font-weight:600; color:var(--ink); margin-bottom:3px; }
+.scale-desc { font-size:12px; color:var(--ink3); margin-bottom:10px; line-height:1.4; }
+.scale-grid { display:flex; flex-direction:column; gap:6px; margin-bottom:4px; }
+.scale-row { display:flex; gap:5px; justify-content:space-between; }
+.scale-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:8px 2px 6px; border-radius:8px; border:2px solid var(--border);
+  background:var(--bg); cursor:pointer; transition:all 0.15s;
+  -webkit-tap-highlight-color:transparent; font-family:'DM Sans',sans-serif; min-width:0;
+}
+.scale-btn:active { transform:scale(0.93); }
+.scale-btn .swatch { width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,0.15); }
+.scale-btn .e { font-size:18px; line-height:1; }
+.scale-btn .enum { font-size:9px; color:var(--ink3); font-family:'DM Mono',monospace; font-weight:500; margin-top:2px; }
+.scale-btn .elabel { font-size:7.5px; color:var(--ink3); text-align:center; line-height:1.15; font-weight:500; text-transform:uppercase; letter-spacing:0.2px; margin-top:1px; }
+.scale-btn.selected { border-color:var(--accent); background:var(--accent-bg); box-shadow:0 2px 8px rgba(59,110,92,0.18); transform:scale(1.06); }
+.scale-btn.selected .enum, .scale-btn.selected .elabel { color:var(--accent); }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all 0.15s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:#2c5648; }
+.btn-ghost { background:none; border:1px solid var(--border); color:var(--ink2); }
+.btn-icon { background:none; border:none; color:var(--ink3); cursor:pointer; font-size:15px; padding:4px; }
+.btn-icon:hover { color:var(--accent); }
+
+.hist-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; }
+.hist-top { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.hist-date { font-size:12px; color:var(--ink3); min-width:90px; }
+.hist-vals { display:flex; gap:12px; flex:1; }
+.hist-metric { display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; }
+.hist-metric-icon { display:flex; align-items:center; gap:4px; }
+.hist-metric-swatch { width:12px; height:12px; border-radius:50%; border:1px solid rgba(0,0,0,0.15); }
+.hist-metric-val { font-size:18px; font-weight:600; font-family:'DM Mono',monospace; color:var(--ink); }
+.hist-metric-label { font-size:9px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.3px; }
+.hist-note { padding:6px 0 0; font-size:12px; color:var(--ink3); font-style:italic; }
+.hist-actions { display:flex; gap:6px; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px; z-index:999; opacity:0; transition:all .25s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.toast.success { background:var(--accent); }
+.toast.error { background:#C94040; }
+@media (max-width:480px) { .page { padding:14px 12px 40px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Sputum Log</span>
+    <span class="logo-sub">Color · Texture · Volume</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('log')" id="tab-log">Log</button>
+  <button class="tab" onclick="showTab('history')" id="tab-history">History</button>
+</div>
+
+<!-- LOG -->
+<div class="page active" id="page-log">
+  <div class="checkin-card">
+    <div class="card-date-row">
+      <div class="card-date" id="date-display"></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:18px">
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Date</label>
+        <input type="date" id="log-date" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%">
+      </div>
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Time</label>
+        <input type="time" id="log-time" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%">
+      </div>
+    </div>
+
+    <div id="scale-groups-container"></div>
+
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Notes (optional)</label>
+      <textarea id="log-notes" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%;resize:vertical;min-height:60px" placeholder="Any other observations…"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="clearLog()">Reset</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveLog()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
+  <div id="history-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  SCALE DEFINITIONS
+// ══════════════════════════════════════════════════
+const SCALES = {
+  color: {
+    title: 'Color',
+    desc: '1 = blood (hemoptysis) · 10 = clear (also covers nosebleed-tinged)',
+    options: [
+      { score:1, label:'Blood', swatch:'#8B1A1A' },
+      { score:2, label:'Tinged', swatch:'#A8453F' },
+      { score:3, label:'Brown', swatch:'#7B5A3C' },
+      { score:4, label:'Grn-Brn', swatch:'#7A7A3C' },
+      { score:5, label:'Green', swatch:'#4F7942' },
+      { score:6, label:'Grn-Yel', swatch:'#9CAE3A' },
+      { score:7, label:'Yellow', swatch:'#E0C233' },
+      { score:8, label:'Pale Yel', swatch:'#EDE08F' },
+      { score:9, label:'Wht-Yel', swatch:'#F5F0DC' },
+      { score:10, label:'Clear', swatch:'#FFFFFF' },
+    ]
+  },
+  texture: {
+    title: 'Texture',
+    desc: '1 = thick / very sticky · 10 = watery — descriptive only, no "better/worse" direction',
+    options: [
+      { score:1, label:'Solid' }, { score:2, label:'V. Thick' }, { score:3, label:'Thick' },
+      { score:4, label:'Sticky' }, { score:5, label:'Tacky' }, { score:6, label:'Moderate' },
+      { score:7, label:'Loose' }, { score:8, label:'Thin' }, { score:9, label:'V. Thin' }, { score:10, label:'Watery' },
+    ]
+  },
+  volume: {
+    title: 'Volume',
+    desc: '1 = >45 mL (most) · 10 = 0–5 mL (least)',
+    options: [
+      { score:1, label:'>45mL' }, { score:2, label:'40-45' }, { score:3, label:'35-40' },
+      { score:4, label:'30-35' }, { score:5, label:'25-30' }, { score:6, label:'20-25' },
+      { score:7, label:'15-20' }, { score:8, label:'10-15' }, { score:9, label:'5-10' }, { score:10, label:'0-5mL' },
+    ]
+  },
+};
+const selections = {};
+
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let currentUser = null;
+let logs = [];
+let realtimeChannel = null;
+let editingId = null;
+const recentLocalWriteIds = new Set();
+function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+(async function init() {
+  const now = new Date();
+  document.getElementById('date-display').textContent = now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById('log-date').value = now.toISOString().slice(0,10);
+  document.getElementById('log-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+
+  renderScaleGroups();
+
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+
+  logs = await fetchRows('sputum_logs', currentUser.id, 'taken_at', true);
+  renderHistory();
+
+  realtimeChannel = subscribeToTable('sputum_logs', currentUser.id, handleRealtimeChange);
+})();
+
+function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwn = recentLocalWriteIds.has(id);
+  if (payload.eventType === 'INSERT') {
+    if (!logs.some(l => l.id === payload.new.id)) logs.push(payload.new);
+  } else if (payload.eventType === 'UPDATE') {
+    const i = logs.findIndex(l => l.id === payload.new.id);
+    if (i >= 0) logs[i] = payload.new; else logs.push(payload.new);
+  } else if (payload.eventType === 'DELETE') {
+    logs = logs.filter(l => l.id !== payload.old.id);
+  }
+  logs.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+  if (document.getElementById('page-history').classList.contains('active')) renderHistory();
+  if (!isOwn) showToast('Updated from another device', 'success');
+}
+
+// ══════════════════════════════════════════════════
+//  SCALE PICKER RENDER
+// ══════════════════════════════════════════════════
+function renderScaleGroups() {
+  const container = document.getElementById('scale-groups-container');
+  container.innerHTML = Object.keys(SCALES).map(key => `
+    <div class="scale-group">
+      <div class="scale-title">${SCALES[key].title}</div>
+      <div class="scale-desc">${SCALES[key].desc}</div>
+      <div class="scale-grid" id="sg-${key}"></div>
+    </div>`).join('');
+  Object.keys(SCALES).forEach(key => renderScaleRow(key));
+}
+
+function renderScaleRow(key) {
+  const scale = SCALES[key];
+  const container = document.getElementById('sg-' + key);
+  const row1 = scale.options.slice(0,5), row2 = scale.options.slice(5,10);
+  function makeBtn(opt) {
+    const swatchHtml = opt.swatch ? `<span class="swatch" style="background:${opt.swatch}"></span>` : `<span class="e">${'●'.repeat(1)}</span>`;
+    return `<button class="scale-btn" id="sb-${key}-${opt.score}" onclick="selectScale('${key}', ${opt.score})">
+      ${swatchHtml}<span class="enum">${opt.score}</span><span class="elabel">${opt.label}</span>
+    </button>`;
+  }
+  container.innerHTML = `<div class="scale-row">${row1.map(makeBtn).join('')}</div><div class="scale-row">${row2.map(makeBtn).join('')}</div>`;
+}
+
+function selectScale(key, score) {
+  SCALES[key].options.forEach(o => { const b = document.getElementById(`sb-${key}-${o.score}`); if (b) b.classList.remove('selected'); });
+  const chosen = document.getElementById(`sb-${key}-${score}`);
+  if (chosen) chosen.classList.add('selected');
+  selections[key] = score;
+}
+
+// ══════════════════════════════════════════════════
+//  SAVE / EDIT / DELETE
+// ══════════════════════════════════════════════════
+async function saveLog() {
+  if (!selections.color || !selections.texture || !selections.volume) {
+    showToast('Please select all three: color, texture, volume', 'error');
+    return;
+  }
+  const date = document.getElementById('log-date').value;
+  const time = document.getElementById('log-time').value || '00:00';
+  const notes = document.getElementById('log-notes').value.trim();
+  if (!date) { showToast('Please select a date', 'error'); return; }
+  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const btn = document.getElementById('save-btn');
+
+  btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
+  try {
+    if (editingId) {
+      const updated = await updateRow('sputum_logs', editingId, {
+        color_score: selections.color, texture_score: selections.texture, volume_score: selections.volume, notes, taken_at,
+      });
+      markLocalWrite(updated.id);
+      const i = logs.findIndex(l => l.id === editingId);
+      if (i >= 0) logs[i] = updated;
+      showToast('Entry updated ✓', 'success');
+    } else {
+      const inserted = await insertRow('sputum_logs', {
+        user_id: currentUser.id,
+        color_score: selections.color, texture_score: selections.texture, volume_score: selections.volume,
+        notes, taken_at,
+      });
+      markLocalWrite(inserted.id);
+      logs.push(inserted);
+      showToast('Entry saved ✓', 'success');
+    }
+    logs.sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+    clearLog();
+    showTab('history');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = editingId ? 'Update Entry' : 'Save Entry';
+  }
+}
+
+function clearLog() {
+  Object.keys(SCALES).forEach(key => {
+    SCALES[key].options.forEach(o => { const b = document.getElementById(`sb-${key}-${o.score}`); if (b) b.classList.remove('selected'); });
+    delete selections[key];
+  });
+  document.getElementById('log-notes').value = '';
+  editingId = null;
+  document.getElementById('save-btn').textContent = 'Save Entry';
+  const now = new Date();
+  document.getElementById('log-date').value = now.toISOString().slice(0,10);
+  document.getElementById('log-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+}
+
+function editLog(id) {
+  const l = logs.find(x => x.id === id);
+  if (!l) return;
+  editingId = id;
+  selectScale('color', l.color_score);
+  selectScale('texture', l.texture_score);
+  selectScale('volume', l.volume_score);
+  document.getElementById('log-notes').value = l.notes || '';
+  const d = new Date(l.taken_at);
+  document.getElementById('log-date').value = d.toISOString().slice(0,10);
+  document.getElementById('log-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('save-btn').textContent = 'Update Entry';
+  showTab('log');
+  window.scrollTo(0,0);
+}
+
+async function deleteLog(id) {
+  if (!confirm('Delete this entry?')) return;
+  try {
+    await deleteRow('sputum_logs', id);
+    markLocalWrite(id);
+    logs = logs.filter(l => l.id !== id);
+    renderHistory();
+    showToast('Deleted');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  TABS / HISTORY
+// ══════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('page-'+name).classList.add('active');
+  if (name==='history') renderHistory();
+}
+
+function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+function colorSwatchFor(score) { return SCALES.color.options.find(o=>o.score===score)?.swatch || '#ccc'; }
+
+function renderHistory() {
+  const recs = logs.slice().reverse();
+  const el = document.getElementById('history-content');
+  if (!recs.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">🫧</div><div class="empty-title">No entries yet</div><div class="empty-sub">Log your first sputum entry above.</div></div>`; return; }
+  el.innerHTML = recs.map(r => `
+    <div class="hist-row">
+      <div class="hist-top">
+        <div class="hist-date">${fmtDate(r.taken_at)}<br><span style="font-size:11px">${fmtTime(r.taken_at)}</span></div>
+        <div class="hist-vals">
+          <div class="hist-metric">
+            <div class="hist-metric-icon"><span class="hist-metric-swatch" style="background:${colorSwatchFor(r.color_score)}"></span><span class="hist-metric-val">${r.color_score}</span></div>
+            <div class="hist-metric-label">Color</div>
+          </div>
+          <div class="hist-metric"><div class="hist-metric-val">${r.texture_score}</div><div class="hist-metric-label">Texture</div></div>
+          <div class="hist-metric"><div class="hist-metric-val">${r.volume_score}</div><div class="hist-metric-label">Volume</div></div>
+        </div>
+        <div class="hist-actions">
+          <button class="btn-icon" onclick="editLog('${r.id}')" title="Edit">✏️</button>
+          <button class="btn-icon" onclick="deleteLog('${r.id}')" title="Delete">🗑</button>
+        </div>
+      </div>
+      ${r.notes ? `<div class="hist-note">"${r.notes}"</div>` : ''}
+    </div>`).join('');
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+window.addEventListener('beforeunload', () => { if (realtimeChannel) sb.removeChannel(realtimeChannel); });
+</script>
+</body>
+</html>

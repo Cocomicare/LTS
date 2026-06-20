@@ -261,6 +261,7 @@ const MODULES = [
   { id:'spiro',    name:'Spirometer',      icon:'🫁', file:'spirometer_surveillance.html',  table:'spirometer_sessions',  dateField:'taken_at' },
   { id:'peakflow', name:'Peak Flow',       icon:'💨', file:'peak_flow_tracker.html',         table:'peak_flow_sessions',   dateField:'taken_at' },
   { id:'checkin',  name:'Symptom Check-in',icon:'📋', file:'symptom_checkin.html',           table:'symptom_checkins',     dateField:'taken_at' },
+  { id:'sputum',   name:'Sputum Log',      icon:'🫧', file:'sputum_log.html',                table:'sputum_logs',          dateField:'taken_at' },
   { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
   { id:'health',   name:'Health Index',    icon:'📊', file:'health_index.html',              table:'health_index_history', dateField:'computed_at' },
 ];
@@ -268,7 +269,7 @@ const MODULES = [
 // Modules shown as data-driven tracking tiles on the dashboard.
 // 'health' is excluded — it's shown via the hero card instead.
 // 'immuno' is excluded — it lives in the Reference Guide section instead.
-const TRACKING_TILE_IDS = ['vitals','spiro','peakflow','checkin'];
+const TRACKING_TILE_IDS = ['vitals','spiro','peakflow','checkin','sputum'];
 
 // Educational / reference content now lives behind a single hub page.
 const REFERENCE_FILES = {
@@ -470,8 +471,11 @@ async function renderTiles() {
       sinceStr = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
       overdue = days >= 3;
       const displayVal = lastRow.value ?? lastRow.fev1 ?? lastRow.pef ?? lastRow.score ?? lastRow.severity_score
+        ?? lastRow.color_score
         ?? (lastRow.session_data && lastRow.session_data.volume_ml) ?? null;
-      const displayUnit = lastRow.unit ?? (lastRow.session_data && lastRow.session_data.volume_ml != null ? 'mL' : null);
+      const displayUnit = lastRow.unit
+        ?? (lastRow.color_score != null ? 'color' : null)
+        ?? (lastRow.session_data && lastRow.session_data.volume_ml != null ? 'mL' : null);
       if (displayVal !== null && displayVal !== undefined) {
         valHtml = `<div class="tile-val">${displayVal}${displayUnit ? `<span style="font-size:12px;color:var(--ink3);margin-left:3px">${displayUnit}</span>` : ''}</div>`;
       }
