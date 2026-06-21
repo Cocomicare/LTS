@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Health Index</title>
+<title>Early Warning Signal</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -109,7 +109,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 <header>
   <div>
-    <span class="logo-title">Health Index</span>
+    <span class="logo-title">Early Warning Signal</span>
     <span class="logo-sub">Composite Score</span>
   </div>
 </header>
@@ -123,7 +123,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 <!-- INDEX -->
 <div class="page active" id="page-index">
   <div class="dial-card">
-    <div class="dial-title">Composite Health Index</div>
+    <div class="dial-title">Early Warning Signal</div>
     <div class="dial-subtitle">Weighted score across all surveillance parameters</div>
     <div class="dial-wrap">
       <svg class="dial-svg" viewBox="0 0 240 135" id="dial-svg">
@@ -649,7 +649,7 @@ function renderTrend() {
   trendChart = new Chart(document.getElementById('trend-chart'), {
     type:'line',
     data:{ labels, datasets:[
-      { label:'Health Index', data:scores, borderColor:'#3B82C4', backgroundColor:'rgba(59,130,196,0.08)', borderWidth:2.5, pointBackgroundColor:scores.map(s=>getZoneColor(s,thresholds)), pointRadius:5, fill:true, tension:0.3 },
+      { label:'Early Warning Signal', data:scores, borderColor:'#3B82C4', backgroundColor:'rgba(59,130,196,0.08)', borderWidth:2.5, pointBackgroundColor:scores.map(s=>getZoneColor(s,thresholds)), pointRadius:5, fill:true, tension:0.3 },
       { label:'Running Avg', data:runAvg, borderColor:'#8A9EAF', borderDash:[6,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.3 }
     ]},
     options:{ responsive:true, maintainAspectRatio:false,

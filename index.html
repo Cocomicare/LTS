@@ -263,7 +263,7 @@ const MODULES = [
   { id:'checkin',  name:'Symptom Check-in',icon:'📋', file:'symptom_checkin.html',           table:'symptom_checkins',     dateField:'taken_at' },
   { id:'sputum',   name:'Sputum Log',      icon:'🫧', file:'sputum_log.html',                table:'sputum_logs',          dateField:'taken_at' },
   { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
-  { id:'health',   name:'Health Index',    icon:'📊', file:'health_index.html',              table:'health_index_history', dateField:'computed_at' },
+  { id:'health',   name:'Early Warning Signal', icon:'📊', file:'health_index.html',         table:'health_index_history', dateField:'computed_at' },
 ];
 
 // Modules shown as data-driven tracking tiles on the dashboard.
@@ -394,9 +394,9 @@ async function renderHeroScore() {
     if (!latest) {
       container.innerHTML = `
         <div class="hero-score-card zone-none" onclick="openModule('health')">
-          <div class="hero-eyebrow">Composite Health Index</div>
+          <div class="hero-eyebrow">Early Warning Signal</div>
           <div class="hero-empty-icon">📊</div>
-          <div class="hero-empty-text">No score yet — log a few readings across your modules, then open Health Index to generate your first composite score.</div>
+          <div class="hero-empty-text">No score yet — log a few readings across your modules, then open Early Warning Signal to generate your first composite score.</div>
         </div>`;
       return;
     }
@@ -420,7 +420,7 @@ async function renderHeroScore() {
       <div class="hero-score-card zone-${zone}" onclick="openModule('health')">
         <div class="hero-top">
           <div>
-            <div class="hero-eyebrow">Composite Health Index</div>
+            <div class="hero-eyebrow">Early Warning Signal</div>
             <div class="hero-score-row">
               <span class="hero-score-num">${score}</span>
               <span class="hero-score-max">/ 100</span>
