@@ -226,7 +226,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
   </div>
   <div class="dash-body">
     <div id="hero-score-container"></div>
-    <div id="med-impact-hero-container"></div>
+    <div id="assistant-tile-container"></div>
     <div class="section-label">Modules</div>
     <div class="tiles" id="tiles"></div>
 
@@ -259,6 +259,16 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
 <script src="score_engine.js"></script>
 <script>
 // ══════════════════════════════════════════════════
+//  FEATURE FLAGS
+//  Set to false for a "lite" deployment without the Clinical
+//  Assistant — e.g. a general-purpose variant of this app for
+//  someone else. Toggling this off only hides the tile/module;
+//  it never affects data collection or Early Warning Signal
+//  scoring, which work fully independently of this flag.
+// ══════════════════════════════════════════════════
+const CLINICAL_ASSISTANT_ENABLED = true;
+
+// ══════════════════════════════════════════════════
 //  MODULE REGISTRY
 // ══════════════════════════════════════════════════
 const MODULES = [
@@ -270,11 +280,11 @@ const MODULES = [
   { id:'labs',     name:'Labs',            icon:'🧪', file:'labs.html',                      table:'lab_results',          dateField:'taken_at' },
   { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
   { id:'health',   name:'Early Warning Signal', icon:'📊', file:'health_index.html',         table:'health_index_history', dateField:'computed_at' },
-  { id:'medimpact',name:'Medication Impact Signal', icon:'💉', file:'medication_impact.html', table:'medication_impact_history', dateField:'computed_at' },
+  { id:'assistant',name:'Clinical Assistant', icon:'💬', file:'clinical_assistant.html',     table:null,                   dateField:null },
 ];
 
 // Modules shown as data-driven tracking tiles on the dashboard.
-// 'health' and 'medimpact' are excluded — shown via hero cards instead.
+// 'health' is excluded — shown via the hero card instead.
 // 'immuno' is excluded — it lives in the Reference Guide section instead.
 const TRACKING_TILE_IDS = ['vitals','spiro','peakflow','checkin','sputum','labs'];
 
@@ -388,7 +398,7 @@ async function showDashboard() {
   showScreen('screen-dashboard');
   setGreeting();
   await renderHeroScore();
-  await renderMedImpactHero();
+  renderAssistantTile();
   await renderTiles();
   setupDashboardRealtime();
 }
@@ -403,13 +413,12 @@ function setupDashboardRealtime() {
   const tablesToWatch = [
     'vitals_readings', 'spirometer_sessions', 'peak_flow_sessions',
     'symptom_checkins', 'sputum_logs', 'lab_results',
-    'health_index_history', 'medication_impact_history',
+    'health_index_history',
   ];
 
   tablesToWatch.forEach(table => {
     const channel = subscribeToTable(table, currentUser.id, () => {
       renderHeroScore();
-      renderMedImpactHero();
       renderTiles();
     });
     dashboardRealtimeChannels.push(channel);
@@ -497,81 +506,24 @@ async function syncEarlyWarningSignal() {
 }
 
 // ══════════════════════════════════════════════════
-//  MEDICATION IMPACT SIGNAL HERO
+//  CLINICAL ASSISTANT TILE
+//  Purely a navigation card — no data-tracking logic, since this
+//  module doesn't log readings itself. Gated by CLINICAL_ASSISTANT_ENABLED;
+//  rendering nothing when disabled is the entire effect of that flag.
 // ══════════════════════════════════════════════════
-async function renderMedImpactHero() {
-  const container = document.getElementById('med-impact-hero-container');
+function renderAssistantTile() {
+  const container = document.getElementById('assistant-tile-container');
   if (!container) return;
-  try {
-    const { data: historyRows } = await sb
-      .from('medication_impact_history')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('computed_at', { ascending: false })
-      .limit(1);
-    const latest = historyRows && historyRows[0];
-    const thresholds = { red:85, orange:90, amber:95 };
-
-    if (!latest) {
-      container.innerHTML = `
-        <div class="hero-score-card zone-none" onclick="openModule('medimpact')">
-          <div class="hero-eyebrow">Medication Impact Signal</div>
-          <div class="hero-empty-icon">💉</div>
-          <div class="hero-empty-text">No score yet — upload labs and log blood pressure, then tap sync below to generate your first score.</div>
-          <button class="hero-sync-btn" id="med-hero-sync-btn" onclick="event.stopPropagation(); syncMedicationImpactSignal()">↻ Sync Now</button>
-        </div>`;
-      return;
-    }
-
-    const score = latest.score;
-    const zone = score >= thresholds.amber ? 'green' : score >= thresholds.orange ? 'amber' : score >= thresholds.red ? 'orange' : 'red';
-    const statusText = {
-      green:  '✓ No concerning side effects detected',
-      amber:  '👀 Mild deviation — keep an eye on labs',
-      orange: '⚠️ Notable deviation — review with your team',
-      red:    '🚨 Significant deviation — contact your team',
-    }[zone];
-
-    const computedDate = new Date(latest.computed_at);
-    const today = new Date(); today.setHours(0,0,0,0);
-    const cd = new Date(computedDate); cd.setHours(0,0,0,0);
-    const days = Math.floor((today - cd) / 86400000);
-    const updatedStr = days === 0 ? 'Updated today' : days === 1 ? 'Updated yesterday' : `Updated ${days} days ago`;
-
-    container.innerHTML = `
-      <div class="hero-score-card zone-${zone}" onclick="openModule('medimpact')">
-        <div class="hero-top">
-          <div>
-            <div class="hero-eyebrow">Medication Impact Signal</div>
-            <div class="hero-score-row">
-              <span class="hero-score-num">${score}</span>
-              <span class="hero-score-max">/ 100</span>
-            </div>
-            <div class="hero-status">${statusText}</div>
-          </div>
-          <div class="hero-chevron">→</div>
-        </div>
-        <div class="hero-updated">
-          ${updatedStr} · Tap card for full breakdown
-          <button class="hero-sync-btn" id="med-hero-sync-btn" onclick="event.stopPropagation(); syncMedicationImpactSignal()">↻ Sync Now</button>
-        </div>
-      </div>`;
-  } catch (e) {
-    container.innerHTML = '';
-  }
-}
-
-async function syncMedicationImpactSignal() {
-  const btn = document.getElementById('med-hero-sync-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing…'; }
-  try {
-    await medComputeAndSave(currentUser.id);
-    await renderMedImpactHero();
-    showToast('Medication Impact Signal updated ✓', 'success');
-  } catch (e) {
-    showToast('Sync failed: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Sync Now'; }
-  }
+  if (!CLINICAL_ASSISTANT_ENABLED) { container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="ref-tile" onclick="openModule('assistant')" style="margin-bottom:18px">
+      <span class="ref-tile-icon">💬</span>
+      <div>
+        <div class="ref-tile-name">Clinical Assistant</div>
+        <div class="ref-tile-desc">Ask questions about your labs, vitals, and trends</div>
+      </div>
+      <span class="ref-tile-chevron">→</span>
+    </div>`;
 }
 
 function setGreeting() {
@@ -694,7 +646,6 @@ async function refreshDashboardData() {
     return;
   }
   renderHeroScore();
-  renderMedImpactHero();
   renderTiles();
 }
 

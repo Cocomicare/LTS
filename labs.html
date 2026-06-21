@@ -34,7 +34,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .card-sub { font-size:12.5px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
 
 .upload-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:30px 16px; text-align:center; cursor:pointer; transition:all .15s; background:var(--bg); }
-.upload-zone:hover { border-color:var(--accent); background:var(--accent-bg); }
+.upload-zone:hover, .upload-zone.drag-over { border-color:var(--accent); background:var(--accent-bg); }
 .upload-zone .icon { font-size:32px; margin-bottom:8px; }
 .upload-zone .label { font-size:13px; color:var(--ink2); font-weight:500; }
 .upload-zone .sub { font-size:11px; color:var(--ink3); margin-top:4px; }
@@ -60,15 +60,20 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .spinner { width:22px; height:22px; border:3px solid var(--accent-bg); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 10px; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
+.section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin:18px 2px 8px; display:flex; align-items:center; gap:6px; }
+.section-label:first-child { margin-top:0; }
+.signal-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); display:inline-block; }
+.ref-dot { width:7px; height:7px; border-radius:50%; background:var(--ink3); display:inline-block; }
+
 .extract-row { display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); }
 .extract-row:last-child { border-bottom:none; }
 .extract-check { width:18px; height:18px; flex-shrink:0; accent-color:var(--accent); }
 .extract-name { font-size:13.5px; font-weight:600; flex:1; }
 .extract-input { width:80px; text-align:right; font-family:'DM Mono',monospace; font-size:14px; padding:6px 8px; border:1.5px solid var(--border); border-radius:6px; background:var(--bg); }
 .extract-unit { font-size:12px; color:var(--ink3); width:90px; }
-.unmatched-note { font-size:11.5px; color:var(--ink3); background:var(--bg); border-radius:8px; padding:10px 12px; margin-top:10px; line-height:1.5; }
 
 .hist-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:12px; }
+.hist-row.signal { border-left:3px solid var(--accent); }
 .hist-name { font-size:13.5px; font-weight:600; flex:1; }
 .hist-val { font-family:'DM Mono',monospace; font-size:18px; font-weight:600; color:var(--ink); }
 .hist-actions { display:flex; gap:6px; }
@@ -82,6 +87,8 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .toast.success { background:var(--good); }
 .toast.error { background:var(--danger); }
 .disclaimer { background:var(--warn-bg); border:1px solid #f0d8b8; border-radius:8px; padding:11px 14px; font-size:12px; color:#9a5a1f; line-height:1.5; margin-bottom:14px; }
+.paste-hint { font-size:11px; color:var(--ink3); text-align:center; margin-top:10px; }
+.new-key-row .extract-name { font-style:italic; }
 </style>
 </head>
 <body>
@@ -104,13 +111,14 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
   <div class="card" id="upload-card">
     <div class="card-title">📷 Upload Lab Report(s)</div>
-    <div class="card-sub">Select multiple screenshots or PDFs at once — e.g. a CBC and a Metabolic Panel together — and they'll all be read in one pass.</div>
-    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+    <div class="card-sub">Select multiple screenshots or PDFs at once — e.g. a CBC and a Metabolic Panel together — and they'll all be read in one pass. We extract every value we can find, not just the ones used for scoring.</div>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
       <div class="icon">🧪</div>
       <div class="label">Tap to choose files</div>
       <div class="sub">JPG, PNG, or PDF — select multiple at once</div>
     </div>
     <input type="file" id="file-input" accept="image/*,application/pdf" multiple onchange="onFilesSelected(event)">
+    <div class="paste-hint">Tip: you can also just paste (Ctrl/Cmd+V) a copied image anywhere on this page.</div>
   </div>
 
   <div class="card" id="preview-card" style="display:none">
@@ -129,7 +137,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
   <div class="card" id="review-card" style="display:none">
     <div class="card-title">Review Extracted Values</div>
-    <div class="card-sub">Uncheck anything that looks wrong, or correct the number directly. Only checked rows will be saved.</div>
+    <div class="card-sub">Uncheck anything that looks wrong, or correct the number directly. Only checked rows will be saved. <strong>Signal</strong> values feed your Early Warning Signal score; <strong>Reference</strong> values are stored for your records and for the Clinical Assistant, but don't affect scoring.</div>
     <div style="display:flex;gap:12px;margin-bottom:16px">
       <div style="flex:1">
         <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Date Drawn</label>
@@ -141,7 +149,6 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
       </div>
     </div>
     <div id="extract-rows"></div>
-    <div id="unmatched-area"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="resetUpload()">Cancel</button>
       <button class="btn btn-primary" id="save-extract-btn" onclick="saveExtractedValues()">Save Selected Values</button>
@@ -159,19 +166,34 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 <script>
 // ══════════════════════════════════════════════════
-//  Extraction now runs through the "extract-labs" Supabase Edge
+//  Extraction runs through the "extract-labs" Supabase Edge
 //  Function. The Anthropic key lives only in that function's
 //  secret store — it is never present in this file or the browser.
 // ══════════════════════════════════════════════════
 const EXTRACT_LABS_URL = `${SUPABASE_URL}/functions/v1/extract-labs`;
 
 // ══════════════════════════════════════════════════
-//  LAB PARAMETER DEFINITIONS — covers CBC AutoDiff + Comprehensive
-//  Metabolic Panel + immunoglobulins. A subset of these (see
-//  score_engine.js MED_PARAMS) also feed Medication Impact Signal.
+//  LAB PARAMETER DEFINITIONS
+//  Open-ended: ANY value found in an uploaded report gets captured
+//  and stored. `signal:true` marks the subset that feeds the Early
+//  Warning Signal (must match score_engine.js EWS_PARAMS lab keys
+//  exactly). Everything else is stored as Reference — visible in
+//  History and usable by the Clinical Assistant, but not scored.
 // ══════════════════════════════════════════════════
 const LAB_PARAMS = {
-  wbc:                { name:'WBC', unit:'K/µL' },
+  // ── Signal (feeds Early Warning Signal) ──
+  dd_cfdna:           { name:'Donor-Derived cfDNA', unit:'%', signal:true },
+  il6:                { name:'IL-6', unit:'pg/mL', signal:true },
+  crp:                { name:'CRP', unit:'mg/L', signal:true },
+  procalcitonin:      { name:'Procalcitonin', unit:'ng/mL', signal:true },
+  neutrophils_abs:    { name:'Neutrophils Absolute', unit:'K/µL', signal:true },
+  lymphocytes_abs:    { name:'Lymphocytes Absolute', unit:'K/µL', signal:true },
+  esr:                { name:'ESR', unit:'mm/hr', signal:true },
+  albumin:            { name:'Albumin', unit:'g/dL', signal:true },
+  wbc:                { name:'WBC', unit:'K/µL', signal:true },
+  igg:                { name:'IgG', unit:'mg/dL', signal:true },
+
+  // ── Reference only (stored, not scored) ──
   rbc:                { name:'RBC', unit:'x10E6/µL' },
   hemoglobin:         { name:'Hemoglobin', unit:'g/dL' },
   hematocrit:         { name:'Hematocrit', unit:'%' },
@@ -186,8 +208,6 @@ const LAB_PARAMS = {
   monocytes_pct:      { name:'Monocytes %', unit:'%' },
   eos_pct:            { name:'Eos %', unit:'%' },
   basos_pct:          { name:'Basos %', unit:'%' },
-  neutrophils_abs:    { name:'Neutrophils Absolute', unit:'K/µL' },
-  lymphocytes_abs:    { name:'Lymphocytes Absolute', unit:'K/µL' },
   monocytes_abs:      { name:'Monocytes Absolute', unit:'K/µL' },
   eosinophils_abs:    { name:'Eosinophils Absolute', unit:'K/µL' },
   basophils_abs:      { name:'Basophils Absolute', unit:'K/µL' },
@@ -199,9 +219,8 @@ const LAB_PARAMS = {
   creatinine:         { name:'Creatinine', unit:'mg/dL' },
   bun_creatinine_ratio:{ name:'BUN/Creatinine Ratio', unit:'' },
   glucose:            { name:'Glucose', unit:'mg/dL' },
-  calcium:             { name:'Calcium', unit:'mg/dL' },
+  calcium:            { name:'Calcium', unit:'mg/dL' },
   total_protein:      { name:'Total Protein', unit:'g/dL' },
-  albumin:            { name:'Albumin', unit:'g/dL' },
   globulin:           { name:'Calc Total Globulin', unit:'g/dL' },
   ag_ratio:           { name:'Albumin/Globulin Ratio', unit:'' },
   total_bilirubin:    { name:'Total Bilirubin', unit:'mg/dL' },
@@ -210,7 +229,6 @@ const LAB_PARAMS = {
   alt:                { name:'ALT', unit:'IU/L' },
   anion_gap:          { name:'Anion Gap', unit:'mmol/L' },
   egfr:               { name:'eGFR', unit:'mL/min/1.73m²' },
-  igg:                { name:'IgG', unit:'mg/dL' },
   iga:                { name:'IgA', unit:'mg/dL' },
   igm:                { name:'IgM', unit:'mg/dL' },
   tac_trough:         { name:'Tacrolimus/Cyclosporine Trough', unit:'ng/mL' },
@@ -233,6 +251,7 @@ function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => rece
   labs = await fetchRows('lab_results', currentUser.id, 'taken_at', true);
   renderHistory();
   realtimeChannel = subscribeToTable('lab_results', currentUser.id, handleRealtimeChange);
+  setupPasteListener();
 })();
 
 function handleRealtimeChange(payload) {
@@ -262,6 +281,42 @@ function onFilesSelected(e) {
   selectedFiles = selectedFiles.concat(newFiles);
   renderFileChips();
   document.getElementById('file-input').value = '';
+}
+
+// ══════════════════════════════════════════════════
+//  CLIPBOARD PASTE — lets you paste a copied image (e.g. a
+//  screenshot of a lab portal result) directly into the page
+//  instead of having to save it as a file first.
+// ══════════════════════════════════════════════════
+function setupPasteListener() {
+  document.addEventListener('paste', (e) => {
+    // Only intercept when we're on the Upload tab and not actively
+    // typing into a text field (so normal copy/paste elsewhere still works).
+    if (!document.getElementById('page-upload').classList.contains('active')) return;
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    let found = false;
+    for (const item of items) {
+      if (item.type.indexOf('image') === 0) {
+        const file = item.getAsFile();
+        if (file) {
+          found = true;
+          // Clipboard image blobs often come back as "image.png" with no
+          // useful name — give it a timestamped name so file chips read cleanly.
+          const named = new File([file], `pasted-${Date.now()}.png`, { type: file.type });
+          selectedFiles.push(named);
+        }
+      }
+    }
+    if (found) {
+      e.preventDefault();
+      renderFileChips();
+      showToast('Image pasted ✓', 'success');
+    }
+  });
 }
 
 function renderFileChips() {
@@ -323,7 +378,12 @@ function fileToBase64(file) {
 }
 
 // ══════════════════════════════════════════════════
-//  EXTRACTION — sends ALL selected files in ONE API call
+//  EXTRACTION — sends ALL selected files in ONE call to the
+//  extract-labs Edge Function. Open-ended: captures every lab
+//  value found, not just ones on a fixed list. Known parameters
+//  get matched to their standard key (and Signal/Reference tier);
+//  anything else gets its own short key invented on the fly and
+//  is still saved as Reference.
 // ══════════════════════════════════════════════════
 async function runExtraction() {
   if (!selectedFiles.length) return;
@@ -343,22 +403,24 @@ async function runExtraction() {
       }
     }
 
-    const paramList = Object.entries(LAB_PARAMS).map(([k,v]) => `${k} ("${v.name}"${v.unit?`, unit ~${v.unit}`:''})`).join(', ');
+    const knownList = Object.entries(LAB_PARAMS).map(([k,v]) => `${k} ("${v.name}"${v.unit?`, unit ~${v.unit}`:''})`).join(', ');
 
-    const prompt = `These images/PDFs are lab results report(s) for a lung transplant patient — there may be multiple separate panels (e.g. a CBC and a Metabolic Panel) included together. Extract ONLY these specific parameters if you can find them anywhere across ALL the provided files, matching by common lab names/abbreviations: ${paramList}.
+    const prompt = `These images/PDFs are lab results report(s) for a lung transplant patient — there may be multiple separate panels (e.g. a CBC and a Metabolic Panel) included together, possibly across several files.
+
+Extract EVERY numeric lab value you can find across ALL the provided files — do not limit yourself to a fixed list. For each value found:
+- If it matches one of these known parameters (match by common lab names/abbreviations), use the exact key given: ${knownList}
+- If it doesn't match any known parameter, invent a short, descriptive snake_case key for it yourself (e.g. "magnesium", "vitamin_d_25oh") and use the lab report's own label as a guide.
 
 Respond with ONLY a raw JSON object, no other text, no markdown fences, in this exact shape:
 {
   "collection_date": "YYYY-MM-DD or null if not visible",
   "values": [
-    { "key": "wbc", "value": 7.2, "unit": "K/uL" }
-  ],
-  "unmatched": ["any other lab names you saw that weren't in the list above, just the names"]
+    { "key": "neutrophils_abs", "value": 4.1, "unit": "K/uL", "label": "Neutrophils Absolute" }
+  ]
 }
 
-Only include a "key" in "values" if you are confident you found that specific parameter's numeric value somewhere in the provided files. Use the exact key strings given above. If a value appears in more than one of the files, just include it once using the most recent/clearest instance. If nothing matches, return an empty values array.`;
+Every entry in "values" must include a human-readable "label" (use the known parameter's name if it matched one, otherwise use the name as it appeared on the report). If a value appears in more than one of the files, include it once using the most recent/clearest instance. If you find nothing at all, return an empty values array.`;
 
-    // Get the current session token to authenticate with the Edge Function.
     const { data: sessionData } = await sb.auth.getSession();
     const accessToken = sessionData?.session?.access_token;
     if (!accessToken) throw new Error('Not logged in — please refresh and log in again');
@@ -406,26 +468,47 @@ function showReview(parsed) {
   document.getElementById('review-date').value = collectionDate;
   document.getElementById('review-time').value = '00:00';
 
-  extractedItems = (parsed.values || [])
-    .filter(v => LAB_PARAMS[v.key])
-    .map(v => ({ key: v.key, name: LAB_PARAMS[v.key].name, value: v.value, unit: v.unit || LAB_PARAMS[v.key].unit }));
+  extractedItems = (parsed.values || []).map(v => {
+    const known = LAB_PARAMS[v.key];
+    return {
+      key: v.key,
+      name: known ? known.name : (v.label || v.key),
+      value: v.value,
+      unit: v.unit || (known ? known.unit : ''),
+      signal: known ? !!known.signal : false,
+      isNew: !known,
+    };
+  });
 
   const rowsEl = document.getElementById('extract-rows');
   if (!extractedItems.length) {
     rowsEl.innerHTML = `<div class="empty" style="padding:20px"><div class="empty-icon">🤷</div><div class="empty-title">Nothing recognized</div><div class="empty-sub">Try clearer or more zoomed-in images.</div></div>`;
-  } else {
-    rowsEl.innerHTML = extractedItems.map((item, i) => `
-      <div class="extract-row">
+    return;
+  }
+
+  const signalItems = extractedItems.filter(i => i.signal);
+  const refItems = extractedItems.filter(i => !i.signal);
+
+  function rowHtml(item, i) {
+    return `
+      <div class="extract-row${item.isNew ? ' new-key-row' : ''}">
         <input type="checkbox" class="extract-check" id="ec-${i}" checked>
         <div class="extract-name">${item.name}</div>
         <input type="number" step="0.01" class="extract-input" id="ev-${i}" value="${item.value}">
         <div class="extract-unit">${item.unit}</div>
-      </div>`).join('');
+      </div>`;
   }
 
-  const unmatchedEl = document.getElementById('unmatched-area');
-  unmatchedEl.innerHTML = (parsed.unmatched && parsed.unmatched.length)
-    ? `<div class="unmatched-note">📎 Also seen but not tracked here: ${parsed.unmatched.join(', ')}</div>` : '';
+  let html = '';
+  if (signalItems.length) {
+    html += `<div class="section-label"><span class="signal-dot"></span> Signal — feeds Early Warning Signal</div>`;
+    html += signalItems.map(item => rowHtml(item, extractedItems.indexOf(item))).join('');
+  }
+  if (refItems.length) {
+    html += `<div class="section-label"><span class="ref-dot"></span> Reference — stored only</div>`;
+    html += refItems.map(item => rowHtml(item, extractedItems.indexOf(item))).join('');
+  }
+  rowsEl.innerHTML = html;
 }
 
 async function saveExtractedValues() {
@@ -465,6 +548,8 @@ async function saveExtractedValues() {
 //  HISTORY
 // ══════════════════════════════════════════════════
 function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function labDisplayName(labType) { return LAB_PARAMS[labType] ? LAB_PARAMS[labType].name : labType; }
+function isSignalLab(labType) { return LAB_PARAMS[labType] ? !!LAB_PARAMS[labType].signal : false; }
 
 async function deleteLab(id) {
   if (!confirm('Delete this value?')) return;
@@ -480,7 +565,7 @@ async function deleteLab(id) {
 async function editLabValue(id) {
   const row = labs.find(l => l.id === id);
   if (!row) return;
-  const newVal = prompt(`New value for ${LAB_PARAMS[row.lab_type]?.name || row.lab_type} (${row.unit||''}):`, row.value);
+  const newVal = prompt(`New value for ${labDisplayName(row.lab_type)} (${row.unit||''}):`, row.value);
   if (newVal === null) return;
   const v = parseFloat(newVal);
   if (isNaN(v)) { showToast('Invalid number', 'error'); return; }
@@ -507,9 +592,9 @@ function renderHistory() {
   el.innerHTML = Object.entries(groups).map(([day, rows]) => `
     <div class="day-group-label">${day}</div>
     ${rows.map(r => {
-      const def = LAB_PARAMS[r.lab_type];
-      return `<div class="hist-row">
-        <div class="hist-name">${def ? def.name : r.lab_type}</div>
+      const signal = isSignalLab(r.lab_type);
+      return `<div class="hist-row${signal ? ' signal' : ''}">
+        <div class="hist-name">${labDisplayName(r.lab_type)}</div>
         <div class="hist-val">${r.value} <span style="font-size:12px;color:var(--ink3)">${r.unit||''}</span></div>
         <div class="hist-actions">
           <button class="btn-icon" onclick="editLabValue('${r.id}')" title="Edit">✏️</button>

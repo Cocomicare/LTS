@@ -3,9 +3,18 @@
 //  Used by health_index.html (the full module) AND index.html (the
 //  dashboard's refresh/sync button) so there's exactly one copy of
 //  the scoring math to maintain. Loaded after supabase-client.js.
+//
+//  Medication Impact Signal (toxicity composite) was retired —
+//  toxicity labs move slowly enough that routine clinic bloodwork
+//  already catches them. This engine now focuses entirely on
+//  subclinical infection/rejection detection, including a set of
+//  lab-derived parameters (see "LAB-DERIVED PARAMS" below) that
+//  layer on top of the original vitals/symptom/peakflow/spiro/sputum
+//  parameters.
 // ══════════════════════════════════════════════════════════════════
 
 const EWS_PARAMS = [
+  // ── Daily/frequent tracking (unchanged from original) ──
   { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:11, maxAgeDays:2, direction:'higher_better',
     desc:'Subjective wellness score', source:'symptoms' },
   { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:22, maxAgeDays:2, direction:'higher_better',
@@ -22,6 +31,35 @@ const EWS_PARAMS = [
     desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
   { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:4, maxAgeDays:3, direction:'higher_better',
     desc:'Composite of color + texture + volume', source:'sputum' },
+
+  // ── LAB-DERIVED PARAMS ──
+  // Ranked by biological lead time (earliest/most specific first). Each
+  // gets its own maxAgeDays reflecting realistic draw cadence: short
+  // windows for markers that are cheap/easy to self-order through
+  // Quest/LabCorp, longer windows for markers that only show up on a
+  // full UF panel or a specialist-ordered test. All of these are
+  // user-adjustable in health_index.html's Settings panel — nothing
+  // here is hardcoded once a settings row exists.
+  { key:'dd_cfdna', name:'Donor-Derived cfDNA', icon:'🧬', unit:'%', weight:10, maxAgeDays:60, direction:'cfdna_binary',
+    desc:'Most direct, earliest rejection-specific signal — specialist/UF-only test (e.g. AlloSure)', source:'labs' },
+  { key:'il6', name:'IL-6', icon:'🔥', unit:'pg/mL', weight:6, maxAgeDays:30, direction:'stable',
+    desc:'Earliest general inflammatory cytokine — precedes CRP', source:'labs' },
+  { key:'crp', name:'CRP', icon:'🌡️', unit:'mg/L', weight:10, maxAgeDays:14, direction:'stable',
+    desc:'Best practical general inflammation marker — self-orderable', source:'labs' },
+  { key:'procalcitonin', name:'Procalcitonin', icon:'🦠', unit:'ng/mL', weight:4, maxAgeDays:30, direction:'stable',
+    desc:'Fast, bacteria-specific — blind to rejection, so weighted lower', source:'labs' },
+  { key:'neutrophils_abs', name:'Absolute Neutrophils', icon:'🛡️', unit:'K/µL', weight:8, maxAgeDays:21, direction:'stable',
+    desc:'Bacterial infection signal; also flags drug-induced neutropenia', source:'labs' },
+  { key:'lymphocytes_abs', name:'Absolute Lymphocytes', icon:'🛡️', unit:'K/µL', weight:6, maxAgeDays:21, direction:'stable',
+    desc:'Viral reactivation (e.g. CMV) and some rejection correlation', source:'labs' },
+  { key:'esr', name:'ESR', icon:'⏱️', unit:'mm/hr', weight:4, maxAgeDays:21, direction:'stable',
+    desc:'Slower, less sensitive cousin of CRP', source:'labs' },
+  { key:'albumin', name:'Albumin', icon:'💧', unit:'g/dL', weight:4, maxAgeDays:21, direction:'higher_better',
+    desc:'Negative acute-phase reactant — lags real-time inflammation by ~weeks', source:'labs' },
+  { key:'wbc', name:'WBC', icon:'🩸', unit:'K/µL', weight:3, maxAgeDays:21, direction:'stable',
+    desc:'Broad infection marker — partially redundant with neutrophils/lymphocytes', source:'labs' },
+  { key:'igg', name:'IgG', icon:'🛡️', unit:'mg/dL', weight:3, maxAgeDays:60, direction:'higher_better',
+    desc:'Standing immune capacity/risk — not a real-time event signal, lowest weight', source:'labs' },
 ];
 const EWS_NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'hr'];
 
@@ -64,8 +102,27 @@ function ewsComputeBPScore(sys, dia) {
   return Math.min(sysScore(sys), diaScore(dia));
 }
 
+// Donor-derived cfDNA doesn't have a meaningful "personal baseline drift" —
+// unlike a CBC value, there's no healthy version of this trending up and
+// down day to day. It's closer to a flag against a fixed clinical cutoff
+// than a percentage deviation. The cutoff below is illustrative (modeled
+// loosely on common %cfDNA reporting for tests like AlloSure) — confirm
+// the actual interpretation thresholds with your transplant team rather
+// than treating this as a clinically validated cutoff.
+function ewsComputeCfdnaScore(latest) {
+  if (latest <= 0.5) return 100;
+  if (latest <= 1.0) return 70;
+  if (latest <= 2.0) return 35;
+  return 10;
+}
+
 function ewsComputeParamScore(param, latest, baseline) {
   if (latest === null || latest === undefined) return null;
+
+  if (param.direction === 'cfdna_binary') {
+    return ewsComputeCfdnaScore(latest);
+  }
+
   const base = (baseline != null && baseline !== 0) ? baseline : latest;
   if (base === 0) return 75;
 
@@ -94,6 +151,8 @@ function ewsComputeParamScore(param, latest, baseline) {
     if (pctDev <= 2.5) return 40;
     return Math.max(0, 20 - pctDev * 4);
   }
+  // 'stable' — deviation in EITHER direction is concerning (e.g. CRP, WBC,
+  // neutrophils/lymphocytes, heart rate, weight)
   const pctDev = Math.abs((latest - base) / base) * 100;
   if (pctDev <= 2) return 100;
   if (pctDev <= 5) return 85;
@@ -109,7 +168,9 @@ function ewsComputeParamScore(param, latest, baseline) {
 //  everything the UI needs to render.
 // ══════════════════════════════════════════════════════════════════
 async function ewsComputeAndSave(userId) {
-  const [settingsRes, historyRes, symptomRows, vitalsRows, peakflowRows, spiroRows, sputumRows] = await Promise.all([
+  const labTypes = EWS_PARAMS.filter(p => p.source === 'labs').map(p => p.key);
+
+  const [settingsRes, historyRes, symptomRows, vitalsRows, peakflowRows, spiroRows, sputumRows, labRows] = await Promise.all([
     sb.from('health_index_settings').select('*').eq('user_id', userId).maybeSingle(),
     sb.from('health_index_history').select('*').eq('user_id', userId).order('computed_at', { ascending: true }),
     sb.from('symptom_checkins').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
@@ -117,6 +178,7 @@ async function ewsComputeAndSave(userId) {
     sb.from('peak_flow_sessions').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
     sb.from('spirometer_sessions').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
     sb.from('sputum_logs').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
+    sb.from('lab_results').select('*').eq('user_id', userId).in('lab_type', labTypes).order('taken_at', { ascending: true }),
   ]);
 
   const settingsRow = settingsRes.data || null;
@@ -131,6 +193,9 @@ async function ewsComputeAndSave(userId) {
     .map(r => ({ date: r.taken_at, value: (Number(r.color_score) + Number(r.texture_score) + Number(r.volume_score)) / 3 }));
   ['spo2','hr','temp','wt'].forEach(vt => {
     rawData[vt] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
+  });
+  labTypes.forEach(key => {
+    rawData[key] = (labRows.data || []).filter(r => r.lab_type === key).map(r => ({ date: r.taken_at, value: Number(r.value) }));
   });
 
   const weights = ewsGetWeights(settingsRow);
@@ -227,150 +292,4 @@ async function ewsComputeAndSave(userId) {
   }
 
   return { score: finalScore, breakdown, missingCount, missingRequired: [], settingsRow, historyRows };
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  MEDICATION IMPACT SIGNAL ENGINE
-//  A separate composite from Early Warning Signal — this one answers
-//  "is my treatment itself causing harm" (nephrotoxicity, bone marrow
-//  suppression, hepatotoxicity, hypertension, immune adequacy) rather
-//  than "am I showing signs of infection/rejection."
-//  Uses fixed defaults — no customizable Settings UI for this one.
-// ══════════════════════════════════════════════════════════════════
-
-const MED_PARAMS = [
-  { key:'creatinine', name:'Creatinine', icon:'💧', unit:'mg/dL', weight:18, maxAgeDays:60, direction:'lower_better',
-    desc:'Nephrotoxicity marker (tacrolimus/cyclosporine)', source:'labs' },
-  { key:'egfr', name:'eGFR', icon:'🫘', unit:'mL/min/1.73m²', weight:14, maxAgeDays:60, direction:'higher_better',
-    desc:'Kidney filtration rate', source:'labs' },
-  { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:14, maxAgeDays:7, direction:'fixed_bp',
-    desc:'Tacrolimus/cyclosporine commonly raise blood pressure', source:'vitals' },
-  { key:'wbc', name:'White Blood Cell Count', icon:'🩸', unit:'K/µL', weight:12, maxAgeDays:60, direction:'higher_better',
-    desc:'Bone marrow suppression (low = concerning here)', source:'labs' },
-  { key:'platelets', name:'Platelets', icon:'🟣', unit:'K/µL', weight:10, maxAgeDays:60, direction:'higher_better',
-    desc:'Bone marrow suppression (low = concerning here)', source:'labs' },
-  { key:'ast', name:'AST', icon:'🟤', unit:'IU/L', weight:6, maxAgeDays:60, direction:'lower_better',
-    desc:'Hepatotoxicity marker', source:'labs' },
-  { key:'alt', name:'ALT', icon:'🟤', unit:'IU/L', weight:6, maxAgeDays:60, direction:'lower_better',
-    desc:'Hepatotoxicity marker', source:'labs' },
-  { key:'glucose', name:'Glucose', icon:'🍬', unit:'mg/dL', weight:8, maxAgeDays:60, direction:'lower_better',
-    desc:'Steroid-induced hyperglycemia', source:'labs' },
-  { key:'igg', name:'IgG', icon:'🛡️', unit:'mg/dL', weight:4, maxAgeDays:45, direction:'higher_better',
-    desc:'Immune adequacy — low levels may require IVIG replacement', source:'labs' },
-  { key:'iga', name:'IgA', icon:'🛡️', unit:'mg/dL', weight:4, maxAgeDays:45, direction:'higher_better',
-    desc:'Immune adequacy', source:'labs' },
-  { key:'igm', name:'IgM', icon:'🛡️', unit:'mg/dL', weight:4, maxAgeDays:45, direction:'higher_better',
-    desc:'Immune adequacy', source:'labs' },
-];
-const MED_BASELINE_DAYS = 60; // labs are periodic, not daily — wider window than EWS
-
-async function medComputeAndSave(userId) {
-  const labTypes = MED_PARAMS.filter(p => p.source === 'labs').map(p => p.key);
-
-  const [historyRes, labRows, vitalsRows] = await Promise.all([
-    sb.from('medication_impact_history').select('*').eq('user_id', userId).order('computed_at', { ascending: true }),
-    sb.from('lab_results').select('*').eq('user_id', userId).in('lab_type', labTypes).order('taken_at', { ascending: true }),
-    sb.from('vitals_readings').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
-  ]);
-
-  let historyRows = historyRes.data || [];
-  const rawData = {};
-
-  labTypes.forEach(key => {
-    rawData[key] = (labRows.data || []).filter(r => r.lab_type === key).map(r => ({ date: r.taken_at, value: Number(r.value) }));
-  });
-
-  // Blood pressure: pair systolic+diastolic by shared timestamp, scored via fixed clinical thresholds.
-  {
-    const bpMap = {};
-    (vitalsRows.data || []).forEach(r => {
-      if (r.vital_type !== 'bp_systolic' && r.vital_type !== 'bp_diastolic') return;
-      const key = r.taken_at;
-      if (!bpMap[key]) bpMap[key] = { date: r.taken_at };
-      if (r.vital_type === 'bp_systolic') bpMap[key].sys = Number(r.value);
-      else bpMap[key].dia = Number(r.value);
-    });
-    rawData.bp = Object.values(bpMap)
-      .filter(p => p.sys != null && p.dia != null)
-      .map(p => ({ date: p.date, value: p.sys, sys: p.sys, dia: p.dia }))
-      .sort((a,b) => new Date(a.date) - new Date(b.date));
-  }
-
-  const today = new Date(); today.setHours(0,0,0,0);
-  let weightedSum = 0, totalWeight = 0, missingCount = 0;
-  const breakdown = [];
-
-  MED_PARAMS.forEach(param => {
-    const recs = rawData[param.key] || [];
-    const latestRec = recs.length ? recs[recs.length-1] : null;
-    const latest = latestRec ? latestRec.value : null;
-    const baseline = ewsRollingBaseline(recs, MED_BASELINE_DAYS);
-    const latestDate = latestRec ? new Date(latestRec.date) : null;
-    if (latestDate) latestDate.setHours(0,0,0,0);
-
-    const cutoff = new Date(today); cutoff.setDate(today.getDate() - param.maxAgeDays);
-    const daysAgo = latestDate ? Math.floor((today - latestDate) / 86400000) : null;
-
-    let freshness = 'ok';
-    if (!latestDate || latest === null) { freshness = 'missing'; missingCount++; }
-    else if (latestDate < cutoff) { freshness = 'missing'; missingCount++; }
-
-    if (freshness === 'missing') {
-      breakdown.push({ param, score:null, latest, baseline, w: param.weight, freshness, daysAgo });
-      return;
-    }
-
-    const score = param.direction === 'fixed_bp'
-      ? ewsComputeBPScore(latestRec.sys, latestRec.dia)
-      : ewsComputeParamScore(param, latest, baseline);
-    totalWeight += param.weight;
-    weightedSum += score * param.weight;
-    breakdown.push({ param, score, latest, baseline, w: param.weight, freshness, daysAgo, sys: latestRec.sys, dia: latestRec.dia });
-  });
-
-  let finalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null;
-  if (finalScore !== null) finalScore = Math.max(0, Math.min(100, finalScore));
-
-  breakdown.sort((a,b) => {
-    if (a.score !== null && b.score === null) return -1;
-    if (a.score === null && b.score !== null) return 1;
-    const impA = a.score !== null ? (100 - a.score) * a.w : 0;
-    const impB = b.score !== null ? (100 - b.score) * b.w : 0;
-    return impB - impA;
-  });
-
-  if (finalScore !== null) {
-    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-    const todaysRows = historyRows.filter(h => {
-      const d = new Date(h.computed_at); d.setHours(0,0,0,0);
-      return d.getTime() === todayStart.getTime();
-    });
-    const components = {};
-    breakdown.forEach(b => { components[b.param.key] = b.score; });
-
-    try {
-      if (todaysRows.length) {
-        todaysRows.sort((a,b) => new Date(b.computed_at) - new Date(a.computed_at));
-        const keep = todaysRows[0];
-        const dupes = todaysRows.slice(1);
-        if (keep.score !== finalScore) {
-          const updated = await updateRow('medication_impact_history', keep.id, { score: finalScore, components });
-          keep.score = updated.score; keep.components = updated.components;
-        }
-        for (const dupe of dupes) {
-          await deleteRow('medication_impact_history', dupe.id);
-          historyRows = historyRows.filter(h => h.id !== dupe.id);
-        }
-      } else {
-        const inserted = await insertRow('medication_impact_history', {
-          user_id: userId, score: finalScore, components, computed_at: new Date().toISOString(),
-        });
-        historyRows.push(inserted);
-      }
-    } catch (e) {
-      console.error('medComputeAndSave: history save failed:', e.message);
-    }
-  }
-
-  return { score: finalScore, breakdown, missingCount, historyRows };
 }
