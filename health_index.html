@@ -277,7 +277,7 @@ const PARAMS = [
   { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:6, maxAgeDays:2, direction:'stable',
     desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
   { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:5, maxAgeDays:7, direction:'stable',
-    desc:'Tacrolimus side effect marker', source:'vitals', vitalType:'bp_systolic' },
+    desc:'Tacrolimus side effect marker — scored vs. clinical thresholds (120/80, 140/90), not your personal baseline', source:'vitals', vitalType:'bp_systolic' },
   { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:12, maxAgeDays:3, direction:'lower_better',
     desc:'Key infection indicator', source:'vitals', vitalType:'temp' },
   { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:5, maxAgeDays:14, direction:'stable',
@@ -346,10 +346,26 @@ async function refreshAll() {
     // Sputum composite: average of color + texture + volume (all on the same higher=better 1-10 scale).
     rawData.sputum = (sputumRows.data || []).filter(r => r.color_score != null && r.texture_score != null && r.volume_score != null)
       .map(r => ({ date: r.taken_at, value: (Number(r.color_score) + Number(r.texture_score) + Number(r.volume_score)) / 3 }));
-    ['spo2','hr','bp_systolic','temp','wt'].forEach(vt => {
-      const key = vt === 'bp_systolic' ? 'bp' : vt;
-      rawData[key] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
+    ['spo2','hr','temp','wt'].forEach(vt => {
+      rawData[vt] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
     });
+    // Blood pressure: pair systolic+diastolic readings sharing the same timestamp.
+    // Scored against fixed clinical thresholds (140/90 etc.), not personal baseline —
+    // BP "normal" is a recognized clinical standard, not something that varies safely person-to-person.
+    {
+      const bpMap = {};
+      (vitalsRows.data || []).forEach(r => {
+        if (r.vital_type !== 'bp_systolic' && r.vital_type !== 'bp_diastolic') return;
+        const key = r.taken_at;
+        if (!bpMap[key]) bpMap[key] = { date: r.taken_at };
+        if (r.vital_type === 'bp_systolic') bpMap[key].sys = Number(r.value);
+        else bpMap[key].dia = Number(r.value);
+      });
+      rawData.bp = Object.values(bpMap)
+        .filter(p => p.sys != null && p.dia != null)
+        .map(p => ({ date: p.date, value: p.sys, sys: p.sys, dia: p.dia }))
+        .sort((a,b) => new Date(a.date) - new Date(b.date));
+    }
 
     await computeScore();
   } catch (e) {
@@ -369,6 +385,27 @@ function rollingBaseline(recs, days) {
   const useRecs = windowRecs.length > 0 ? windowRecs : recs;
   const vals = useRecs.map(r => r.value).filter(v => v != null && !isNaN(v));
   return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+// Blood pressure: scored against fixed clinical categories (not personal baseline),
+// using whichever of systolic/diastolic falls into the more concerning category.
+function computeBPScore(sys, dia) {
+  function sysScore(s) {
+    if (s < 90) return 35;             // hypotensive — discharge guide calls this an emergency threshold
+    if (s < 120) return 100;            // normal
+    if (s < 130) return 90;             // elevated
+    if (s < 140) return 70;             // stage 1 hypertension
+    if (s < 160) return 45;             // stage 2 hypertension
+    return 15;                          // hypertensive crisis range
+  }
+  function diaScore(d) {
+    if (d < 60) return 35;
+    if (d < 80) return 100;
+    if (d < 90) return 70;              // stage 1
+    if (d < 100) return 45;             // stage 2
+    return 15;                          // crisis
+  }
+  return Math.min(sysScore(sys), diaScore(dia));
 }
 
 function computeParamScore(param, latest, baseline) {
@@ -448,10 +485,12 @@ async function computeScore() {
       return;
     }
 
-    const score = computeParamScore(param, latest, baseline);
+    const score = param.key === 'bp'
+      ? computeBPScore(latestRec.sys, latestRec.dia)
+      : computeParamScore(param, latest, baseline);
     totalWeight += w;
     weightedSum += score * w;
-    breakdown.push({ param, score, latest, baseline, w, freshness, daysAgo });
+    breakdown.push({ param, score, latest, baseline, w, freshness, daysAgo, sys: latestRec.sys, dia: latestRec.dia });
   });
 
   if (missingRequired.length > 0) {
@@ -552,8 +591,10 @@ function renderDial(score, breakdown, missingCount, missingRequired) {
     const barWidth = score !== null ? score : 0;
     const isTopImpact = i === 0 && score !== null && score < 90;
     const sinceText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo !== null ? `${daysAgo}d ago` : '—';
-    const baselineText = baseline !== null ? `Baseline: ${baseline.toFixed(1)} ${param.unit}` : 'Building baseline…';
-    const latestText = latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged';
+    const baselineText = param.key === 'bp' ? 'Scored vs. clinical thresholds' : (baseline !== null ? `Baseline: ${baseline.toFixed(1)} ${param.unit}` : 'Building baseline…');
+    const latestText = param.key === 'bp'
+      ? (b.sys != null ? `Latest: ${b.sys}/${b.dia} mmHg` : 'Not logged')
+      : (latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged');
     return `
     <div class="param-row" style="${freshness==='missing'?'opacity:0.45':''}">
       <div class="param-icon">${param.icon}</div>
@@ -805,6 +846,57 @@ function showScoreInfo(paramKey) {
 
   const overlay = document.getElementById('score-info-overlay');
   const sheet = document.getElementById('score-info-sheet');
+
+  if (param.key === 'bp') {
+    if (b.sys == null || b.dia == null) {
+      sheet.innerHTML = `
+        <div class="modal-title">${param.icon} Blood Pressure</div>
+        <div class="modal-sub">How this parameter is scored</div>
+        <div class="modal-section"><p>No paired systolic/diastolic reading on file yet — log a blood pressure reading in Vital Signs to see the calculation here.</p></div>
+        <button class="btn btn-primary modal-close-btn" onclick="closeScoreInfo()">Close</button>`;
+      overlay.classList.add('open');
+      return;
+    }
+    const rows = [
+      ['Normal', '<120 / <80', 100],
+      ['Elevated', '120–129 / <80', 90],
+      ['Stage 1 Hypertension', '130–139 / 80–89', 70],
+      ['Stage 2 Hypertension', '140–159 / 90–99', 45],
+      ['Hypertensive Crisis', '≥160 / ≥100', 15],
+      ['Hypotensive', '<90 / <60', 35],
+    ];
+    const tableRows = rows.map(([label, range, sc]) => `
+      <tr class="${sc === score ? 'current-row' : ''}">
+        <td>${label}</td><td>${range}</td><td>${sc}</td>
+      </tr>`).join('');
+    sheet.innerHTML = `
+      <div class="modal-title">${param.icon} Blood Pressure</div>
+      <div class="modal-sub">How this parameter's score of <strong>${score ?? '—'}</strong> was calculated</div>
+
+      <div class="modal-section">
+        <h4>Your Numbers Right Now</h4>
+        <div class="modal-numbers">
+          Latest reading: <span class="hl">${b.sys} / ${b.dia} mmHg</span><br>
+          Resulting score: <span class="hl">${score ?? '—'} / 100</span>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4>How the Math Works</h4>
+        <p>Unlike most parameters in this app, Blood Pressure is <strong>not</strong> scored against your personal baseline. Instead it uses standard clinical categories, since "normal" blood pressure is a recognized medical standard rather than something that safely varies a lot person to person.</p>
+        <p style="margin-top:8px">Your systolic and diastolic numbers are each checked against the table below, and the <strong>worse</strong> of the two categories determines your score — so a normal systolic reading paired with an elevated diastolic reading still gets flagged.</p>
+      </div>
+
+      <div class="modal-section">
+        <h4>Score Categories</h4>
+        <table class="modal-table"><tr><th>Category</th><th>Systolic / Diastolic</th><th>Score</th></tr>${tableRows}</table>
+      </div>
+
+      <button class="btn btn-primary modal-close-btn" onclick="closeScoreInfo()">Close</button>
+    `;
+    overlay.classList.add('open');
+    return;
+  }
 
   if (latest == null || baseline == null) {
     sheet.innerHTML = `
