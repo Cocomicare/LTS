@@ -262,7 +262,6 @@ const MODULES = [
   { id:'peakflow', name:'Peak Flow',       icon:'💨', file:'peak_flow_tracker.html',         table:'peak_flow_sessions',   dateField:'taken_at' },
   { id:'checkin',  name:'Symptom Check-in',icon:'📋', file:'symptom_checkin.html',           table:'symptom_checkins',     dateField:'taken_at' },
   { id:'sputum',   name:'Sputum Log',      icon:'🫧', file:'sputum_log.html',                table:'sputum_logs',          dateField:'taken_at' },
-  { id:'labs',     name:'Labs',            icon:'🧪', file:'labs.html',                      table:'lab_results',          dateField:'taken_at' },
   { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
   { id:'health',   name:'Health Index',    icon:'📊', file:'health_index.html',              table:'health_index_history', dateField:'computed_at' },
 ];
@@ -270,7 +269,7 @@ const MODULES = [
 // Modules shown as data-driven tracking tiles on the dashboard.
 // 'health' is excluded — it's shown via the hero card instead.
 // 'immuno' is excluded — it lives in the Reference Guide section instead.
-const TRACKING_TILE_IDS = ['vitals','spiro','peakflow','checkin','sputum','labs'];
+const TRACKING_TILE_IDS = ['vitals','spiro','peakflow','checkin','sputum'];
 
 // Educational / reference content now lives behind a single hub page.
 const REFERENCE_FILES = {
