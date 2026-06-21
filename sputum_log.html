@@ -373,6 +373,7 @@ function renderHistory() {
           </div>
           <div class="hist-metric"><div class="hist-metric-val">${r.texture_score}</div><div class="hist-metric-label">Texture</div></div>
           <div class="hist-metric"><div class="hist-metric-val">${r.volume_score}</div><div class="hist-metric-label">Volume</div></div>
+          <div class="hist-metric"><div class="hist-metric-val" style="color:var(--accent)">${((r.color_score + r.texture_score + r.volume_score) / 3).toFixed(1)}</div><div class="hist-metric-label">Average</div></div>
         </div>
         <div class="hist-actions">
           <button class="btn-icon" onclick="editLog('${r.id}')" title="Edit">✏️</button>
