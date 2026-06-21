@@ -93,7 +93,8 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 <div class="input-bar">
   <div class="input-row">
-    <button class="upload-btn" onclick="document.getElementById('doc-file-input').click()" title="Upload a reference document">📎</button>
+    <button class="upload-btn" onclick="document.getElementById('doc-file-input').click()" title="Upload a reference document (image or PDF)">📎</button>
+    <button class="upload-btn" onclick="pasteFromClipboardAssistant()" title="Paste an image from clipboard">📋</button>
     <input type="file" id="doc-file-input" accept="image/*,application/pdf" onchange="onDocFileSelected(event)">
     <textarea id="question-input" placeholder="Ask a question…" rows="1" onkeydown="handleInputKeydown(event)"></textarea>
     <button class="send-btn" id="send-btn" onclick="sendQuestion()">Send</button>
@@ -140,7 +141,64 @@ let pendingDocSummaryRaw = null;
     document.body.innerHTML = '<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
     return;
   }
+  setupPasteListener();
 })();
+
+// ══════════════════════════════════════════════════
+//  PASTE BUTTON — reads the clipboard on demand via the Clipboard
+//  API, in addition to the passive Ctrl+V listener below. Same
+//  image-only limitation applies (no PDFs via clipboard, ever).
+// ══════════════════════════════════════════════════
+async function pasteFromClipboardAssistant() {
+  try {
+    const items = await navigator.clipboard.read();
+    let found = false;
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.indexOf('image') === 0) {
+          const blob = await item.getType(type);
+          const named = new File([blob], `pasted-${Date.now()}.png`, { type });
+          processDocFile(named);
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (!found) appendMessage('error', 'No image found on clipboard.');
+  } catch (e) {
+    appendMessage('error', 'Could not read clipboard — try Ctrl/Cmd+V instead.');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  CLIPBOARD PASTE (KEYBOARD SHORTCUT) — same pattern as the Labs
+//  module.
+// ══════════════════════════════════════════════════
+function setupPasteListener() {
+  document.addEventListener('paste', (e) => {
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+      // Still allow pasting an image even while the question textarea is
+      // focused — only skip our handling if it's actually plain text being pasted.
+      const hasImage = e.clipboardData && Array.from(e.clipboardData.items).some(i => i.type.indexOf('image') === 0);
+      if (!hasImage) return;
+    }
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.indexOf('image') === 0) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          const named = new File([file], `pasted-${Date.now()}.png`, { type: file.type });
+          processDocFile(named);
+        }
+        break;
+      }
+    }
+  });
+}
 
 function handleInputKeydown(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -250,6 +308,11 @@ async function onDocFileSelected(e) {
   const file = e.target.files[0];
   document.getElementById('doc-file-input').value = '';
   if (!file) return;
+  processDocFile(file);
+}
+
+// Shared by the file picker and clipboard paste — both end up here.
+async function processDocFile(file) {
   pendingDocFile = file;
 
   const typingEl = appendTyping();

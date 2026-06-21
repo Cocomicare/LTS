@@ -118,14 +118,18 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
       <div class="sub">JPG, PNG, or PDF — select multiple at once</div>
     </div>
     <input type="file" id="file-input" accept="image/*,application/pdf" multiple onchange="onFilesSelected(event)">
-    <div class="paste-hint">Tip: you can also just paste (Ctrl/Cmd+V) a copied image anywhere on this page.</div>
+    <div style="display:flex;justify-content:center;margin-top:10px">
+      <button class="btn btn-ghost" onclick="pasteFromClipboardLabs()">📋 Paste from Clipboard</button>
+    </div>
+    <div class="paste-hint">Tip: Ctrl/Cmd+V also works anywhere on this page.</div>
   </div>
 
   <div class="card" id="preview-card" style="display:none">
     <div class="card-title">Selected Files</div>
     <div class="file-chip-grid" id="file-chip-grid"></div>
-    <div style="display:flex;gap:10px;justify-content:center">
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
       <button class="btn btn-ghost" onclick="resetUpload()">Clear All</button>
+      <button class="btn btn-ghost" onclick="pasteFromClipboardLabs()">📋 Paste More</button>
       <button class="btn btn-primary" id="extract-btn" onclick="runExtraction()">✨ Extract Values</button>
     </div>
   </div>
@@ -284,9 +288,37 @@ function onFilesSelected(e) {
 }
 
 // ══════════════════════════════════════════════════
-//  CLIPBOARD PASTE — lets you paste a copied image (e.g. a
-//  screenshot of a lab portal result) directly into the page
-//  instead of having to save it as a file first.
+//  PASTE BUTTON — reads the clipboard on demand via the Clipboard
+//  API. Requires a user gesture (the button click itself satisfies
+//  that), unlike the Ctrl+V listener below which fires passively.
+//  Browsers only ever expose IMAGE data through this API, never an
+//  actual PDF file — same limitation as the keyboard shortcut.
+// ══════════════════════════════════════════════════
+async function pasteFromClipboardLabs() {
+  try {
+    const items = await navigator.clipboard.read();
+    let found = false;
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.indexOf('image') === 0) {
+          const blob = await item.getType(type);
+          const named = new File([blob], `pasted-${Date.now()}.png`, { type });
+          selectedFiles.push(named);
+          found = true;
+        }
+      }
+    }
+    if (found) { renderFileChips(); showToast('Image pasted ✓', 'success'); }
+    else showToast('No image found on clipboard', 'error');
+  } catch (e) {
+    showToast('Could not read clipboard — try Ctrl/Cmd+V instead', 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  CLIPBOARD PASTE (KEYBOARD SHORTCUT) — lets you paste a copied
+//  image (e.g. a screenshot of a lab portal result) directly into
+//  the page instead of having to save it as a file first.
 // ══════════════════════════════════════════════════
 function setupPasteListener() {
   document.addEventListener('paste', (e) => {
