@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medication Impact Signal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="score_engine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --surface2:#E8EFF5; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#B5453A; --accent2:#FBEAE8;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --radius:12px; --radius-sm:8px;
+  --zone-green:#2D9E6B; --zone-amber:#E0A030; --zone-orange:#E07B39; --zone-red:#C94040;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:18px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.tabs { display:flex; background:var(--surface2); border-bottom:1px solid var(--border); padding:0 16px; }
+.tab { padding:11px 16px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.page { display:none; padding:20px 16px 40px; max-width:600px; margin:0 auto; }
+.page.active { display:block; }
+
+.dial-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px 20px 20px; margin-bottom:16px; text-align:center; position:relative; }
+.dial-title { font-family:'DM Serif Display',serif; font-size:15px; margin-bottom:4px; }
+.dial-subtitle { font-size:12px; color:var(--ink3); margin-bottom:20px; }
+.dial-wrap { position:relative; width:240px; height:135px; margin:0 auto 12px; }
+.dial-svg { width:100%; height:100%; overflow:visible; }
+.dial-score-wrap { position:absolute; bottom:-8px; left:50%; transform:translateX(-50%); text-align:center; }
+.dial-score { font-family:'DM Mono',monospace; font-size:52px; font-weight:500; line-height:1; transition:color .5s; }
+.dial-score-label { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.6px; margin-top:4px; }
+.dial-status { display:inline-block; padding:5px 18px; border-radius:20px; font-size:13px; font-weight:600; margin-top:48px; }
+.status-green { background:var(--good-bg); color:var(--good); }
+.status-amber { background:#FEF9E7; color:var(--zone-amber); }
+.status-orange { background:var(--warn-bg); color:var(--warn); }
+.status-red { background:var(--danger-bg); color:var(--danger); }
+.dial-freshness { font-size:11px; color:var(--ink3); margin-top:8px; line-height:1.5; }
+
+.breakdown-toggle { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px; font-size:13px; color:var(--accent); cursor:pointer; font-weight:500; }
+.breakdown-arrow { transition:transform .2s; }
+.breakdown-arrow.open { transform:rotate(180deg); }
+.breakdown-panel { display:none; margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+.breakdown-panel.open { display:block; }
+.param-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+.param-row:last-child { border-bottom:none; }
+.param-icon { font-size:16px; flex-shrink:0; width:24px; text-align:center; }
+.param-info { flex:1; }
+.param-name { font-size:13px; font-weight:500; }
+.param-detail { font-size:11px; color:var(--ink3); margin-top:1px; }
+.param-bar-bg { height:6px; background:var(--surface2); border-radius:3px; overflow:hidden; width:80px; }
+.param-bar-fill { height:100%; border-radius:3px; transition:width .5s; }
+.param-score { font-family:'DM Mono',monospace; font-size:13px; font-weight:500; width:44px; text-align:right; flex-shrink:0; }
+.param-weight { font-size:10px; color:var(--ink3); text-align:right; width:28px; flex-shrink:0; }
+.param-missing { font-size:10px; color:var(--ink3); background:var(--surface2); padding:1px 6px; border-radius:8px; flex-shrink:0; white-space:nowrap; }
+
+.trend-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:14px; }
+.trend-title { font-size:11px; font-weight:600; color:var(--ink2); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.trend-wrap { position:relative; height:200px; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.info-note { background:#F0EAFA; border:1px solid #D8C8EE; border-radius:var(--radius-sm); padding:11px 14px; font-size:13px; color:#5a3a80; margin-bottom:14px; line-height:1.5; }
+.toast { position:fixed; bottom:20px; right:20px; background:var(--ink); color:#fff; padding:11px 18px; border-radius:var(--radius-sm); font-size:13px; font-weight:500; z-index:999; opacity:0; transform:translateY(8px); transition:all 0.2s; pointer-events:none; }
+.toast.show { opacity:1; transform:translateY(0); }
+@media (max-width:480px) { .page { padding:14px 12px 40px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Medication Impact Signal</span>
+    <span class="logo-sub">Drug Safety & Immune Adequacy</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('index')" id="tab-index">Signal</button>
+  <button class="tab" onclick="showTab('trend')" id="tab-trend">Trend</button>
+</div>
+
+<div class="page active" id="page-index">
+  <div class="info-note">💊 This score tracks whether your <strong>treatment itself</strong> may be causing harm — kidney/liver strain, bone marrow suppression, blood pressure, and immune adequacy — separate from infection/rejection risk (that's Early Warning Signal).</div>
+
+  <div class="dial-card">
+    <div class="dial-title">Medication Impact Signal</div>
+    <div class="dial-subtitle">Drug safety & immune adequacy</div>
+    <div class="dial-wrap">
+      <svg class="dial-svg" viewBox="0 0 240 135" id="dial-svg">
+        <path id="arc-bg-red" fill="none" stroke="#FAEAEA" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-bg-orange" fill="none" stroke="#FDF0E8" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-bg-amber" fill="none" stroke="#FEF9E7" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-bg-green" fill="none" stroke="#E8F7F1" stroke-width="18" stroke-linecap="butt"/>
+        <path id="arc-fill" fill="none" stroke="#2D9E6B" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="120" cy="130" r="5" fill="var(--ink3)"/>
+        <text x="14" y="132" class="zone-label" fill="var(--zone-red)" text-anchor="middle">0</text>
+        <text x="52" y="55" class="zone-label" fill="var(--zone-orange)" text-anchor="middle">50</text>
+        <text x="120" y="30" class="zone-label" fill="var(--zone-amber)" text-anchor="middle">70</text>
+        <text x="188" y="55" class="zone-label" fill="var(--zone-green)" text-anchor="middle">85</text>
+        <text x="226" y="132" class="zone-label" fill="var(--zone-green)" text-anchor="middle">100</text>
+      </svg>
+      <div class="dial-score-wrap">
+        <div class="dial-score" id="dial-score">—</div>
+        <div class="dial-score-label">out of 100</div>
+      </div>
+    </div>
+    <div class="dial-status" id="dial-status">Calculating…</div>
+    <div class="dial-freshness" id="dial-freshness"></div>
+
+    <div class="breakdown-toggle" onclick="toggleBreakdown()">
+      <span id="breakdown-toggle-label">Show parameter breakdown</span>
+      <span class="breakdown-arrow" id="breakdown-arrow">▼</span>
+    </div>
+    <div class="breakdown-panel" id="breakdown-panel">
+      <div id="breakdown-rows"></div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-trend">
+  <div class="trend-card">
+    <div class="trend-title">Medication Impact Score Over Time</div>
+    <div class="trend-wrap"><canvas id="trend-chart"></canvas></div>
+  </div>
+  <div id="trend-stats"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentUser = null;
+let lastResult = null;
+const THRESHOLDS = { red:85, orange:90, amber:95 };
+
+(async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    return;
+  }
+  await refresh();
+})();
+
+async function refresh() {
+  try {
+    lastResult = await medComputeAndSave(currentUser.id);
+    renderDial(lastResult);
+  } catch (e) {
+    showToast('Sync failed: ' + e.message);
+  }
+}
+
+function getZoneColor(score) {
+  if (score >= THRESHOLDS.amber) return 'var(--zone-green)';
+  if (score >= THRESHOLDS.orange) return 'var(--zone-amber)';
+  if (score >= THRESHOLDS.red) return 'var(--zone-orange)';
+  return 'var(--zone-red)';
+}
+
+function renderDial(result) {
+  const { score, breakdown, missingCount } = result;
+  const cx = 120, cy = 130, r = 90;
+  function arcPath(startAngle, endAngle) {
+    const s = (startAngle * Math.PI) / 180, e = (endAngle * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(Math.PI - s), y1 = cy - r * Math.sin(Math.PI - s);
+    const x2 = cx + r * Math.cos(Math.PI - e), y2 = cy - r * Math.sin(Math.PI - e);
+    const large = (endAngle - startAngle) > 180 ? 1 : 0;
+    return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+  }
+  function scoreToAngle(s) { return (s / 100) * 180; }
+
+  document.getElementById('arc-bg-red').setAttribute('d', arcPath(0, scoreToAngle(THRESHOLDS.red)));
+  document.getElementById('arc-bg-orange').setAttribute('d', arcPath(scoreToAngle(THRESHOLDS.red), scoreToAngle(THRESHOLDS.orange)));
+  document.getElementById('arc-bg-amber').setAttribute('d', arcPath(scoreToAngle(THRESHOLDS.orange), scoreToAngle(THRESHOLDS.amber)));
+  document.getElementById('arc-bg-green').setAttribute('d', arcPath(scoreToAngle(THRESHOLDS.amber), 180));
+
+  const fillEl = document.getElementById('arc-fill');
+  if (score !== null && score > 0) {
+    fillEl.setAttribute('d', arcPath(0, scoreToAngle(Math.min(score, 99.5))));
+    fillEl.setAttribute('stroke', getZoneColor(score));
+    fillEl.style.display = 'block';
+  } else { fillEl.style.display = 'none'; }
+
+  const scoreEl = document.getElementById('dial-score');
+  if (score !== null) { scoreEl.textContent = score; scoreEl.style.color = getZoneColor(score); }
+  else { scoreEl.textContent = '—'; scoreEl.style.color = 'var(--ink3)'; }
+
+  const statusEl = document.getElementById('dial-status');
+  if (score === null) {
+    statusEl.textContent = 'No labs logged yet'; statusEl.className = 'dial-status status-amber';
+  } else if (score >= THRESHOLDS.amber) {
+    statusEl.textContent = '✓ No concerning side effects detected'; statusEl.className = 'dial-status status-green';
+  } else if (score >= THRESHOLDS.orange) {
+    statusEl.textContent = '👀 Mild deviation — keep an eye on labs'; statusEl.className = 'dial-status status-amber';
+  } else if (score >= THRESHOLDS.red) {
+    statusEl.textContent = '⚠️ Notable deviation — review with your team'; statusEl.className = 'dial-status status-orange';
+  } else {
+    statusEl.textContent = '🚨 Significant deviation — contact your team'; statusEl.className = 'dial-status status-red';
+  }
+
+  const activeParams = breakdown.filter(b=>b.score!==null).length;
+  document.getElementById('dial-freshness').innerHTML = missingCount > 0
+    ? `Score based on ${activeParams} of ${breakdown.length} parameters · ${missingCount} not yet logged or stale`
+    : 'All parameters have recent data ✓';
+
+  const rowsEl = document.getElementById('breakdown-rows');
+  rowsEl.innerHTML = breakdown.map(b => {
+    const { param, score, latest, baseline, w, freshness, daysAgo } = b;
+    const barColor = score !== null ? getZoneColor(score) : 'var(--ink3)';
+    const barWidth = score !== null ? score : 0;
+    const sinceText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo !== null ? `${daysAgo}d ago` : '—';
+    const latestText = param.key === 'bp'
+      ? (b.sys != null ? `Latest: ${b.sys}/${b.dia} mmHg` : 'Not logged')
+      : (latest !== null ? `Latest: ${Number(latest).toFixed(2)} ${param.unit}` : 'Not logged');
+    const baselineText = param.key === 'bp' ? 'Clinical thresholds' : (baseline !== null ? `Baseline: ${baseline.toFixed(2)} ${param.unit}` : 'Building baseline…');
+    return `
+    <div class="param-row" style="${freshness==='missing'?'opacity:0.45':''}">
+      <div class="param-icon">${param.icon}</div>
+      <div class="param-info">
+        <div class="param-name">${param.name}</div>
+        <div class="param-detail">${latestText} · ${baselineText} · ${sinceText}</div>
+        <div class="param-bar-bg" style="margin-top:5px"><div class="param-bar-fill" style="width:${barWidth}%;background:${barColor}"></div></div>
+      </div>
+      <div class="param-score" style="color:${barColor}">${score !== null ? score : '—'}</div>
+      <div class="param-weight">${w}%</div>
+      ${freshness === 'missing' ? `<span class="param-missing">Not logged</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleBreakdown() {
+  const panel = document.getElementById('breakdown-panel');
+  const arrow = document.getElementById('breakdown-arrow');
+  const label = document.getElementById('breakdown-toggle-label');
+  const isOpen = panel.classList.toggle('open');
+  arrow.classList.toggle('open', isOpen);
+  label.textContent = isOpen ? 'Hide parameter breakdown' : 'Show parameter breakdown';
+}
+
+let trendChart = null;
+function renderTrend() {
+  const historyRows = (lastResult && lastResult.historyRows) || [];
+  const el = document.getElementById('trend-stats');
+  if (trendChart) { try { trendChart.destroy(); } catch(e){} trendChart = null; }
+
+  if (historyRows.length < 2) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-title">Not enough history yet</div><div class="empty-sub">The score is recorded each time this module is opened (or synced from the dashboard).</div></div>`;
+    return;
+  }
+  const sorted = historyRows.slice().sort((a,b) => new Date(a.computed_at) - new Date(b.computed_at));
+  const labels = sorted.map(h => new Date(h.computed_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const scores = sorted.map(h => h.score);
+  const avg = scores.reduce((a,b)=>a+b,0)/scores.length;
+  const latest = scores[scores.length-1];
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);margin-bottom:3px">Latest</div>
+        <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:${getZoneColor(latest)}">${latest}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);margin-bottom:3px">Average</div>
+        <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--ink)">${avg.toFixed(1)}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);margin-bottom:3px">Days tracked</div>
+        <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--ink)">${historyRows.length}</div>
+      </div>
+    </div>`;
+
+  trendChart = new Chart(document.getElementById('trend-chart'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'Medication Impact', data:scores, borderColor:'#B5453A', backgroundColor:'rgba(181,69,58,0.08)', borderWidth:2.5, pointBackgroundColor:scores.map(s=>getZoneColor(s)), pointRadius:5, fill:true, tension:0.3 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:9},color:'#8A9EAF',maxTicksLimit:10}},
+               y:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:10},color:'#8A9EAF'},min:0,max:100} }
+    }
+  });
+}
+
+function showTab(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'index') refresh();
+  if (name === 'trend') renderTrend();
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast show';
+  setTimeout(()=>el.className='toast', 2800);
+}
+</script>
+</body>
+</html>

@@ -6,23 +6,21 @@
 // ══════════════════════════════════════════════════════════════════
 
 const EWS_PARAMS = [
-  { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:10, maxAgeDays:2, direction:'higher_better',
+  { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:11, maxAgeDays:2, direction:'higher_better',
     desc:'Subjective wellness score', source:'symptoms' },
-  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:20, maxAgeDays:2, direction:'higher_better',
+  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:22, maxAgeDays:2, direction:'higher_better',
     desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
-  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:21, maxAgeDays:2, direction:'higher_better',
+  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:22, maxAgeDays:2, direction:'higher_better',
     desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
-  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:15, maxAgeDays:2, direction:'higher_better',
+  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:16, maxAgeDays:2, direction:'higher_better',
     desc:'Inspiratory volume — complements FEV1', source:'spiro' },
-  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:6, maxAgeDays:2, direction:'stable',
+  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:7, maxAgeDays:2, direction:'stable',
     desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
-  { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:5, maxAgeDays:7, direction:'stable',
-    desc:'Tacrolimus side effect marker — scored vs. clinical thresholds (120/80, 140/90), not your personal baseline', source:'vitals', vitalType:'bp_systolic' },
-  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:12, maxAgeDays:3, direction:'lower_better',
+  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:13, maxAgeDays:3, direction:'lower_better',
     desc:'Key infection indicator', source:'vitals', vitalType:'temp' },
   { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:5, maxAgeDays:14, direction:'stable',
     desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
-  { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:6, maxAgeDays:3, direction:'higher_better',
+  { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:4, maxAgeDays:3, direction:'higher_better',
     desc:'Composite of color + texture + volume', source:'sputum' },
 ];
 const EWS_NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'hr'];
@@ -134,20 +132,6 @@ async function ewsComputeAndSave(userId) {
   ['spo2','hr','temp','wt'].forEach(vt => {
     rawData[vt] = (vitalsRows.data || []).filter(r => r.vital_type === vt).map(r => ({ date: r.taken_at, value: Number(r.value) }));
   });
-  {
-    const bpMap = {};
-    (vitalsRows.data || []).forEach(r => {
-      if (r.vital_type !== 'bp_systolic' && r.vital_type !== 'bp_diastolic') return;
-      const key = r.taken_at;
-      if (!bpMap[key]) bpMap[key] = { date: r.taken_at };
-      if (r.vital_type === 'bp_systolic') bpMap[key].sys = Number(r.value);
-      else bpMap[key].dia = Number(r.value);
-    });
-    rawData.bp = Object.values(bpMap)
-      .filter(p => p.sys != null && p.dia != null)
-      .map(p => ({ date: p.date, value: p.sys, sys: p.sys, dia: p.dia }))
-      .sort((a,b) => new Date(a.date) - new Date(b.date));
-  }
 
   const weights = ewsGetWeights(settingsRow);
   const windows = ewsGetWindows(settingsRow);
@@ -187,12 +171,10 @@ async function ewsComputeAndSave(userId) {
       return;
     }
 
-    const score = param.key === 'bp'
-      ? ewsComputeBPScore(latestRec.sys, latestRec.dia)
-      : ewsComputeParamScore(param, latest, baseline);
+    const score = ewsComputeParamScore(param, latest, baseline);
     totalWeight += w;
     weightedSum += score * w;
-    breakdown.push({ param, score, latest, baseline, w, freshness, daysAgo, sys: latestRec.sys, dia: latestRec.dia });
+    breakdown.push({ param, score, latest, baseline, w, freshness, daysAgo });
   });
 
   if (missingRequired.length > 0) {
@@ -245,4 +227,150 @@ async function ewsComputeAndSave(userId) {
   }
 
   return { score: finalScore, breakdown, missingCount, missingRequired: [], settingsRow, historyRows };
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MEDICATION IMPACT SIGNAL ENGINE
+//  A separate composite from Early Warning Signal — this one answers
+//  "is my treatment itself causing harm" (nephrotoxicity, bone marrow
+//  suppression, hepatotoxicity, hypertension, immune adequacy) rather
+//  than "am I showing signs of infection/rejection."
+//  Uses fixed defaults — no customizable Settings UI for this one.
+// ══════════════════════════════════════════════════════════════════
+
+const MED_PARAMS = [
+  { key:'creatinine', name:'Creatinine', icon:'💧', unit:'mg/dL', weight:18, maxAgeDays:60, direction:'lower_better',
+    desc:'Nephrotoxicity marker (tacrolimus/cyclosporine)', source:'labs' },
+  { key:'egfr', name:'eGFR', icon:'🫘', unit:'mL/min/1.73m²', weight:14, maxAgeDays:60, direction:'higher_better',
+    desc:'Kidney filtration rate', source:'labs' },
+  { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:14, maxAgeDays:7, direction:'fixed_bp',
+    desc:'Tacrolimus/cyclosporine commonly raise blood pressure', source:'vitals' },
+  { key:'wbc', name:'White Blood Cell Count', icon:'🩸', unit:'K/µL', weight:12, maxAgeDays:60, direction:'higher_better',
+    desc:'Bone marrow suppression (low = concerning here)', source:'labs' },
+  { key:'platelets', name:'Platelets', icon:'🟣', unit:'K/µL', weight:10, maxAgeDays:60, direction:'higher_better',
+    desc:'Bone marrow suppression (low = concerning here)', source:'labs' },
+  { key:'ast', name:'AST', icon:'🟤', unit:'IU/L', weight:6, maxAgeDays:60, direction:'lower_better',
+    desc:'Hepatotoxicity marker', source:'labs' },
+  { key:'alt', name:'ALT', icon:'🟤', unit:'IU/L', weight:6, maxAgeDays:60, direction:'lower_better',
+    desc:'Hepatotoxicity marker', source:'labs' },
+  { key:'glucose', name:'Glucose', icon:'🍬', unit:'mg/dL', weight:8, maxAgeDays:60, direction:'lower_better',
+    desc:'Steroid-induced hyperglycemia', source:'labs' },
+  { key:'igg', name:'IgG', icon:'🛡️', unit:'mg/dL', weight:4, maxAgeDays:45, direction:'higher_better',
+    desc:'Immune adequacy — low levels may require IVIG replacement', source:'labs' },
+  { key:'iga', name:'IgA', icon:'🛡️', unit:'mg/dL', weight:4, maxAgeDays:45, direction:'higher_better',
+    desc:'Immune adequacy', source:'labs' },
+  { key:'igm', name:'IgM', icon:'🛡️', unit:'mg/dL', weight:4, maxAgeDays:45, direction:'higher_better',
+    desc:'Immune adequacy', source:'labs' },
+];
+const MED_BASELINE_DAYS = 60; // labs are periodic, not daily — wider window than EWS
+
+async function medComputeAndSave(userId) {
+  const labTypes = MED_PARAMS.filter(p => p.source === 'labs').map(p => p.key);
+
+  const [historyRes, labRows, vitalsRows] = await Promise.all([
+    sb.from('medication_impact_history').select('*').eq('user_id', userId).order('computed_at', { ascending: true }),
+    sb.from('lab_results').select('*').eq('user_id', userId).in('lab_type', labTypes).order('taken_at', { ascending: true }),
+    sb.from('vitals_readings').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
+  ]);
+
+  let historyRows = historyRes.data || [];
+  const rawData = {};
+
+  labTypes.forEach(key => {
+    rawData[key] = (labRows.data || []).filter(r => r.lab_type === key).map(r => ({ date: r.taken_at, value: Number(r.value) }));
+  });
+
+  // Blood pressure: pair systolic+diastolic by shared timestamp, scored via fixed clinical thresholds.
+  {
+    const bpMap = {};
+    (vitalsRows.data || []).forEach(r => {
+      if (r.vital_type !== 'bp_systolic' && r.vital_type !== 'bp_diastolic') return;
+      const key = r.taken_at;
+      if (!bpMap[key]) bpMap[key] = { date: r.taken_at };
+      if (r.vital_type === 'bp_systolic') bpMap[key].sys = Number(r.value);
+      else bpMap[key].dia = Number(r.value);
+    });
+    rawData.bp = Object.values(bpMap)
+      .filter(p => p.sys != null && p.dia != null)
+      .map(p => ({ date: p.date, value: p.sys, sys: p.sys, dia: p.dia }))
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  let weightedSum = 0, totalWeight = 0, missingCount = 0;
+  const breakdown = [];
+
+  MED_PARAMS.forEach(param => {
+    const recs = rawData[param.key] || [];
+    const latestRec = recs.length ? recs[recs.length-1] : null;
+    const latest = latestRec ? latestRec.value : null;
+    const baseline = ewsRollingBaseline(recs, MED_BASELINE_DAYS);
+    const latestDate = latestRec ? new Date(latestRec.date) : null;
+    if (latestDate) latestDate.setHours(0,0,0,0);
+
+    const cutoff = new Date(today); cutoff.setDate(today.getDate() - param.maxAgeDays);
+    const daysAgo = latestDate ? Math.floor((today - latestDate) / 86400000) : null;
+
+    let freshness = 'ok';
+    if (!latestDate || latest === null) { freshness = 'missing'; missingCount++; }
+    else if (latestDate < cutoff) { freshness = 'missing'; missingCount++; }
+
+    if (freshness === 'missing') {
+      breakdown.push({ param, score:null, latest, baseline, w: param.weight, freshness, daysAgo });
+      return;
+    }
+
+    const score = param.direction === 'fixed_bp'
+      ? ewsComputeBPScore(latestRec.sys, latestRec.dia)
+      : ewsComputeParamScore(param, latest, baseline);
+    totalWeight += param.weight;
+    weightedSum += score * param.weight;
+    breakdown.push({ param, score, latest, baseline, w: param.weight, freshness, daysAgo, sys: latestRec.sys, dia: latestRec.dia });
+  });
+
+  let finalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null;
+  if (finalScore !== null) finalScore = Math.max(0, Math.min(100, finalScore));
+
+  breakdown.sort((a,b) => {
+    if (a.score !== null && b.score === null) return -1;
+    if (a.score === null && b.score !== null) return 1;
+    const impA = a.score !== null ? (100 - a.score) * a.w : 0;
+    const impB = b.score !== null ? (100 - b.score) * b.w : 0;
+    return impB - impA;
+  });
+
+  if (finalScore !== null) {
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const todaysRows = historyRows.filter(h => {
+      const d = new Date(h.computed_at); d.setHours(0,0,0,0);
+      return d.getTime() === todayStart.getTime();
+    });
+    const components = {};
+    breakdown.forEach(b => { components[b.param.key] = b.score; });
+
+    try {
+      if (todaysRows.length) {
+        todaysRows.sort((a,b) => new Date(b.computed_at) - new Date(a.computed_at));
+        const keep = todaysRows[0];
+        const dupes = todaysRows.slice(1);
+        if (keep.score !== finalScore) {
+          const updated = await updateRow('medication_impact_history', keep.id, { score: finalScore, components });
+          keep.score = updated.score; keep.components = updated.components;
+        }
+        for (const dupe of dupes) {
+          await deleteRow('medication_impact_history', dupe.id);
+          historyRows = historyRows.filter(h => h.id !== dupe.id);
+        }
+      } else {
+        const inserted = await insertRow('medication_impact_history', {
+          user_id: userId, score: finalScore, components, computed_at: new Date().toISOString(),
+        });
+        historyRows.push(inserted);
+      }
+    } catch (e) {
+      console.error('medComputeAndSave: history save failed:', e.message);
+    }
+  }
+
+  return { score: finalScore, breakdown, missingCount, historyRows };
 }
