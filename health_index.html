@@ -248,12 +248,10 @@ const PARAMS = [
     desc:'Subjective wellness score', source:'symptoms' },
   { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:20, maxAgeDays:2, direction:'higher_better',
     desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
-  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:13, maxAgeDays:2, direction:'higher_better',
+  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:21, maxAgeDays:2, direction:'higher_better',
     desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
-  { key:'pef', name:'PEF', icon:'💨', unit:'L/min', weight:8, maxAgeDays:2, direction:'higher_better',
-    desc:'Peak expiratory flow', source:'peakflow', field:'pef' },
   { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:15, maxAgeDays:2, direction:'higher_better',
-    desc:'Inspiratory volume — complements peak flow', source:'spiro' },
+    desc:'Inspiratory volume — complements FEV1', source:'spiro' },
   { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:6, maxAgeDays:2, direction:'stable',
     desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
   { key:'bp', name:'Blood Pressure', icon:'💜', unit:'mmHg', weight:5, maxAgeDays:7, direction:'stable',
@@ -265,7 +263,7 @@ const PARAMS = [
   { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:6, maxAgeDays:3, direction:'higher_better',
     desc:'Composite of color + texture + volume', source:'sputum' },
 ];
-const NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'pef', 'hr'];
+const NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'hr'];
 
 // ══════════════════════════════════════════════════
 //  STATE
@@ -320,7 +318,6 @@ async function refreshAll() {
 
     rawData.symptoms = (symptomRows.data || []).map(r => ({ date: r.taken_at, value: r.severity_score }));
     rawData.fev1 = (peakflowRows.data || []).filter(r => r.fev1 != null).map(r => ({ date: r.taken_at, value: Number(r.fev1) }));
-    rawData.pef  = (peakflowRows.data || []).filter(r => r.pef  != null).map(r => ({ date: r.taken_at, value: Number(r.pef) }));
     rawData.spiro = (spiroRows.data || []).filter(r => r.session_data && r.session_data.volume_ml != null)
       .map(r => ({ date: r.taken_at, value: Number(r.session_data.volume_ml) }));
     // Sputum composite: average of color + texture + volume (all on the same higher=better 1-10 scale).

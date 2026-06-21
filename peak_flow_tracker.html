@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Peak Flow</title>
+<title>FEV1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -12,7 +12,7 @@
 :root {
   --bg:#F0F4F8; --surface:#fff; --border:#D0DCE8;
   --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
-  --accent:#3B82C4; --accent-light:#E8F1FA;
+  --accent:#7C3AED; --accent-light:#F0EAFE;
   --good:#2D9E6B; --good-bg:#E8F7F1;
   --warn:#E07B39; --warn-bg:#FDF0E8;
   --danger:#C94040; --danger-bg:#FAEAEA;
@@ -40,35 +40,27 @@ label{font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;
 input[type=date],input[type=time],textarea{padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--bg);color:var(--ink);outline:none;width:100%;transition:border-color .15s}
 input:focus,textarea:focus{border-color:var(--accent)}
 textarea{resize:vertical;min-height:60px}
-.readings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}
-.reading-block{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg);border-radius:10px;padding:16px 12px}
+.reading-block{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg);border-radius:10px;padding:20px 12px;max-width:220px;margin:0 auto}
 .reading-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)}
 .reading-name{font-size:13px;font-weight:600;color:var(--ink2)}
-.reading-input{width:120px;font-size:40px;font-family:'DM Mono',monospace;text-align:center;padding:8px;border:2px solid var(--border);border-radius:10px;background:var(--surface)}
+.reading-input{width:140px;font-size:44px;font-family:'DM Mono',monospace;text-align:center;padding:8px;border:2px solid var(--border);border-radius:10px;background:var(--surface)}
 .reading-input:focus{border-color:var(--accent);outline:none}
 .reading-unit{font-family:'DM Mono',monospace;font-size:14px;color:var(--ink3)}
 .reading-hint{font-size:11px;color:var(--ink3);text-align:center}
 .form-actions{display:flex;gap:10px;justify-content:flex-end}
-.hist-row{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px}
-.hist-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.hist-row{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
 .hist-date{font-size:12px;color:var(--ink3);min-width:90px}
-.hist-note{font-size:12px;color:var(--ink2);flex:1}
 .del-btn{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;padding:4px}
 .del-btn:hover{color:var(--danger)}
-.hist-vals{display:flex;gap:16px}
-.hist-metric{display:flex;flex-direction:column;gap:2px}
-.hist-metric-label{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
-.hist-metric-val{font-size:21px;font-weight:500;font-family:'DM Mono',monospace;color:var(--ink);letter-spacing:-0.3px}
-.hist-metric-unit{font-size:11px;color:var(--ink3);font-weight:400}
-.stats-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.hist-metric-val{font-size:24px;font-weight:500;font-family:'DM Mono',monospace;color:var(--ink);letter-spacing:-0.3px;flex:1}
+.hist-metric-unit{font-size:12px;color:var(--ink3);font-weight:400}
+.hist-actions{display:flex;gap:6px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
 .stat-label{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-.stat-sub{font-size:11px;color:var(--ink3);margin-top:4px}
-.stat-row{display:flex;gap:12px}
-.stat-item{flex:1}
-.stat-val{font-size:21px;font-weight:500;font-family:'DM Mono',monospace;color:var(--ink);letter-spacing:-0.3px}
+.stat-val{font-size:24px;font-weight:500;font-family:'DM Mono',monospace;color:var(--ink);letter-spacing:-0.3px}
 .stat-unit{font-size:11px;color:var(--ink3)}
-.chart-wrap{position:relative;height:220px;margin-bottom:16px}
+.chart-wrap{position:relative;height:240px;margin-bottom:16px}
 .chart-title{font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
 .empty{text-align:center;padding:40px 20px;color:var(--ink3)}
 .empty-icon{font-size:36px;margin-bottom:10px}
@@ -83,8 +75,8 @@ textarea{resize:vertical;min-height:60px}
 
 <header>
   <div class="header-left">
-    <h1>Peak Flow</h1>
-    <p>PEF &amp; FEV1 Surveillance</p>
+    <h1>FEV1</h1>
+    <p>Forced Expiratory Volume Surveillance</p>
   </div>
   <div style="display:flex;gap:8px">
     <button class="btn btn-ghost" onclick="exportData()">↓ Export</button>
@@ -115,24 +107,14 @@ textarea{resize:vertical;min-height:60px}
   </div>
 
   <div class="card">
-    <div class="card-title">Readings — Best Effort</div>
-    <div class="readings-grid">
-      <div class="reading-block">
-        <div class="reading-label">PEF</div>
-        <div class="reading-name">Peak Expiratory Flow</div>
-        <input type="number" class="reading-input" id="pefVal" min="0" max="900" step="1" placeholder="—" oninput="onValInput()">
-        <div class="reading-unit">L/min</div>
-        <div class="reading-hint">Highest value on your device</div>
-      </div>
-      <div class="reading-block">
-        <div class="reading-label">FEV1</div>
-        <div class="reading-name">Forced Expiratory Vol.</div>
-        <input type="number" class="reading-input" id="fev1Val" min="0" max="10" step="0.01" placeholder="—" oninput="onValInput()">
-        <div class="reading-unit">Liters</div>
-        <div class="reading-hint">Volume in 1 second</div>
-      </div>
+    <div class="card-title">FEV1 Reading — Best Effort</div>
+    <div class="reading-block">
+      <div class="reading-label">FEV1</div>
+      <div class="reading-name">Forced Expiratory Vol. in 1 sec</div>
+      <input type="number" class="reading-input" id="fev1Val" min="0" max="10" step="0.01" placeholder="—" oninput="onValInput()">
+      <div class="reading-unit">Liters</div>
+      <div class="reading-hint">Record the highest value out of 3 attempts</div>
     </div>
-    <div style="font-size:12px;color:var(--ink3);text-align:center;margin-top:4px">At least one value required — enter both if your device shows both</div>
   </div>
 
   <div class="form-actions">
@@ -151,10 +133,6 @@ textarea{resize:vertical;min-height:60px}
 <div class="page" id="page-trends">
   <div class="stats-row" id="statsRow"></div>
   <div class="card">
-    <div class="chart-title">🔵 PEF (L/min) Over Time</div>
-    <div class="chart-wrap"><canvas id="pefChart"></canvas></div>
-  </div>
-  <div class="card">
     <div class="chart-title">🟣 FEV1 (Liters) Over Time</div>
     <div class="chart-wrap"><canvas id="fev1Chart"></canvas></div>
   </div>
@@ -163,14 +141,11 @@ textarea{resize:vertical;min-height:60px}
 <div id="toast"></div>
 
 <script>
-// ══════════════════════════════════════════════════
-//  STATE — live in-memory only, sourced from Supabase
-// ══════════════════════════════════════════════════
 let currentUser = null;
-let sessions = [];          // rows from peak_flow_sessions, sorted by taken_at asc
+let sessions = [];
 let realtimeChannel = null;
-let pefChart = null, fev1Chart = null;
-let editingId = null;       // set when editing an existing reading instead of creating new
+let fev1Chart = null;
+let editingId = null;
 const recentLocalWriteIds = new Set();
 
 function markLocalWrite(id) {
@@ -178,9 +153,6 @@ function markLocalWrite(id) {
   setTimeout(() => recentLocalWriteIds.delete(id), 5000);
 }
 
-// ══════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════
 (async function init() {
   initForm();
 
@@ -199,7 +171,8 @@ function markLocalWrite(id) {
 })();
 
 async function loadSessions() {
-  sessions = await fetchRows('peak_flow_sessions', currentUser.id, 'taken_at', true);
+  const rows = await fetchRows('peak_flow_sessions', currentUser.id, 'taken_at', true);
+  sessions = rows.filter(r => r.fev1 != null);
 }
 
 function handleRealtimeChange(payload) {
@@ -207,11 +180,14 @@ function handleRealtimeChange(payload) {
   const isOwnRecentWrite = recentLocalWriteIds.has(id);
 
   if (payload.eventType === 'INSERT') {
-    const exists = sessions.some(s => s.id === payload.new.id);
-    if (!exists) sessions.push(payload.new);
+    if (payload.new.fev1 != null && !sessions.some(s => s.id === payload.new.id)) sessions.push(payload.new);
   } else if (payload.eventType === 'UPDATE') {
     const i = sessions.findIndex(s => s.id === payload.new.id);
-    if (i >= 0) sessions[i] = payload.new; else sessions.push(payload.new);
+    if (payload.new.fev1 != null) {
+      if (i >= 0) sessions[i] = payload.new; else sessions.push(payload.new);
+    } else if (i >= 0) {
+      sessions.splice(i, 1);
+    }
   } else if (payload.eventType === 'DELETE') {
     sessions = sessions.filter(s => s.id !== payload.old.id);
   }
@@ -223,9 +199,6 @@ function handleRealtimeChange(payload) {
   if (!isOwnRecentWrite) showToast('Updated from another device', 'success');
 }
 
-// ══════════════════════════════════════════════════
-//  UI HELPERS
-// ══════════════════════════════════════════════════
 function showTab(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -262,7 +235,6 @@ function initForm() {
   const now = new Date();
   document.getElementById('sessionDate').value = now.toISOString().slice(0,10);
   document.getElementById('sessionTime').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  document.getElementById('pefVal').value = '';
   document.getElementById('fev1Val').value = '';
   document.getElementById('saveBtn').disabled = true;
   document.getElementById('saveBtn').textContent = 'Save Reading';
@@ -270,24 +242,19 @@ function initForm() {
 }
 
 function onValInput() {
-  const pef = parseFloat(document.getElementById('pefVal').value);
   const fev = parseFloat(document.getElementById('fev1Val').value);
-  document.getElementById('saveBtn').disabled = isNaN(pef) && isNaN(fev);
+  document.getElementById('saveBtn').disabled = isNaN(fev);
 }
 
 function clearForm() { initForm(); }
 
-// ══════════════════════════════════════════════════
-//  SAVE — straight to Supabase, no localStorage
-// ══════════════════════════════════════════════════
 async function saveSession() {
   const date  = document.getElementById('sessionDate').value;
   const time  = document.getElementById('sessionTime').value || '00:00';
-  const pef   = parseFloat(document.getElementById('pefVal').value);
   const fev1  = parseFloat(document.getElementById('fev1Val').value);
 
   if (!date) { showToast('Please select a date','error'); return; }
-  if (isNaN(pef) && isNaN(fev1)) { showToast('Enter at least one reading','error'); return; }
+  if (isNaN(fev1)) { showToast('Enter a reading','error'); return; }
 
   const taken_at = new Date(`${date}T${time}:00`).toISOString();
   const btn = document.getElementById('saveBtn');
@@ -295,11 +262,7 @@ async function saveSession() {
 
   try {
     if (editingId) {
-      const updated = await updateRow('peak_flow_sessions', editingId, {
-        pef: isNaN(pef) ? null : pef,
-        fev1: isNaN(fev1) ? null : fev1,
-        taken_at,
-      });
+      const updated = await updateRow('peak_flow_sessions', editingId, { fev1, taken_at });
       markLocalWrite(updated.id);
       const i = sessions.findIndex(s => s.id === updated.id);
       if (i >= 0) sessions[i] = updated;
@@ -308,8 +271,7 @@ async function saveSession() {
     } else {
       const inserted = await insertRow('peak_flow_sessions', {
         user_id: currentUser.id,
-        pef: isNaN(pef) ? null : pef,
-        fev1: isNaN(fev1) ? null : fev1,
+        fev1,
         taken_at,
       });
       markLocalWrite(inserted.id);
@@ -326,29 +288,23 @@ async function saveSession() {
   }
 }
 
-// ══════════════════════════════════════════════════
-//  HISTORY
-// ══════════════════════════════════════════════════
 function renderHistory() {
   const list = sessions.slice().reverse();
   const el = document.getElementById('historyContent');
   if (!list.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No readings yet</div><div class="empty-sub">Log your first peak flow reading above.</div></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No readings yet</div><div class="empty-sub">Log your first FEV1 reading above.</div></div>`;
     return;
   }
   el.innerHTML = list.map(s => {
     const ds = daysSince(s.taken_at);
     const sinceStr = ds===0?'Today':ds===1?'Yesterday':ds+'d ago';
-    const pefHtml = s.pef!=null ? `<div class="hist-metric"><div class="hist-metric-label">PEF</div><div class="hist-metric-val">${s.pef}<span class="hist-metric-unit"> L/min</span></div></div>` : '';
-    const fev1Html = s.fev1!=null ? `<div class="hist-metric"><div class="hist-metric-label">FEV1</div><div class="hist-metric-val">${Number(s.fev1).toFixed(2)}<span class="hist-metric-unit"> L</span></div></div>` : '';
     return `<div class="hist-row">
-      <div class="hist-top">
-        <div class="hist-date">${fmtDate(s.taken_at)}<br><span style="font-size:11px">${fmtTime(s.taken_at)||sinceStr}</span></div>
-        <div class="hist-note" style="flex:1"></div>
+      <div class="hist-date">${fmtDate(s.taken_at)}<br><span style="font-size:11px">${fmtTime(s.taken_at)||sinceStr}</span></div>
+      <div class="hist-metric-val">${Number(s.fev1).toFixed(2)} <span class="hist-metric-unit">L</span></div>
+      <div class="hist-actions">
         <button class="del-btn" onclick="editSession('${s.id}')" title="Edit">✏️</button>
         <button class="del-btn" onclick="deleteSession('${s.id}')" title="Delete">🗑</button>
       </div>
-      <div class="hist-vals">${pefHtml}${fev1Html}</div>
     </div>`;
   }).join('');
 }
@@ -360,7 +316,6 @@ function editSession(id) {
   const d = new Date(s.taken_at);
   document.getElementById('sessionDate').value = d.toISOString().slice(0,10);
   document.getElementById('sessionTime').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-  document.getElementById('pefVal').value = s.pef ?? '';
   document.getElementById('fev1Val').value = s.fev1 ?? '';
   document.getElementById('saveBtn').disabled = false;
   document.getElementById('saveBtn').textContent = 'Update Reading';
@@ -380,85 +335,44 @@ async function deleteSession(id) {
   }
 }
 
-// ══════════════════════════════════════════════════
-//  TRENDS
-// ══════════════════════════════════════════════════
 function renderTrends() {
   const el = document.getElementById('statsRow');
 
   if (!sessions.length) {
     el.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📈</div><div class="empty-title">No data yet</div></div>`;
-    if (pefChart) { pefChart.destroy(); pefChart=null; }
     if (fev1Chart) { fev1Chart.destroy(); fev1Chart=null; }
     return;
   }
 
-  const pefSessions  = sessions.filter(s=>s.pef!=null);
-  const fev1Sessions = sessions.filter(s=>s.fev1!=null);
-
-  const latestPef  = pefSessions.length  ? pefSessions[pefSessions.length-1].pef : null;
-  const latestFev1 = fev1Sessions.length ? fev1Sessions[fev1Sessions.length-1].fev1 : null;
-  const avgPef  = pefSessions.length  ? Math.round(pefSessions.reduce((a,s)=>a+s.pef,0)/pefSessions.length)  : null;
-  const avgFev1 = fev1Sessions.length ? (fev1Sessions.reduce((a,s)=>a+Number(s.fev1),0)/fev1Sessions.length).toFixed(2) : null;
-  const bestPef  = pefSessions.length  ? Math.max(...pefSessions.map(s=>s.pef))  : null;
-  const bestFev1 = fev1Sessions.length ? Math.max(...fev1Sessions.map(s=>Number(s.fev1))) : null;
+  const latest = sessions[sessions.length-1].fev1;
+  const avg = (sessions.reduce((a,s)=>a+Number(s.fev1),0)/sessions.length).toFixed(2);
+  const best = Math.max(...sessions.map(s=>Number(s.fev1))).toFixed(2);
 
   el.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">PEF (L/min)</div>
-      <div class="stat-row">
-        <div class="stat-item"><div style="font-size:10px;color:var(--ink3)">Latest</div><div class="stat-val">${latestPef??'—'}</div></div>
-        <div class="stat-item"><div style="font-size:10px;color:var(--ink3)">Avg</div><div class="stat-val">${avgPef??'—'}</div></div>
-        <div class="stat-item"><div style="font-size:10px;color:var(--ink3)">Best</div><div class="stat-val">${bestPef??'—'}</div></div>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">FEV1 (Liters)</div>
-      <div class="stat-row">
-        <div class="stat-item"><div style="font-size:10px;color:var(--ink3)">Latest</div><div class="stat-val">${latestFev1??'—'}</div></div>
-        <div class="stat-item"><div style="font-size:10px;color:var(--ink3)">Avg</div><div class="stat-val">${avgFev1??'—'}</div></div>
-        <div class="stat-item"><div style="font-size:10px;color:var(--ink3)">Best</div><div class="stat-val">${bestFev1??'—'}</div></div>
-      </div>
-    </div>`;
-
-  if (pefChart) pefChart.destroy();
-  if (pefSessions.length) {
-    pefChart = new Chart(document.getElementById('pefChart').getContext('2d'), {
-      type:'line',
-      data:{ labels:pefSessions.map(s=>fmtDate(s.taken_at)), datasets:[
-        { label:'PEF', data:pefSessions.map(s=>s.pef), borderColor:'#3B82C4', backgroundColor:'#3B82C420', fill:true, tension:0.3, pointRadius:4, borderWidth:2 },
-        { label:'Avg', data:pefSessions.map(()=>avgPef), borderColor:'#8A9EAF', borderDash:[5,4], pointRadius:0, borderWidth:1.5 }
-      ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:i=>` ${i.raw} L/min`}} },
-        scales:{ y:{beginAtZero:false,ticks:{color:'#8A9EAF',font:{size:11}},grid:{color:'#E8EAF0'}},
-                 x:{ticks:{color:'#8A9EAF',font:{size:11},maxTicksLimit:6},grid:{color:'#E8EAF0'}} }
-      }
-    });
-  }
+    <div class="stat-card"><div class="stat-label">Latest</div><div class="stat-val">${Number(latest).toFixed(2)}<span class="stat-unit"> L</span></div></div>
+    <div class="stat-card"><div class="stat-label">Average</div><div class="stat-val">${avg}<span class="stat-unit"> L</span></div></div>
+    <div class="stat-card"><div class="stat-label">Best</div><div class="stat-val">${best}<span class="stat-unit"> L</span></div></div>`;
 
   if (fev1Chart) fev1Chart.destroy();
-  if (fev1Sessions.length) {
-    fev1Chart = new Chart(document.getElementById('fev1Chart').getContext('2d'), {
-      type:'line',
-      data:{ labels:fev1Sessions.map(s=>fmtDate(s.taken_at)), datasets:[
-        { label:'FEV1', data:fev1Sessions.map(s=>s.fev1), borderColor:'#7C3AED', backgroundColor:'#7C3AED20', fill:true, tension:0.3, pointRadius:4, borderWidth:2 },
-        { label:'Avg', data:fev1Sessions.map(()=>parseFloat(avgFev1)), borderColor:'#8A9EAF', borderDash:[5,4], pointRadius:0, borderWidth:1.5 }
-      ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:i=>` ${i.raw} L`}} },
-        scales:{ y:{beginAtZero:false,ticks:{color:'#8A9EAF',font:{size:11}},grid:{color:'#E8EAF0'}},
-                 x:{ticks:{color:'#8A9EAF',font:{size:11},maxTicksLimit:6},grid:{color:'#E8EAF0'}} }
-      }
-    });
-  }
+  fev1Chart = new Chart(document.getElementById('fev1Chart').getContext('2d'), {
+    type:'line',
+    data:{ labels:sessions.map(s=>fmtDate(s.taken_at)), datasets:[
+      { label:'FEV1', data:sessions.map(s=>Number(s.fev1)), borderColor:'#7C3AED', backgroundColor:'#7C3AED20', fill:true, tension:0.3, pointRadius:4, borderWidth:2 },
+      { label:'Avg', data:sessions.map(()=>parseFloat(avg)), borderColor:'#8A9EAF', borderDash:[5,4], pointRadius:0, borderWidth:1.5 }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:i=>` ${i.raw} L`}} },
+      scales:{ y:{beginAtZero:false,ticks:{color:'#8A9EAF',font:{size:11}},grid:{color:'#E8EAF0'}},
+               x:{ticks:{color:'#8A9EAF',font:{size:11},maxTicksLimit:6},grid:{color:'#E8EAF0'}} }
+    }
+  });
 }
 
 function exportData() {
   if (!sessions.length) { showToast('No data to export','error'); return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(sessions,null,2)],{type:'application/json'}));
-  a.download = `peak_flow_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `fev1_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   showToast('Exported ✓');
 }
