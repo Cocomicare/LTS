@@ -85,7 +85,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
 .hero-score-num { font-family:'DM Mono',monospace; font-size:56px; font-weight:500; line-height:1; letter-spacing:-1px; }
 .hero-score-max { font-size:15px; opacity:.75; font-weight:400; }
 .hero-status { font-size:13px; font-weight:500; margin-top:6px; opacity:.95; }
-.hero-updated { font-size:11px; opacity:.7; margin-top:10px; }
+.hero-updated { font-size:11px; opacity:.7; margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.hero-sync-btn { background:rgba(255,255,255,0.22); border:1px solid rgba(255,255,255,0.4); color:#fff; font-size:11px; font-weight:600; padding:4px 10px; border-radius:14px; cursor:pointer; flex-shrink:0; transition:background .15s; }
+.hero-sync-btn:hover { background:rgba(255,255,255,0.32); }
+.hero-sync-btn:disabled { opacity:.6; cursor:not-allowed; }
 .hero-chevron { font-size:20px; opacity:.7; margin-top:4px; }
 .hero-empty-icon { font-size:30px; margin-bottom:6px; }
 .hero-empty-text { font-size:13px; opacity:.9; line-height:1.4; }
@@ -252,6 +255,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
 <!-- Supabase SDK + shared client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
+<script src="score_engine.js"></script>
 <script>
 // ══════════════════════════════════════════════════
 //  MODULE REGISTRY
@@ -367,6 +371,7 @@ async function handleReset() {
 }
 
 async function handleSignOut() {
+  teardownDashboardRealtime();
   await sb.auth.signOut();
   showScreen('screen-login');
 }
@@ -374,11 +379,40 @@ async function handleSignOut() {
 // ══════════════════════════════════════════════════
 //  DASHBOARD — live data, no localStorage
 // ══════════════════════════════════════════════════
+let dashboardRealtimeChannels = [];
+
 async function showDashboard() {
   showScreen('screen-dashboard');
   setGreeting();
   await renderHeroScore();
   await renderTiles();
+  setupDashboardRealtime();
+}
+
+// Subscribe once to every table that affects the dashboard (tracking tiles +
+// the Early Warning Signal history), so changes made on ANY device push an
+// instant refresh here — no need to wait for the 60s poll or a tab switch.
+function setupDashboardRealtime() {
+  if (dashboardRealtimeChannels.length) return; // already subscribed this session
+  if (!currentUser) return;
+
+  const tablesToWatch = [
+    'vitals_readings', 'spirometer_sessions', 'peak_flow_sessions',
+    'symptom_checkins', 'sputum_logs', 'health_index_history',
+  ];
+
+  tablesToWatch.forEach(table => {
+    const channel = subscribeToTable(table, currentUser.id, () => {
+      renderHeroScore();
+      renderTiles();
+    });
+    dashboardRealtimeChannels.push(channel);
+  });
+}
+
+function teardownDashboardRealtime() {
+  dashboardRealtimeChannels.forEach(ch => sb.removeChannel(ch));
+  dashboardRealtimeChannels = [];
 }
 
 async function renderHeroScore() {
@@ -396,7 +430,8 @@ async function renderHeroScore() {
         <div class="hero-score-card zone-none" onclick="openModule('health')">
           <div class="hero-eyebrow">Early Warning Signal</div>
           <div class="hero-empty-icon">📊</div>
-          <div class="hero-empty-text">No score yet — log a few readings across your modules, then open Early Warning Signal to generate your first composite score.</div>
+          <div class="hero-empty-text">No score yet — log a few readings across your modules, then tap sync below to generate your first composite score.</div>
+          <button class="hero-sync-btn" id="hero-sync-btn" onclick="event.stopPropagation(); syncEarlyWarningSignal()">↻ Sync Now</button>
         </div>`;
       return;
     }
@@ -429,10 +464,29 @@ async function renderHeroScore() {
           </div>
           <div class="hero-chevron">→</div>
         </div>
-        <div class="hero-updated">${updatedStr} · Tap for full breakdown</div>
+        <div class="hero-updated">
+          ${updatedStr} · Tap card for full breakdown
+          <button class="hero-sync-btn" id="hero-sync-btn" onclick="event.stopPropagation(); syncEarlyWarningSignal()">↻ Sync Now</button>
+        </div>
       </div>`;
   } catch (e) {
     container.innerHTML = '';
+  }
+}
+
+// Triggers a fresh score calculation right from the dashboard, without
+// needing to open the full Early Warning Signal module — uses the same
+// shared scoring engine (score_engine.js) the module itself uses.
+async function syncEarlyWarningSignal() {
+  const btn = document.getElementById('hero-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing…'; }
+  try {
+    await ewsComputeAndSave(currentUser.id);
+    await renderHeroScore();
+    showToast('Early Warning Signal updated ✓', 'success');
+  } catch (e) {
+    showToast('Sync failed: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Sync Now'; }
   }
 }
 
