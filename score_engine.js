@@ -52,14 +52,6 @@ const EWS_PARAMS = [
     desc:'Bacterial infection signal; also flags drug-induced neutropenia', source:'labs' },
   { key:'lymphocytes_abs', name:'Absolute Lymphocytes', icon:'🛡️', unit:'K/µL', weight:6, maxAgeDays:21, direction:'stable',
     desc:'Viral reactivation (e.g. CMV) and some rejection correlation', source:'labs' },
-  { key:'esr', name:'ESR', icon:'⏱️', unit:'mm/hr', weight:4, maxAgeDays:21, direction:'stable',
-    desc:'Slower, less sensitive cousin of CRP', source:'labs' },
-  { key:'albumin', name:'Albumin', icon:'💧', unit:'g/dL', weight:4, maxAgeDays:21, direction:'higher_better',
-    desc:'Negative acute-phase reactant — lags real-time inflammation by ~weeks', source:'labs' },
-  { key:'wbc', name:'WBC', icon:'🩸', unit:'K/µL', weight:3, maxAgeDays:21, direction:'stable',
-    desc:'Broad infection marker — partially redundant with neutrophils/lymphocytes', source:'labs' },
-  { key:'igg', name:'IgG', icon:'🛡️', unit:'mg/dL', weight:3, maxAgeDays:60, direction:'higher_better',
-    desc:'Standing immune capacity/risk — not a real-time event signal, lowest weight', source:'labs' },
 ];
 const EWS_NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'hr'];
 
