@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UF Health Facility Directory</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --warn:#E07B39; --warn-bg:#FDF0E8; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.search-box { width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:10px; font-size:15px; margin-bottom:14px; background:var(--surface); }
+.danger-box { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:8px; padding:12px 14px; margin-bottom:16px; color:var(--danger); font-weight:600; line-height:1.5; font-size:13.5px; }
+.facility-row { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:8px; }
+.facility-row.emergency { border-left:4px solid var(--danger); }
+.facility-name { font-weight:600; font-size:13.5px; }
+.facility-addr { font-size:13px; color:var(--ink2); margin-top:2px; }
+.tag { display:inline-block; background:var(--danger-bg); color:var(--danger); font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 7px; border-radius:10px; margin-left:6px; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="reference_hub.html" style="display:inline-block;font-size:13px;color:#3B82C4;text-decoration:none;font-weight:600;margin-bottom:6px">← Reference Guide</a><br>
+  <div class="logo-title">UF Health Facility Directory</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page">
+  <input type="text" class="search-box" id="search" placeholder="🔍 Search facility name…" oninput="filterRows()">
+  <div id="content"></div>
+</div>
+
+<script>
+const FACILITIES = [
+  { name:"UF Health Shands Psychiatric Hospital / Center for Autism & Neurodevelopment / Florida Surgical Center / Children's Surgical Center", addr:"4101 NW 89th Boulevard" },
+  { name:"UF Health – Springhill", addr:"4037 & 4197 NW 86th Terrace" },
+  { name:"UF Health – Magnolia Parke", addr:"4740 NW 39th Place & 3951 NW 48th Terrace" },
+  { name:"UF Health Sleep Center", addr:"4740 NW 39th Place, Suite C", emergency:false },
+  { name:"UF Health Davis Cancer Pavilion", addr:"1535 Gale Lemerand Drive" },
+  { name:"UF Health Medical Plaza", addr:"1549 Gale Lemerand Drive" },
+  { name:"UF Health Heart & Vascular and Neuromedicine Hospitals", addr:"1600 SW Archer Road" },
+  { name:"UF Health Shands Emergency Center – Springhill", addr:"8491 NW 39th Avenue", emergency:true },
+  { name:"UF Health Shands Hospital / Shands Children's Hospital / Shands Pediatric E.R. / Faculty Dental Practice", addr:"1600 SW Archer Road" },
+  { name:"UF Health Pain Medicine – Ayers", addr:"720 SW 2nd Avenue, Suite 101" },
+  { name:"UF Health Family Medicine – Main", addr:"1701 N. Main Street" },
+  { name:"UF Health – Tower Hill", addr:"7540 W. University Avenue" },
+  { name:"UF Health Shands Cancer Hospital / Shands E.R.", addr:"1515 SW Archer Road", emergency:true },
+  { name:"UF Health Family Medicine – Eastside", addr:"410 NE Waldo Road" },
+  { name:"UF Health – The Oaks", addr:"6201 W. Newberry Road" },
+  { name:"UF Health Rehab Hospital (affiliated with Select Medical)", addr:"2708 SW Archer Road" },
+  { name:"UF Health Pediatrics – Gerold L. Schiebler CMS Center", addr:"1699 SW 16th Avenue, Building A" },
+  { name:"UF Health Endoscopy Center", addr:"2001 SW 13th Street" },
+  { name:"UF Health – Haile Plantation", addr:"2846 SW 87th Way, Suite A" },
+  { name:"UF Health Pediatrics – Tower Square", addr:"7046 SW Archer Road" },
+  { name:"UF Health Medical Lab – Rocky Point", addr:"4800 SW 35th Drive (verify — partially unclear in source)" },
+  { name:"UF Health Emergency Center – Kanapaha", addr:"7405 SW Williston Road", emergency:true },
+  { name:"UF Health Norman Fixel Institute for Neurological Diseases", addr:"3009 SW Williston Road" },
+  { name:"UF Health Senior Care – Oak Hammock", addr:"2660 SW 53rd Place" },
+  { name:"Senior Recreation Center", addr:"5701 NW 34th Blvd" },
+  { name:"UF Health Family Medicine – Jonesville", addr:"13611 NW 1st Ln #200" },
+  { name:"UF Health Pediatrics – Tioga", addr:"133 SW 130th Way" },
+  { name:"University of Florida HealthStreet", addr:"2401 SW Archer Road" },
+  { name:"UF Health Dialysis Center", addr:"2409 SW Archer Road" },
+];
+
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    document.getElementById('search').style.display = 'none';
+    return;
+  }
+  renderRows(FACILITIES);
+})();
+
+function renderRows(rows) {
+  const warning = `<div class="danger-box">⚠️ This is a name/address reference only — pin numbers from the original printed map are intentionally omitted here, since that pairing wasn't fully legible in the source photo. For navigation in an urgent situation, use GPS/maps directly rather than this list, and keep the original physical map in your binder as the authoritative reference.</div>`;
+  document.getElementById('content').innerHTML = warning + rows.map(f => `
+    <div class="facility-row${f.emergency ? ' emergency' : ''}">
+      <div class="facility-name">${f.name}${f.emergency ? '<span class="tag">Emergency Services</span>' : ''}</div>
+      <div class="facility-addr">${f.addr}</div>
+    </div>`).join('');
+}
+
+function filterRows() {
+  const q = document.getElementById('search').value.toLowerCase();
+  renderRows(FACILITIES.filter(f => (f.name + f.addr).toLowerCase().includes(q)));
+}
+</script>
+<div class="source-note">Source: UF Health Gainesville Area Locations map — name/address pairings, pin-number mapping not included</div>
+</body>
+</html>

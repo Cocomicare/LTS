@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Care Roadmap</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#3B82C4; --warn:#E07B39; --warn-bg:#FDF0E8; --danger:#C94040; --danger-bg:#FAEAEA; --good:#2D9E6B; --good-bg:#E8F7F1; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card h3 { font-size:14px; font-weight:700; margin:14px 0 6px; }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.phase-box { border-left:4px solid var(--accent); background:var(--bg); border-radius:8px; padding:13px 15px; margin-bottom:12px; }
+.phase-box h3 { margin-top:0; color:var(--accent); }
+.warn-box { background:var(--warn-bg); border:1px solid #f0d8b8; border-radius:8px; padding:12px 14px; margin:10px 0; color:#9a5a1f; line-height:1.5; }
+.team-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:13.5px; color:var(--ink2); }
+.team-row:last-child { border-bottom:none; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="reference_hub.html" style="display:inline-block;font-size:13px;color:#3B82C4;text-decoration:none;font-weight:600;margin-bottom:6px">← Reference Guide</a><br>
+  <div class="logo-title">Care Roadmap</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>What to Expect After Discharge</h2>
+      <p>UF Health's lung transplant care involves a coordinated team working together. You're assigned one primary transplant coordinator, but your care is supported by:</p>
+      <div class="team-row">👨‍⚕️ Attending Physicians</div>
+      <div class="team-row">👩‍⚕️ Nurse Practitioners</div>
+      <div class="team-row">📋 A team of transplant coordinators</div>
+      <div class="team-row">🦷 Specialty providers (GI, Endocrinology, etc.)</div>
+      <div class="team-row">🤝 Social workers and case management</div>
+      <div class="team-row">💊 Pharmacy</div>
+      <div class="team-row">🏥 Inpatient transplant providers when hospitalized</div>
+
+      <h3>How Your Plan Flows</h3>
+      <p>You'll be seen in clinic weekly in the beginning by the transplant team — typically by an Attending as well as a Nurse Practitioner. After you leave clinic, the team reviews and formulates your plan, then sends it to your primary coordinator the following day. This is when you may receive follow-up communication from your coordinator on next steps. You are assigned one coordinator, but the team works together to support you.</p>
+      <p>Some appointments (such as GI or Endocrinology) are scheduled directly by those offices — this is normal and part of how the system is designed to work. Your transplant coordinator helps guide transplant-related care, but not every task will come directly from your coordinator.</p>
+    </div>
+
+    <div class="card">
+      <h2>🧭 Phases of Care</h2>
+      <p>Your transplant journey happens in phases. Understanding this helps reduce confusion and anxiety.</p>
+
+      <div class="phase-box">
+        <h3>Phase 1: First 90 Days (Stay in Gainesville)</h3>
+        <ul>
+          <li>Weekly clinic visits</li>
+          <li>Frequent lab monitoring</li>
+          <li>Medication adjustments</li>
+          <li>One-month bronchoscopy requirement reviewed</li>
+          <li>GI evaluation planned (scheduled with Dr. Amaris)</li>
+          <li>Physical therapy goals reviewed</li>
+          <li>Close communication with your transplant team</li>
+        </ul>
+        <p style="font-size:13px;font-style:italic">Frequent contact during this phase is normal and expected.</p>
+      </div>
+
+      <div class="phase-box">
+        <h3>Phase 2: Transitioning Home</h3>
+        <ul>
+          <li>Medications transferred to local pharmacy</li>
+          <li>Lab monitoring arranged locally</li>
+          <li>Pulmonary Function Tests locally</li>
+          <li>Chest X-rays locally</li>
+          <li>Telemedicine visits when appropriate</li>
+        </ul>
+        <p style="font-size:13px;font-style:italic">Communication typically becomes less frequent as medications stabilize.</p>
+      </div>
+
+      <div class="phase-box">
+        <h3>Phase 3: Long-Term Follow-Up</h3>
+        <ul>
+          <li>Monthly lab monitoring</li>
+          <li>Clinic visits every 3–6 months</li>
+          <li>Imaging as scheduled</li>
+          <li>Continued transplant oversight</li>
+        </ul>
+      </div>
+
+      <div class="warn-box">If complications arise (such as infection or rejection), your care may temporarily return to a more intensive phase.</div>
+    </div>
+
+    <div class="card">
+      <h2>🤝 Your Role in Your Transplant Journey</h2>
+      <p>Transplant care is a partnership. You play an active role in:</p>
+      <ul>
+        <li>Scheduling specialty appointments when directed</li>
+        <li>Monitoring your symptoms</li>
+        <li>Taking medications as prescribed</li>
+        <li>Using MyChart for routine communication</li>
+        <li>Asking questions when unsure</li>
+      </ul>
+      <p style="font-weight:600">You are an important member of your care team.</p>
+    </div>
+
+    <div class="card">
+      <h2>🔑 Before You Leave the Hospital</h2>
+      <p>Before discharge, your team completes readiness checkpoints to ensure:</p>
+      <ul>
+        <li>Education has been completed</li>
+        <li>Medications are correct and at bedside</li>
+        <li>Follow-up plans are reviewed</li>
+        <li>Housing requirements are confirmed</li>
+      </ul>
+      <p style="font-style:italic">If something feels unclear before discharge, please let your team know.</p>
+    </div>
+
+    <div class="warn-box" style="margin:0 0 16px">⚠️ <strong>Note:</strong> this page's source document also included an "Emergency Symptoms" list under "How to Contact Us," but that section was not legible in the photo it was built from. If you have it handy, a clearer photo would let this be completed accurately rather than guessed at.</div>
+
+    <div class="source-note">Source: UF Health Lung Transplant Program — Your Transplant Care Roadmap</div>
+  `;
+})();
+</script>
+</body>
+</html>

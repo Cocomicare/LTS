@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post-Discharge FAQ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#0D5C6B; --warn:#E07B39; --warn-bg:#FDF0E8; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.qa-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:12px; }
+.qa-q { font-weight:700; font-size:14.5px; color:var(--accent); margin-bottom:6px; }
+.qa-a { font-size:13.5px; color:var(--ink2); line-height:1.6; }
+.warn-box { background:var(--warn-bg); border:1px solid #f0d8b8; border-radius:8px; padding:10px 12px; margin-top:8px; color:#9a5a1f; font-size:13px; line-height:1.5; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="reference_hub.html" style="display:inline-block;font-size:13px;color:#3B82C4;text-decoration:none;font-weight:600;margin-bottom:6px">← Reference Guide</a><br>
+  <div class="logo-title">Post-Discharge FAQ</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="qa-card">
+      <div class="qa-q">When can I shower?</div>
+      <div class="qa-a">You can shower immediately after discharge unless otherwise indicated by your coordinator.</div>
+    </div>
+
+    <div class="qa-card">
+      <div class="qa-q">When can I drive?</div>
+      <div class="qa-a">Based upon your individual progress.</div>
+    </div>
+
+    <div class="qa-card">
+      <div class="qa-q">What should I do about my chest tube dressing site?</div>
+      <div class="qa-a">Cover your chest tube site with a dry gauze dressing. This is only to protect your clothes from any drainage.</div>
+    </div>
+
+    <div class="qa-card">
+      <div class="qa-q">When do my chest tube sutures come out?</div>
+      <div class="qa-a">Your sutures will most likely come out during your next clinic visit.</div>
+    </div>
+
+    <div class="qa-card">
+      <div class="qa-q">My chest tube site is red. Is this normal?</div>
+      <div class="qa-a">You can expect the suture site to be red — this is part of the healing process.</div>
+    </div>
+
+    <div class="qa-card">
+      <div class="qa-q">What are common symptoms I might experience after being discharged?</div>
+      <div class="qa-a">
+        You may experience some decreased appetite, weight loss, episodic fatigue and/or shortness of breath during the first two weeks after being discharged.
+        <div class="warn-box">⚠️ You should report any decrease in spirometry, or a decrease in oxygen saturation below 90% while exercising in the physical therapy gym, to your coordinator.</div>
+      </div>
+    </div>
+
+    <div class="source-note">Source: UF Health Lung Transplant Program — Some Frequently Asked Questions After Being Discharged</div>
+  `;
+})();
+</script>
+</body>
+</html>
