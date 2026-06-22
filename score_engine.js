@@ -15,21 +15,21 @@
 
 const EWS_PARAMS = [
   // ── Daily/frequent tracking (unchanged from original) ──
-  { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:11, maxAgeDays:2, direction:'higher_better',
+  { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:8, maxAgeDays:2, direction:'higher_better',
     desc:'Subjective wellness score', source:'symptoms' },
-  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:22, maxAgeDays:2, direction:'higher_better',
+  { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:15, maxAgeDays:2, direction:'higher_better',
     desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
-  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:22, maxAgeDays:2, direction:'higher_better',
+  { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:15, maxAgeDays:2, direction:'higher_better',
     desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
-  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:16, maxAgeDays:2, direction:'higher_better',
+  { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:11, maxAgeDays:2, direction:'higher_better',
     desc:'Inspiratory volume — complements FEV1', source:'spiro' },
-  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:7, maxAgeDays:2, direction:'stable',
+  { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:5, maxAgeDays:2, direction:'stable',
     desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
-  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:13, maxAgeDays:3, direction:'lower_better',
+  { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:9, maxAgeDays:2, direction:'lower_better',
     desc:'Key infection indicator', source:'vitals', vitalType:'temp' },
-  { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:5, maxAgeDays:14, direction:'stable',
+  { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:3, maxAgeDays:14, direction:'stable',
     desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
-  { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:4, maxAgeDays:3, direction:'higher_better',
+  { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:3, maxAgeDays:2, direction:'higher_better',
     desc:'Composite of color + texture + volume', source:'sputum' },
 
   // ── LAB-DERIVED PARAMS ──
@@ -40,20 +40,49 @@ const EWS_PARAMS = [
   // full UF panel or a specialist-ordered test. All of these are
   // user-adjustable in health_index.html's Settings panel — nothing
   // here is hardcoded once a settings row exists.
-  { key:'dd_cfdna', name:'Donor-Derived cfDNA', icon:'🧬', unit:'%', weight:10, maxAgeDays:60, direction:'cfdna_binary',
-    desc:'Most direct, earliest rejection-specific signal — specialist/UF-only test (e.g. AlloSure)', source:'labs' },
-  { key:'il6', name:'IL-6', icon:'🔥', unit:'pg/mL', weight:6, maxAgeDays:30, direction:'stable',
-    desc:'Earliest general inflammatory cytokine — precedes CRP', source:'labs' },
-  { key:'crp', name:'CRP', icon:'🌡️', unit:'mg/L', weight:10, maxAgeDays:14, direction:'stable',
+  { key:'dd_cfdna', name:'Donor-Derived cfDNA', icon:'🧬', unit:'%', weight:7, maxAgeDays:7, direction:'cfdna_binary',
+    desc:'Most direct, earliest rejection-specific signal — specialist/UF-only test (e.g. AlloSure). Window is longer than other labs since it is drawn rarely but its biology does not spike/decay as fast as inflammatory markers.', source:'labs' },
+  { key:'il6', name:'IL-6', icon:'🔥', unit:'pg/mL', weight:4, maxAgeDays:2, direction:'stable',
+    desc:'Earliest general inflammatory cytokine — precedes CRP. Fastest-moving marker on this list (half-life in hours), so the shortest window.', source:'labs' },
+  { key:'crp', name:'CRP', icon:'🌡️', unit:'mg/L', weight:7, maxAgeDays:3, direction:'stable',
     desc:'Best practical general inflammation marker — self-orderable', source:'labs' },
-  { key:'procalcitonin', name:'Procalcitonin', icon:'🦠', unit:'ng/mL', weight:4, maxAgeDays:30, direction:'stable',
-    desc:'Fast, bacteria-specific — blind to rejection, so weighted lower', source:'labs' },
-  { key:'neutrophils_abs', name:'Absolute Neutrophils', icon:'🛡️', unit:'K/µL', weight:8, maxAgeDays:21, direction:'stable',
-    desc:'Bacterial infection signal; also flags drug-induced neutropenia', source:'labs' },
-  { key:'lymphocytes_abs', name:'Absolute Lymphocytes', icon:'🛡️', unit:'K/µL', weight:6, maxAgeDays:21, direction:'stable',
+  { key:'procalcitonin', name:'Procalcitonin', icon:'🦠', unit:'ng/mL', weight:3, maxAgeDays:2, direction:'stable',
+    desc:'Fast, bacteria-specific — blind to rejection, so weighted lower. ~24hr half-life, short window.', source:'labs' },
+  { key:'neutrophils_abs', name:'Absolute Neutrophils', icon:'🛡️', unit:'K/µL', weight:6, maxAgeDays:3, direction:'stable',
+    desc:'Bacterial infection signal; also flags drug-induced neutropenia. Can shift meaningfully within 24-48hrs.', source:'labs' },
+  { key:'lymphocytes_abs', name:'Absolute Lymphocytes', icon:'🛡️', unit:'K/µL', weight:4, maxAgeDays:3, direction:'stable',
     desc:'Viral reactivation (e.g. CMV) and some rejection correlation', source:'labs' },
 ];
+// Most lab params will sit "Excluded" for the majority of any given month
+// under typical (monthly) draw cadence — that's intentional. A lab value
+// only meaningfully describes "right now" for a few days; stretching trust
+// in it across weeks would be worse than excluding it and letting the
+// score lean on daily vitals/symptoms instead. See EWS_FLOOR_THRESHOLD
+// below for how a single fresh, severely abnormal lab can still escalate
+// the score during its brief active window.
 const EWS_NONNEGOTIABLES = ['symptoms', 'spo2', 'fev1', 'hr'];
+
+// ══════════════════════════════════════════════════
+//  SINGLE-PARAMETER FLOOR RULE
+//  The weighted composite alone has a real blind spot: a moderate,
+//  genuinely-early signal in just one or two parameters (e.g. SpO2
+//  or Symptom Check-in dropping meaningfully) can get almost entirely
+//  averaged away if every other tracked parameter happens to be near-
+//  perfect at the same time — the more "healthy" data you have, the
+//  more it can dilute one real problem. This mirrors a known pattern
+//  in real clinical scoring systems (e.g. the UK's NEWS2), which pair
+//  an aggregate score with a rule that escalates regardless of the
+//  total if any single vital sign is severely abnormal on its own.
+//
+//  Applies across all 14 EWS_PARAMS. dd_cfdna gets its own (higher)
+//  threshold because it uses fixed clinical-cutoff buckets rather
+//  than a continuous personal-baseline curve — its "mild but real"
+//  bucket scores 70, which a shared 65 floor would miss entirely,
+//  even though early dd-cfDNA elevation is one of the most clinically
+//  important signals this whole system tracks.
+// ══════════════════════════════════════════════════
+const EWS_FLOOR_THRESHOLD = 65;
+const EWS_FLOOR_OVERRIDES = { dd_cfdna: 70 };
 
 function ewsGetWeights(settingsRow) {
   const saved = (settingsRow && settingsRow.weights) || {};
@@ -241,6 +270,22 @@ async function ewsComputeAndSave(userId) {
   let finalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null;
   if (finalScore !== null) finalScore = Math.max(0, Math.min(100, finalScore));
 
+  // ── Apply the single-parameter floor rule ──
+  // A severely abnormal individual parameter caps the score regardless
+  // of what the weighted composite computed — see EWS_FLOOR_THRESHOLD
+  // comment above for why this exists.
+  let floorTriggeredBy = null;
+  if (finalScore !== null) {
+    for (const b of breakdown) {
+      if (b.score === null) continue;
+      const floor = EWS_FLOOR_OVERRIDES[b.param.key] ?? EWS_FLOOR_THRESHOLD;
+      if (b.score <= floor && b.score < finalScore) {
+        finalScore = b.score;
+        floorTriggeredBy = b.param.name;
+      }
+    }
+  }
+
   breakdown.sort((a,b) => {
     if (a.score !== null && b.score === null) return -1;
     if (a.score === null && b.score !== null) return 1;
@@ -283,5 +328,5 @@ async function ewsComputeAndSave(userId) {
     }
   }
 
-  return { score: finalScore, breakdown, missingCount, missingRequired: [], settingsRow, historyRows };
+  return { score: finalScore, breakdown, missingCount, missingRequired: [], settingsRow, historyRows, floorTriggeredBy };
 }

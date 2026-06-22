@@ -65,6 +65,12 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .param-missing { font-size:10px; color:var(--ink3); background:var(--surface2); padding:1px 6px; border-radius:8px; flex-shrink:0; white-space:nowrap; }
 .param-info-btn { background:none; border:none; color:var(--ink3); font-size:15px; cursor:pointer; padding:2px 4px; flex-shrink:0; }
 .param-info-btn:hover { color:var(--accent); }
+.inactive-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:10px 0; font-size:12.5px; color:var(--ink3); cursor:pointer; border-top:1px dashed var(--border); margin-top:4px; }
+.inactive-toggle:hover { color:var(--accent); }
+.inactive-toggle-arrow { transition:transform .2s; font-size:10px; }
+.inactive-toggle-arrow.open { transform:rotate(180deg); }
+.inactive-params-panel { display:none; }
+.inactive-params-panel.open { display:block; }
 
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(20,30,40,0.55); z-index:1000; align-items:flex-end; justify-content:center; }
 .modal-overlay.open { display:flex; }
@@ -306,9 +312,9 @@ async function refreshAll() {
     lastBreakdown = result.breakdown;
 
     if (result.missingRequired.length > 0) {
-      renderDial(null, result.breakdown, result.missingCount, result.missingRequired);
+      renderDial(null, result.breakdown, result.missingCount, result.missingRequired, null);
     } else {
-      renderDial(result.score, result.breakdown, result.missingCount, []);
+      renderDial(result.score, result.breakdown, result.missingCount, [], result.floorTriggeredBy);
     }
   } catch (e) {
     showToast('Sync failed: ' + e.message, 'error');
@@ -327,7 +333,7 @@ function getZoneColor(score, thresholds) {
   return 'var(--zone-red)';
 }
 
-function renderDial(score, breakdown, missingCount, missingRequired) {
+function renderDial(score, breakdown, missingCount, missingRequired, floorTriggeredBy) {
   const thresholds = getThresholds();
   const cx = 120, cy = 130, r = 90;
   function arcPath(startAngle, endAngle) {
@@ -381,6 +387,8 @@ function renderDial(score, breakdown, missingCount, missingRequired) {
   const activeParams = breakdown.filter(b=>b.score!==null).length;
   if (missingRequired.length > 0) {
     freshEl.innerHTML = `<strong style="color:var(--warn)">Required readings missing or expired:</strong><br>${missingRequired.join(' · ')}`;
+  } else if (floorTriggeredBy) {
+    freshEl.innerHTML = `<strong style="color:var(--warn)">⚠ Score capped due to ${floorTriggeredBy}</strong> — this one parameter scored low enough on its own to override the weighted average.`;
   } else if (missingCount > 0) {
     freshEl.innerHTML = `Score based on ${activeParams} of ${breakdown.length} parameters · ${missingCount} excluded`;
   } else {
@@ -389,7 +397,8 @@ function renderDial(score, breakdown, missingCount, missingRequired) {
 
   const rowsEl = document.getElementById('breakdown-rows');
   lastBreakdown = breakdown;
-  rowsEl.innerHTML = breakdown.map((b,i) => {
+
+  function rowHtml(b, i, dimmed) {
     const { param, score, latest, baseline, w, freshness, daysAgo } = b;
     const barColor = score !== null ? getZoneColor(score, thresholds) : 'var(--ink3)';
     const barWidth = score !== null ? score : 0;
@@ -400,7 +409,7 @@ function renderDial(score, breakdown, missingCount, missingRequired) {
       ? (b.sys != null ? `Latest: ${b.sys}/${b.dia} mmHg` : 'Not logged')
       : (latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged');
     return `
-    <div class="param-row" style="${freshness==='missing'?'opacity:0.45':''}">
+    <div class="param-row" style="${dimmed?'opacity:0.45':''}">
       <div class="param-icon">${param.icon}</div>
       <div class="param-info">
         <div class="param-name">${param.name} ${isTopImpact ? '<span style="color:var(--warn);font-size:11px">★ highest impact</span>' : ''}</div>
@@ -412,10 +421,49 @@ function renderDial(score, breakdown, missingCount, missingRequired) {
       <button class="param-info-btn" onclick="showScoreInfo('${param.key}')" title="How is this scored?">ⓘ</button>
       ${freshness === 'missing' ? `<span class="param-missing">Excluded</span>` : ''}
     </div>`;
-  }).join('');
+  }
+
+  const activeRows = [], inactiveRows = [];
+  breakdown.forEach((b, i) => {
+    if (b.freshness === 'missing') inactiveRows.push(b); else activeRows.push(b);
+  });
+
+  let html = activeRows.map((b,i) => rowHtml(b, i, false)).join('');
+
+  if (inactiveRows.length > 0) {
+    html += `
+      <div class="inactive-toggle" id="inactive-toggle" onclick="toggleInactiveParams()">
+        <span id="inactive-toggle-label">Show ${inactiveRows.length} inactive parameter${inactiveRows.length>1?'s':''}</span>
+        <span class="inactive-toggle-arrow" id="inactive-toggle-arrow">▾</span>
+      </div>
+      <div class="inactive-params-panel" id="inactive-params-panel">
+        ${inactiveRows.map((b,i) => rowHtml(b, i, true)).join('')}
+      </div>`;
+  }
+
+  rowsEl.innerHTML = html;
+  // Preserve open/closed state across re-renders (e.g. realtime updates)
+  if (showInactiveParams) {
+    const p = document.getElementById('inactive-params-panel');
+    const a = document.getElementById('inactive-toggle-arrow');
+    const l = document.getElementById('inactive-toggle-label');
+    if (p) { p.classList.add('open'); a.classList.add('open'); l.textContent = `Hide ${inactiveRows.length} inactive parameter${inactiveRows.length>1?'s':''}`; }
+  }
 
   const activePct = Math.round(breakdown.filter(b=>b.score!==null).reduce((a,b)=>a+b.w,0));
   document.getElementById('score-basis').textContent = `Score based on ${activePct}% of total weight · ${getBaselineDays()}-day baseline window`;
+}
+
+let showInactiveParams = false;
+function toggleInactiveParams() {
+  showInactiveParams = !showInactiveParams;
+  const panel = document.getElementById('inactive-params-panel');
+  const arrow = document.getElementById('inactive-toggle-arrow');
+  const label = document.getElementById('inactive-toggle-label');
+  const count = panel.children.length;
+  panel.classList.toggle('open', showInactiveParams);
+  arrow.classList.toggle('open', showInactiveParams);
+  label.textContent = showInactiveParams ? `Hide ${count} inactive parameter${count>1?'s':''}` : `Show ${count} inactive parameter${count>1?'s':''}`;
 }
 
 function toggleBreakdown() {
