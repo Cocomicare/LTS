@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medications</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#7B5EA7; --accent-bg:#F0EAFA;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --radius:12px; --radius-sm:8px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.5px; margin-left:8px; }
+.tabs { display:flex; background:#E8EFF5; border-bottom:1px solid var(--border); padding:0 16px; }
+.tab { padding:11px 14px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.page { display:none; padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.page.active { display:block; }
+
+.fab { position:fixed; bottom:24px; right:20px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:#fff; font-size:26px; border:none; box-shadow:0 4px 14px rgba(123,94,167,0.4); cursor:pointer; z-index:90; display:flex; align-items:center; justify-content:center; }
+
+.med-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:10px; cursor:pointer; }
+.med-card.inactive { opacity:0.5; }
+.med-top { display:flex; justify-content:space-between; align-items:flex-start; }
+.med-name { font-weight:700; font-size:15px; }
+.med-dosage { font-size:13px; color:var(--ink2); margin-top:1px; }
+.med-freq { font-size:12.5px; color:var(--ink3); margin-top:3px; }
+.refill-chip { font-size:11px; font-weight:600; padding:3px 9px; border-radius:12px; white-space:nowrap; margin-left:8px; }
+.refill-chip.ok { background:var(--good-bg); color:var(--good); }
+.refill-chip.soon { background:var(--warn-bg); color:#9a5a1f; }
+.refill-chip.overdue { background:var(--danger-bg); color:var(--danger); }
+.refill-chip.none { background:var(--bg); color:var(--ink3); }
+
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:14px; }
+.card-title { font-family:'DM Serif Display',serif; font-size:16px; margin-bottom:6px; }
+.card-sub { font-size:12.5px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
+
+.upload-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:26px 16px; text-align:center; cursor:pointer; transition:all .15s; background:var(--bg); }
+.upload-zone:hover { border-color:var(--accent); background:var(--accent-bg); }
+.upload-zone .icon { font-size:28px; margin-bottom:6px; }
+.upload-zone .label { font-size:13px; color:var(--ink2); font-weight:500; }
+#file-input { display:none; }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all .15s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:#6a4f93; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:none; border:1px solid var(--border); color:var(--ink2); }
+.btn-danger { background:none; border:1px solid #f0c0c0; color:var(--danger); }
+
+.field-group { margin-bottom:14px; }
+.field-group label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink2); display:block; margin-bottom:6px; }
+.field-group input, .field-group textarea, .field-group select {
+  width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 12px; font-size:14px; font-family:'DM Sans',sans-serif;
+}
+.field-group textarea { resize:vertical; min-height:60px; }
+.field-row { display:flex; gap:12px; }
+.field-row .field-group { flex:1; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; }
+
+.detail-row { padding:10px 0; border-bottom:1px solid var(--border); }
+.detail-row:last-child { border-bottom:none; }
+.detail-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink3); margin-bottom:3px; }
+.detail-val { font-size:14px; color:var(--ink); line-height:1.5; }
+
+.spinner { width:22px; height:22px; border:3px solid var(--accent-bg); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 10px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px; z-index:999; opacity:0; transition:all .25s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Medications</span>
+    <span class="logo-sub">Ongoing List</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('list')" id="tab-list">List</button>
+  <button class="tab" onclick="showTab('add')" id="tab-add">Add / Upload</button>
+</div>
+
+<!-- LIST -->
+<div class="page active" id="page-list">
+  <div id="list-content"></div>
+</div>
+
+<!-- ADD / UPLOAD -->
+<div class="page" id="page-add">
+  <div class="card" id="upload-card">
+    <div class="card-title">📷 Add via Photo or PDF</div>
+    <div class="card-sub">Upload a photo of the pill bottle/label, or a medication instruction sheet — we'll pull out the name, dosage, frequency, and side effects automatically. Review before saving.</div>
+    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="icon">💊</div>
+      <div class="label">Tap to choose a file</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*,application/pdf" onchange="onFileSelected(event)">
+    <div style="display:flex;justify-content:center;margin-top:10px">
+      <button class="btn btn-ghost" onclick="pasteFromClipboardMeds()">📋 Paste from Clipboard</button>
+    </div>
+  </div>
+
+  <div class="card" id="loading-card" style="display:none;text-align:center">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:var(--ink2)">Reading the label…</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:14px">
+    <button class="btn btn-ghost" onclick="openForm(null)">✏️ Or enter manually</button>
+  </div>
+</div>
+
+<!-- ADD/EDIT FORM MODAL -->
+<div id="form-modal" style="display:none;position:fixed;inset:0;background:rgba(20,30,40,0.55);z-index:200;overflow-y:auto;padding:20px">
+  <div style="max-width:480px;margin:0 auto">
+    <div class="card">
+      <div class="card-title" id="form-title">Add Medication</div>
+      <div class="field-group"><label>Name</label><input type="text" id="f-name"></div>
+      <div class="field-row">
+        <div class="field-group"><label>Dosage</label><input type="text" id="f-dosage" placeholder="e.g. 5mg"></div>
+        <div class="field-group"><label>Frequency</label><input type="text" id="f-frequency" placeholder="e.g. Twice daily"></div>
+      </div>
+      <div class="field-group"><label>Purpose</label><input type="text" id="f-purpose" placeholder="e.g. Prevents rejection"></div>
+      <div class="field-group"><label>Side Effects</label><textarea id="f-side-effects"></textarea></div>
+      <div class="field-group"><label>Other Notes</label><textarea id="f-other-notes"></textarea></div>
+      <div class="field-row">
+        <div class="field-group"><label>Refill Date</label><input type="date" id="f-refill-date"></div>
+        <div class="field-group"><label>Remind Me Before</label>
+          <select id="f-reminder-days">
+            <option value="3">3 days</option>
+            <option value="7" selected>7 days</option>
+            <option value="10">10 days</option>
+            <option value="14">14 days</option>
+            <option value="21">21 days</option>
+            <option value="30">30 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <label style="font-size:13.5px;color:var(--ink2);text-transform:none;font-weight:500">Currently active</label>
+        <input type="checkbox" id="f-active" checked style="width:18px;height:18px">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px">
+        <button class="btn btn-ghost" onclick="closeForm()">Cancel</button>
+        <button class="btn btn-primary" id="form-save-btn" onclick="saveForm()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div id="detail-modal" style="display:none;position:fixed;inset:0;background:rgba(20,30,40,0.55);z-index:200;overflow-y:auto;padding:20px">
+  <div style="max-width:480px;margin:0 auto">
+    <div class="card" id="detail-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<button class="fab" onclick="showTab('add')" title="Add medication">+</button>
+
+<script>
+const EXTRACT_LABS_URL = `${SUPABASE_URL}/functions/v1/extract-labs`; // reused — generic Anthropic proxy
+
+let currentUser = null;
+let meds = [];
+let realtimeChannel = null;
+let editingId = null;
+let pendingExtraction = null;
+const recentLocalWriteIds = new Set();
+function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
+
+(async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div></div>';
+    return;
+  }
+  meds = await fetchRows('medications', currentUser.id, 'name', true);
+  renderList();
+  realtimeChannel = subscribeToTable('medications', currentUser.id, handleRealtimeChange);
+  setupPasteListener();
+})();
+
+function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwn = recentLocalWriteIds.has(id);
+  if (payload.eventType === 'INSERT') { if (!meds.some(m=>m.id===payload.new.id)) meds.push(payload.new); }
+  else if (payload.eventType === 'UPDATE') { const i=meds.findIndex(m=>m.id===payload.new.id); if(i>=0) meds[i]=payload.new; }
+  else if (payload.eventType === 'DELETE') { meds = meds.filter(m=>m.id!==payload.old.id); }
+  renderList();
+  if (!isOwn) showToast('Updated from another device', 'success');
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('page-'+name).classList.add('active');
+}
+
+// ══════════════════════════════════════════════════
+//  REFILL STATUS — all date math anchored to Eastern calendar
+//  dates, consistent with the rest of the app.
+// ══════════════════════════════════════════════════
+function refillStatus(med) {
+  if (!med.refill_date) return { label: 'No refill date', cls: 'none' };
+  const today = new Date(easternDateInputValue() + 'T00:00:00Z');
+  const refill = new Date(med.refill_date + 'T00:00:00Z');
+  const daysLeft = Math.round((refill - today) / 86400000);
+  const lead = med.reminder_days_before ?? 7;
+  if (daysLeft < 0) return { label: `Overdue by ${Math.abs(daysLeft)}d`, cls: 'overdue', daysLeft };
+  if (daysLeft <= lead) return { label: daysLeft === 0 ? 'Refill due today' : `Refill in ${daysLeft}d`, cls: 'soon', daysLeft };
+  return { label: `Refill in ${daysLeft}d`, cls: 'ok', daysLeft };
+}
+
+// ══════════════════════════════════════════════════
+//  LIST
+// ══════════════════════════════════════════════════
+function renderList() {
+  const el = document.getElementById('list-content');
+  if (!meds.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💊</div><div class="empty-title">No medications yet</div><div class="empty-sub">Tap "Add / Upload" or the + button to get started.</div></div>`;
+    return;
+  }
+  const sorted = meds.slice().sort((a,b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    const sa = refillStatus(a), sb = refillStatus(b);
+    return (sa.daysLeft ?? 9999) - (sb.daysLeft ?? 9999);
+  });
+  el.innerHTML = sorted.map(m => {
+    const status = refillStatus(m);
+    return `
+    <div class="med-card${m.active ? '' : ' inactive'}" onclick="showDetail('${m.id}')">
+      <div class="med-top">
+        <div>
+          <div class="med-name">${m.name}</div>
+          <div class="med-dosage">${m.dosage || ''}</div>
+          <div class="med-freq">${m.frequency || ''}</div>
+        </div>
+        <div class="refill-chip ${status.cls}">${status.label}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showDetail(id) {
+  const m = meds.find(x => x.id === id);
+  if (!m) return;
+  const status = refillStatus(m);
+  document.getElementById('detail-content').innerHTML = `
+    <div class="card-title">${m.name}</div>
+    <div class="detail-row"><div class="detail-label">Dosage</div><div class="detail-val">${m.dosage || '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Frequency</div><div class="detail-val">${m.frequency || '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Purpose</div><div class="detail-val">${m.purpose || '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Side Effects</div><div class="detail-val">${m.side_effects || '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Other Notes</div><div class="detail-val">${m.other_notes || '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Refill Date</div><div class="detail-val">${m.refill_date || '—'} <span class="refill-chip ${status.cls}" style="margin-left:6px">${status.label}</span></div></div>
+    <div class="detail-row"><div class="detail-label">Reminder Lead Time</div><div class="detail-val">${m.reminder_days_before} days before refill date</div></div>
+    <div class="detail-row"><div class="detail-label">Status</div><div class="detail-val">${m.active ? 'Active' : 'Inactive'}</div></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-danger" onclick="deleteMed('${m.id}')">Delete</button>
+      <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
+      <button class="btn btn-primary" onclick="closeDetail(); openForm('${m.id}')">Edit</button>
+    </div>`;
+  document.getElementById('detail-modal').style.display = 'flex';
+}
+function closeDetail() { document.getElementById('detail-modal').style.display = 'none'; }
+
+async function deleteMed(id) {
+  if (!confirm('Delete this medication?')) return;
+  try {
+    await deleteRow('medications', id);
+    markLocalWrite(id);
+    meds = meds.filter(m => m.id !== id);
+    closeDetail();
+    renderList();
+    showToast('Deleted');
+  } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
+}
+
+// ══════════════════════════════════════════════════
+//  ADD / EDIT FORM
+// ══════════════════════════════════════════════════
+function openForm(id) {
+  editingId = id;
+  const m = id ? meds.find(x => x.id === id) : null;
+  document.getElementById('form-title').textContent = id ? 'Edit Medication' : 'Add Medication';
+  document.getElementById('f-name').value = m?.name || pendingExtraction?.name || '';
+  document.getElementById('f-dosage').value = m?.dosage || pendingExtraction?.dosage || '';
+  document.getElementById('f-frequency').value = m?.frequency || pendingExtraction?.frequency || '';
+  document.getElementById('f-purpose').value = m?.purpose || pendingExtraction?.purpose || '';
+  document.getElementById('f-side-effects').value = m?.side_effects || pendingExtraction?.side_effects || '';
+  document.getElementById('f-other-notes').value = m?.other_notes || pendingExtraction?.other_notes || '';
+  document.getElementById('f-refill-date').value = m?.refill_date || '';
+  document.getElementById('f-reminder-days').value = String(m?.reminder_days_before ?? 7);
+  document.getElementById('f-active').checked = m ? m.active : true;
+  pendingExtraction = null;
+  document.getElementById('form-modal').style.display = 'flex';
+}
+function closeForm() { document.getElementById('form-modal').style.display = 'none'; }
+
+async function saveForm() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { showToast('Name is required', 'error'); return; }
+  const fields = {
+    name,
+    dosage: document.getElementById('f-dosage').value.trim(),
+    frequency: document.getElementById('f-frequency').value.trim(),
+    purpose: document.getElementById('f-purpose').value.trim(),
+    side_effects: document.getElementById('f-side-effects').value.trim(),
+    other_notes: document.getElementById('f-other-notes').value.trim(),
+    refill_date: document.getElementById('f-refill-date').value || null,
+    reminder_days_before: parseInt(document.getElementById('f-reminder-days').value, 10),
+    active: document.getElementById('f-active').checked,
+  };
+  const btn = document.getElementById('form-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    if (editingId) {
+      const updated = await updateRow('medications', editingId, fields);
+      markLocalWrite(updated.id);
+      const i = meds.findIndex(m => m.id === editingId); if (i>=0) meds[i] = updated;
+    } else {
+      const inserted = await insertRow('medications', { user_id: currentUser.id, ...fields });
+      markLocalWrite(inserted.id);
+      meds.push(inserted);
+    }
+    renderList();
+    closeForm();
+    showTab('list');
+    showToast('Saved ✓', 'success');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  PDF/IMAGE EXTRACTION — reuses the extract-labs Edge Function,
+//  which is just a generic Anthropic proxy; only the prompt differs.
+// ══════════════════════════════════════════════════
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onFileSelected(e) {
+  const file = e.target.files[0];
+  document.getElementById('file-input').value = '';
+  if (!file) return;
+  processMedFile(file);
+}
+
+async function processMedFile(file) {
+  document.getElementById('upload-card').style.display = 'none';
+  document.getElementById('loading-card').style.display = 'block';
+  try {
+    const base64 = await fileToBase64(file);
+    const contentBlocks = [
+      file.type === 'application/pdf'
+        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+        : { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } },
+    ];
+    const prompt = `This is a photo or document showing a prescription medication — a pill bottle label, pharmacy printout, or medication instruction sheet. Extract what you can find and respond with ONLY raw JSON, no markdown fences, no other text, in this exact shape:
+{
+  "name": "medication name (brand and/or generic)",
+  "dosage": "e.g. 5mg",
+  "frequency": "e.g. Twice daily, morning and evening",
+  "purpose": "what it's for, if stated or you know it",
+  "side_effects": "common side effects, brief, if stated on the label or you know them",
+  "other_notes": "any other relevant instructions visible (e.g. take with food, avoid grapefruit, etc.)"
+}
+If a field truly isn't determinable, use an empty string for it. Do not include a refill date — that's entered separately by the user.`;
+
+    const { data: sessionData } = await sb.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    const response = await fetch(EXTRACT_LABS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}`, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ contentBlocks, prompt }),
+    });
+    if (!response.ok) throw new Error(`Extraction failed (${response.status})`);
+    const data = await response.json();
+    const textBlock = data.content.find(b => b.type === 'text');
+    const cleaned = (textBlock?.text || '').replace(/```json|```/g, '').trim();
+    pendingExtraction = JSON.parse(cleaned);
+
+    document.getElementById('loading-card').style.display = 'none';
+    document.getElementById('upload-card').style.display = 'block';
+    openForm(null);
+    showToast('Extracted — review before saving', 'success');
+  } catch (e) {
+    document.getElementById('loading-card').style.display = 'none';
+    document.getElementById('upload-card').style.display = 'block';
+    showToast('Could not read that file: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  CLIPBOARD PASTE — same pattern as Labs / Clinical Assistant.
+// ══════════════════════════════════════════════════
+function setupPasteListener() {
+  document.addEventListener('paste', (e) => {
+    if (!document.getElementById('page-add').classList.contains('active')) return;
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.indexOf('image') === 0) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          const named = new File([file], `pasted-${Date.now()}.png`, { type: file.type });
+          processMedFile(named);
+        }
+        break;
+      }
+    }
+  });
+}
+
+async function pasteFromClipboardMeds() {
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.indexOf('image') === 0) {
+          const blob = await item.getType(type);
+          const named = new File([blob], `pasted-${Date.now()}.png`, { type });
+          processMedFile(named);
+          return;
+        }
+      }
+    }
+    showToast('No image found on clipboard', 'error');
+  } catch (e) {
+    showToast('Could not read clipboard — try Ctrl/Cmd+V instead', 'error');
+  }
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => t.className = 'toast', 3200);
+}
+
+window.addEventListener('beforeunload', () => { if (realtimeChannel) sb.removeChannel(realtimeChannel); });
+</script>
+</body>
+</html>

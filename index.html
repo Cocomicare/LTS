@@ -93,6 +93,16 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
 .hero-empty-icon { font-size:30px; margin-bottom:6px; }
 .hero-empty-text { font-size:13px; opacity:.9; line-height:1.4; }
 
+.refill-banner { border-radius:16px; padding:14px 16px; margin-bottom:14px; display:flex; align-items:center; gap:12px; cursor:pointer; }
+.refill-banner.soon { background:#FDF0E8; border:1.5px solid #f0d8b8; }
+.refill-banner.overdue { background:#FAEAEA; border:1.5px solid #f0c0c0; }
+.refill-banner-icon { font-size:22px; flex-shrink:0; }
+.refill-banner-title { font-size:13.5px; font-weight:700; }
+.refill-banner.soon .refill-banner-title { color:#9a5a1f; }
+.refill-banner.overdue .refill-banner-title { color:#C94040; }
+.refill-banner-sub { font-size:12px; color:var(--ink2); margin-top:2px; }
+.refill-banner-chevron { margin-left:auto; color:var(--ink3); font-size:16px; flex-shrink:0; }
+
 .section-label { font-size:12px; font-weight:600; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; margin:18px 4px 10px; }
 .ref-tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:12px; margin-bottom:8px; -webkit-tap-highlight-color:transparent; }
 .ref-tile:hover { border-color:var(--teal-mid); box-shadow:0 4px 16px rgba(13,92,107,.08); }
@@ -225,6 +235,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
     <div class="sync-pill"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Live synced</span></div>
   </div>
   <div class="dash-body">
+    <div id="refill-banner-container"></div>
     <div id="hero-score-container"></div>
     <div id="assistant-tile-container"></div>
     <div class="section-label">Modules</div>
@@ -281,6 +292,7 @@ const MODULES = [
   { id:'immuno',   name:'Immunosuppression',icon:'💊', file:'Immuno_Suppression_Dial.html',  table:'immuno_doses',         dateField:'taken_at' },
   { id:'health',   name:'Early Warning Signal', icon:'📊', file:'health_index.html',         table:'health_index_history', dateField:'computed_at' },
   { id:'assistant',name:'Clinical Assistant', icon:'💬', file:'clinical_assistant.html',     table:null,                   dateField:null },
+  { id:'medications',name:'Medications', icon:'💊', file:'medications.html',                table:'medications',          dateField:'refill_date' },
 ];
 
 // Modules shown as data-driven tracking tiles on the dashboard.
@@ -397,6 +409,7 @@ let dashboardRealtimeChannels = [];
 async function showDashboard() {
   showScreen('screen-dashboard');
   setGreeting();
+  await renderRefillBanner();
   await renderHeroScore();
   renderAssistantTile();
   await renderTiles();
@@ -413,13 +426,14 @@ function setupDashboardRealtime() {
   const tablesToWatch = [
     'vitals_readings', 'spirometer_sessions', 'peak_flow_sessions',
     'symptom_checkins', 'sputum_logs', 'lab_results',
-    'health_index_history',
+    'health_index_history', 'medications',
   ];
 
   tablesToWatch.forEach(table => {
     const channel = subscribeToTable(table, currentUser.id, () => {
       renderHeroScore();
       renderTiles();
+      renderRefillBanner();
     });
     dashboardRealtimeChannels.push(channel);
   });
@@ -505,7 +519,59 @@ async function syncEarlyWarningSignal() {
 }
 
 // ══════════════════════════════════════════════════
-//  CLINICAL ASSISTANT TILE
+//  MEDICATION REFILL REMINDER BANNER
+//  Shown at the very top of the dashboard whenever any active
+//  medication's refill is within its own configured lead time (or
+//  overdue). Each medication's lead time is independently
+//  configurable (set on that medication in the Medications module),
+//  not a single global setting. All date math anchored to Eastern
+//  calendar dates, consistent with the rest of the app.
+// ══════════════════════════════════════════════════
+async function renderRefillBanner() {
+  const container = document.getElementById('refill-banner-container');
+  if (!container) return;
+  try {
+    const { data: rows } = await sb
+      .from('medications')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .eq('active', true)
+      .not('refill_date', 'is', null);
+
+    const today = new Date(easternDateInputValue() + 'T00:00:00Z');
+    const due = (rows || []).map(m => {
+      const refill = new Date(m.refill_date + 'T00:00:00Z');
+      const daysLeft = Math.round((refill - today) / 86400000);
+      return { ...m, daysLeft };
+    }).filter(m => m.daysLeft <= (m.reminder_days_before ?? 7))
+      .sort((a,b) => a.daysLeft - b.daysLeft);
+
+    if (!due.length) { container.innerHTML = ''; return; }
+
+    const worst = due[0];
+    const isOverdue = worst.daysLeft < 0;
+    const label = isOverdue
+      ? `Overdue by ${Math.abs(worst.daysLeft)} day${Math.abs(worst.daysLeft)===1?'':'s'}`
+      : worst.daysLeft === 0 ? 'Due today' : `Due in ${worst.daysLeft} day${worst.daysLeft===1?'':'s'}`;
+    const subText = due.length > 1
+      ? `${worst.name} and ${due.length - 1} other${due.length-1===1?'':'s'} need refilling soon`
+      : `${worst.name} needs refilling soon`;
+
+    container.innerHTML = `
+      <div class="refill-banner ${isOverdue?'overdue':'soon'}" onclick="openModule('medications')">
+        <div class="refill-banner-icon">💊</div>
+        <div>
+          <div class="refill-banner-title">${label} — Refill ${due.length > 1 ? 'reminders' : 'reminder'}</div>
+          <div class="refill-banner-sub">${subText}</div>
+        </div>
+        <div class="refill-banner-chevron">→</div>
+      </div>`;
+  } catch (e) {
+    container.innerHTML = '';
+  }
+}
+
+
 //  Purely a navigation card — no data-tracking logic, since this
 //  module doesn't log readings itself. Gated by CLINICAL_ASSISTANT_ENABLED;
 //  rendering nothing when disabled is the entire effect of that flag.
@@ -513,8 +579,18 @@ async function syncEarlyWarningSignal() {
 function renderAssistantTile() {
   const container = document.getElementById('assistant-tile-container');
   if (!container) return;
-  if (!CLINICAL_ASSISTANT_ENABLED) { container.innerHTML = ''; return; }
-  container.innerHTML = `
+  let html = '';
+  html += `
+    <div class="ref-tile" onclick="openModule('medications')" style="margin-bottom:10px">
+      <span class="ref-tile-icon">💊</span>
+      <div>
+        <div class="ref-tile-name">Medications</div>
+        <div class="ref-tile-desc">Ongoing list, dosages, refill dates</div>
+      </div>
+      <span class="ref-tile-chevron">→</span>
+    </div>`;
+  if (CLINICAL_ASSISTANT_ENABLED) {
+    html += `
     <div class="ref-tile" onclick="openModule('assistant')" style="margin-bottom:18px">
       <span class="ref-tile-icon">💬</span>
       <div>
@@ -523,6 +599,8 @@ function renderAssistantTile() {
       </div>
       <span class="ref-tile-chevron">→</span>
     </div>`;
+  }
+  container.innerHTML = html;
 }
 
 function setGreeting() {
@@ -646,6 +724,7 @@ async function refreshDashboardData() {
   }
   renderHeroScore();
   renderTiles();
+  renderRefillBanner();
 }
 
 setInterval(refreshDashboardData, 60000);
