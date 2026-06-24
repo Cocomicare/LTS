@@ -154,7 +154,7 @@ function ewsComputeParamScore(param, latest, baseline) {
     if (pctDev <= 1.0) return 85;
     if (pctDev <= 2.0) return 65;
     if (pctDev <= 3.0) return 40;
-    return Math.max(0, 20 - (pctDev - 3) * 5);
+    return Math.max(0, Math.round(20 - (pctDev - 3) * 5));
   }
   if (param.direction === 'higher_better') {
     const ratio = latest / base;
@@ -170,7 +170,7 @@ function ewsComputeParamScore(param, latest, baseline) {
     if (pctDev <= 1.0) return 85;
     if (pctDev <= 1.5) return 65;
     if (pctDev <= 2.5) return 40;
-    return Math.max(0, 20 - pctDev * 4);
+  return Math.max(0, Math.round(20 - pctDev * 4));
   }
   // 'stable' — deviation in EITHER direction is concerning (e.g. CRP, WBC,
   // neutrophils/lymphocytes, heart rate, weight)
@@ -179,7 +179,7 @@ function ewsComputeParamScore(param, latest, baseline) {
   if (pctDev <= 5) return 85;
   if (pctDev <= 10) return 65;
   if (pctDev <= 15) return 40;
-  return Math.max(0, 20 - (pctDev - 15));
+  return Math.max(0, Math.round(20 - (pctDev - 15)));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -279,7 +279,7 @@ async function ewsComputeAndSave(userId) {
       if (b.score === null) continue;
       const floor = EWS_FLOOR_OVERRIDES[b.param.key] ?? EWS_FLOOR_THRESHOLD;
       if (b.score <= floor && b.score < finalScore) {
-        finalScore = b.score;
+        finalScore = Math.round(b.score);
         floorTriggeredBy = b.param.name;
       }
     }
