@@ -81,6 +81,27 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .review-more label { font-size:10px; font-weight:600; text-transform:uppercase; color:var(--ink3); display:block; margin-bottom:3px; }
 .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; }
 
+.export-header { text-align:center; margin-bottom:18px; display:none; }
+.export-header h1 { font-family:'DM Serif Display',serif; font-size:20px; }
+.export-header p { font-size:12px; color:var(--ink2); margin-top:4px; }
+.export-med-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:10px; }
+.export-med-row.inactive { opacity:0.55; }
+.export-med-top { display:flex; justify-content:space-between; align-items:baseline; }
+.export-med-name { font-weight:700; font-size:14.5px; }
+.export-med-dosage { font-size:13px; color:var(--ink2); }
+.export-med-freq { font-size:12.5px; color:var(--ink3); margin-top:2px; }
+.export-med-detail { font-size:12.5px; color:var(--ink2); margin-top:6px; line-height:1.5; }
+.export-med-detail strong { color:var(--ink); }
+.export-status-tag { font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 8px; border-radius:10px; background:var(--bg); color:var(--ink3); }
+@media print {
+  header, .tabs, .fab, #export-controls, .toast { display:none !important; }
+  body { background:#fff; }
+  .page { display:none !important; }
+  .page#page-export { display:block !important; padding:0; }
+  .export-header { display:block !important; }
+  .export-med-row { break-inside:avoid; border:none; border-bottom:1px solid #ddd; border-radius:0; padding:10px 0; }
+}
+
 
 .detail-row { padding:10px 0; border-bottom:1px solid var(--border); }
 .detail-row:last-child { border-bottom:none; }
@@ -110,6 +131,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 <div class="tabs">
   <button class="tab active" onclick="showTab('list')" id="tab-list">List</button>
   <button class="tab" onclick="showTab('add')" id="tab-add">Add / Upload</button>
+  <button class="tab" onclick="showTab('export')" id="tab-export">📄 Export</button>
 </div>
 
 <!-- LIST -->
@@ -150,6 +172,23 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   <div class="card" style="text-align:center;padding:14px">
     <button class="btn btn-ghost" onclick="openForm(null)">✏️ Or enter manually</button>
   </div>
+</div>
+
+<!-- EXPORT / MEDICATION LIST FOR CLINIC VISIT -->
+<div class="page" id="page-export">
+  <div class="card" id="export-controls">
+    <div class="card-title">📄 Medication List for Clinic Visit</div>
+    <div class="card-sub">A clean, printable snapshot of her current medications — generate it right before a visit so it's accurate, then print or save as PDF.</div>
+    <div class="toggle-row">
+      <label style="font-size:13.5px;color:var(--ink2);font-weight:500">Include inactive medications</label>
+      <input type="checkbox" id="export-include-inactive" style="width:18px;height:18px">
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn btn-primary" onclick="generateExport()">Generate List</button>
+      <button class="btn btn-ghost" id="export-print-btn" onclick="window.print()" style="display:none">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+  <div id="export-report"></div>
 </div>
 
 <!-- ADD/EDIT FORM MODAL -->
@@ -574,6 +613,49 @@ async function pasteFromClipboardMeds() {
   } catch (e) {
     showToast('Could not read clipboard — try Ctrl/Cmd+V instead', 'error');
   }
+}
+
+// ══════════════════════════════════════════════════
+//  PRINTABLE MEDICATION LIST — a snapshot of the current list,
+//  not a trend over time, so no chart/date-range needed here.
+// ══════════════════════════════════════════════════
+function generateExport() {
+  const includeInactive = document.getElementById('export-include-inactive').checked;
+  const list = meds
+    .filter(m => includeInactive || m.active)
+    .slice()
+    .sort((a,b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+  const reportEl = document.getElementById('export-report');
+  if (!list.length) {
+    reportEl.innerHTML = `<div class="empty"><div class="empty-icon">💊</div><div class="empty-title">No medications to show</div></div>`;
+    document.getElementById('export-print-btn').style.display = 'none';
+    return;
+  }
+
+  let html = `<div class="export-header"><h1>LTS Care — Medication List</h1><p>Generated ${fmtEasternDate(new Date().toISOString())} at ${fmtEasternTime(new Date().toISOString())}</p></div>`;
+  html += list.map(m => `
+    <div class="export-med-row${m.active ? '' : ' inactive'}">
+      <div class="export-med-top">
+        <div>
+          <span class="export-med-name">${m.name}</span>
+          <span class="export-med-dosage">${m.dosage ? ' — ' + m.dosage : ''}</span>
+        </div>
+        ${!m.active ? '<span class="export-status-tag">Inactive</span>' : ''}
+      </div>
+      <div class="export-med-freq">${m.frequency || ''}</div>
+      ${m.purpose ? `<div class="export-med-detail"><strong>Purpose:</strong> ${m.purpose}</div>` : ''}
+      ${m.side_effects ? `<div class="export-med-detail"><strong>Side Effects:</strong> ${m.side_effects}</div>` : ''}
+      ${m.other_notes ? `<div class="export-med-detail"><strong>Notes:</strong> ${m.other_notes}</div>` : ''}
+      ${m.refill_date ? `<div class="export-med-detail"><strong>Refill Date:</strong> ${m.refill_date}</div>` : ''}
+    </div>`).join('');
+
+  reportEl.innerHTML = html;
+  document.getElementById('export-print-btn').style.display = 'inline-flex';
+  showToast('List generated ✓', 'success');
 }
 
 function showToast(msg, type='') {
