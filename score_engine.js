@@ -222,7 +222,7 @@ async function ewsComputeAndSave(userId) {
   const weights = ewsGetWeights(settingsRow);
   const windows = ewsGetWindows(settingsRow);
   const baselineDays = ewsGetBaselineDays(settingsRow);
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(easternDateInputValue() + 'T00:00:00Z');
 
   let weightedSum = 0, totalWeight = 0, missingCount = 0;
   const breakdown = [];
@@ -236,12 +236,11 @@ async function ewsComputeAndSave(userId) {
     const latestRec = recs.length ? recs[recs.length-1] : null;
     const latest = latestRec ? latestRec.value : null;
     const baseline = ewsRollingBaseline(recs, baselineDays);
-    const latestDate = latestRec ? new Date(latestRec.date) : null;
-    if (latestDate) latestDate.setHours(0,0,0,0);
+    const latestDate = latestRec ? new Date(easternDateInputValue(latestRec.date) + 'T00:00:00Z') : null;
 
     const maxAge = windows[param.key] || param.maxAgeDays || 7;
-    const cutoff = new Date(today); cutoff.setDate(today.getDate() - maxAge);
-    const daysAgo = latestDate ? Math.floor((today - latestDate) / 86400000) : null;
+    const cutoff = new Date(today); cutoff.setUTCDate(today.getUTCDate() - maxAge);
+    const daysAgo = latestDate ? Math.round((today - latestDate) / 86400000) : null;
 
     let freshness = 'ok';
     if (!latestDate || latest === null) {
@@ -296,11 +295,8 @@ async function ewsComputeAndSave(userId) {
 
   // Save to history (dedupe same-day rows, same approach as before)
   if (finalScore !== null) {
-    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-    const todaysRows = historyRows.filter(h => {
-      const d = new Date(h.computed_at); d.setHours(0,0,0,0);
-      return d.getTime() === todayStart.getTime();
-    });
+    const todayStr = easternDateInputValue();
+    const todaysRows = historyRows.filter(h => easternDateInputValue(h.computed_at) === todayStr);
     const components = {};
     breakdown.forEach(b => { components[b.param.key] = b.score; });
 

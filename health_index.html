@@ -489,7 +489,7 @@ function renderTrend() {
     return;
   }
   const sorted = historyRows.slice().sort((a,b) => new Date(a.computed_at) - new Date(b.computed_at));
-  const labels = sorted.map(h => new Date(h.computed_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const labels = sorted.map(h => fmtEasternDate(h.computed_at, {month:'short',day:'numeric'}));
   const scores = sorted.map(h => h.score);
   const avg = scores.reduce((a,b)=>a+b,0)/scores.length;
   const latest = scores[scores.length-1];

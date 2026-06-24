@@ -153,3 +153,96 @@ async function upsertByUser(tableName, userId, fields) {
   }
   return data;
 }
+
+// ══════════════════════════════════════════════════
+//  EASTERN TIME HELPERS
+//  Every module logs and displays times in US Eastern, regardless
+//  of what timezone the device's OS/browser happens to be set to.
+//  This is deliberate: the app has one household, all in the
+//  Eastern timezone, and a per-device-local-clock approach was
+//  causing real bugs — most notably, editing a late-evening entry
+//  would show the wrong (next) day, because toISOString() always
+//  returns UTC date/time components, not local ones.
+//
+//  If the app is ever used by someone outside Eastern time, this is
+//  the one place that would need a user-selectable timezone setting
+//  instead of the hardcoded EASTERN_TZ constant below.
+// ══════════════════════════════════════════════════
+const EASTERN_TZ = 'America/New_York';
+
+// Internal: extract Eastern-local Y/M/D/H/M(/S) parts from a stored
+// UTC timestamp (or "now" if none given).
+function easternDateParts(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: EASTERN_TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const map = {};
+  fmt.formatToParts(d).forEach(p => { map[p.type] = p.value; });
+  // Some browsers render hour '24' for midnight; normalize to '00'.
+  if (map.hour === '24') map.hour = '00';
+  return map;
+}
+
+/** Value for an <input type="date">, in Eastern time. No arg = today (Eastern). */
+function easternDateInputValue(iso) {
+  const p = easternDateParts(iso);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+/** Value for an <input type="time">, in Eastern time. No arg = right now (Eastern). */
+function easternTimeInputValue(iso) {
+  const p = easternDateParts(iso);
+  return `${p.hour}:${p.minute}`;
+}
+
+/**
+ * Takes a "YYYY-MM-DD" date string and "HH:MM" time string — both
+ * understood as Eastern Time, regardless of the device's own
+ * timezone — and returns the correct UTC ISO string for storage.
+ * Handles EST/EDT (daylight saving) automatically, since it asks
+ * the JS environment what Eastern actually means on that date.
+ */
+function parseEasternDateTime(dateStr, timeStr) {
+  const safeTime = (timeStr && timeStr.length >= 4) ? timeStr : '00:00';
+  // Step 1: treat the input as if it were already UTC (a deliberately
+  // wrong starting guess — we'll correct it in step 3).
+  const naiveUTC = new Date(`${dateStr}T${safeTime}:00Z`);
+  // Step 2: ask what Eastern's wall clock would show for that UTC instant.
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: EASTERN_TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const map = {};
+  fmt.formatToParts(naiveUTC).forEach(p => { map[p.type] = p.value; });
+  if (map.hour === '24') map.hour = '00';
+  const easternAsIfUTC = new Date(`${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}Z`);
+  // Step 3: the gap between our naive guess and what Eastern actually
+  // showed IS the current UTC/Eastern offset (handles DST automatically).
+  const offsetMs = naiveUTC.getTime() - easternAsIfUTC.getTime();
+  return new Date(naiveUTC.getTime() + offsetMs).toISOString();
+}
+
+/** Display a stored UTC timestamp as an Eastern-time date string. */
+function fmtEasternDate(iso, opts) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    timeZone: EASTERN_TZ,
+    ...(opts || { month: 'short', day: 'numeric', year: 'numeric' }),
+  });
+}
+
+/** Display a stored UTC timestamp as an Eastern-time time string. */
+function fmtEasternTime(iso, opts) {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    timeZone: EASTERN_TZ,
+    ...(opts || { hour: 'numeric', minute: '2-digit' }),
+  });
+}
+
+/** True if the given stored UTC timestamp falls on "today" in Eastern time. */
+function isEasternToday(iso) {
+  return easternDateInputValue(iso) === easternDateInputValue();
+}

@@ -460,10 +460,9 @@ async function renderHeroScore() {
       red:    '🚨 Significant deviation — contact your care team',
     }[zone];
 
-    const computedDate = new Date(latest.computed_at);
-    const today = new Date(); today.setHours(0,0,0,0);
-    const cd = new Date(computedDate); cd.setHours(0,0,0,0);
-    const days = Math.floor((today - cd) / 86400000);
+    const today = new Date(easternDateInputValue() + 'T00:00:00Z');
+    const cd = new Date(easternDateInputValue(latest.computed_at) + 'T00:00:00Z');
+    const days = Math.round((today - cd) / 86400000);
     const updatedStr = days === 0 ? 'Updated today' : days === 1 ? 'Updated yesterday' : `Updated ${days} days ago`;
 
     container.innerHTML = `
@@ -582,7 +581,7 @@ async function renderTiles() {
 
   container.innerHTML = html.join('');
   dot.classList.remove('syncing');
-  document.getElementById('sync-text').textContent = 'Live synced · ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('sync-text').textContent = 'Live synced · ' + fmtEasternTime(new Date().toISOString(), {hour:'2-digit', minute:'2-digit'});
 }
 
 function openModule(id) {

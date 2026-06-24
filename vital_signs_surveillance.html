@@ -246,9 +246,8 @@ function buildVitalPages() {
 })();
 
 function initVitalDateTime(vital) {
-  const now = new Date();
-  document.getElementById(vital+'-date').value = now.toISOString().slice(0,10);
-  document.getElementById(vital+'-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById(vital+'-date').value = easternDateInputValue();
+  document.getElementById(vital+'-time').value = easternTimeInputValue();
 }
 
 function handleRealtimeChange(payload) {
@@ -323,13 +322,13 @@ function renderDashboard() {
 }
 
 function sinceStr(iso) {
-  const d = new Date(iso); d.setHours(0,0,0,0);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const days = Math.floor((today - d) / 86400000);
+  const d = new Date(easternDateInputValue(iso) + 'T00:00:00Z');
+  const today = new Date(easternDateInputValue() + 'T00:00:00Z');
+  const days = Math.round((today - d) / 86400000);
   return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
 }
-function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
-function fmtTime(iso) { return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+function fmtDate(iso) { return fmtEasternDate(iso); }
+function fmtTime(iso) { return fmtEasternTime(iso); }
 
 // ══════════════════════════════════════════════════
 //  FORM
@@ -363,7 +362,7 @@ async function saveVital(vital) {
   const date = document.getElementById(vital+'-date').value;
   const time = document.getElementById(vital+'-time').value || '00:00';
   if (!date) { showToast('Please select a date', 'error'); return; }
-  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const taken_at = parseEasternDateTime(date, time);
   const btn = document.getElementById(vital+'-save-btn');
   const editing = editState[vital];
 
@@ -421,17 +420,15 @@ function editReading(vital, key) {
     editState[vital] = { sysId: p.sysId, diaId: p.diaId };
     document.getElementById(vital+'-sys').value = p.sys;
     document.getElementById(vital+'-dia').value = p.dia;
-    const d = new Date(p.taken_at);
-    document.getElementById(vital+'-date').value = d.toISOString().slice(0,10);
-    document.getElementById(vital+'-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    document.getElementById(vital+'-date').value = easternDateInputValue(p.taken_at);
+    document.getElementById(vital+'-time').value = easternTimeInputValue(p.taken_at);
   } else {
     const row = readings.find(r => r.id === key);
     if (!row) return;
     editState[vital] = { id: row.id };
     document.getElementById(vital+'-val').value = row.value;
-    const d = new Date(row.taken_at);
-    document.getElementById(vital+'-date').value = d.toISOString().slice(0,10);
-    document.getElementById(vital+'-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    document.getElementById(vital+'-date').value = easternDateInputValue(row.taken_at);
+    document.getElementById(vital+'-time').value = easternTimeInputValue(row.taken_at);
   }
   document.getElementById(vital+'-save-btn').disabled = false;
   document.getElementById(vital+'-save-btn').textContent = 'Update Reading';

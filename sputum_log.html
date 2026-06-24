@@ -187,10 +187,9 @@ function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => rece
 //  INIT
 // ══════════════════════════════════════════════════
 (async function init() {
-  const now = new Date();
-  document.getElementById('date-display').textContent = now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
-  document.getElementById('log-date').value = now.toISOString().slice(0,10);
-  document.getElementById('log-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('date-display').textContent = fmtEasternDate(new Date().toISOString(), {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById('log-date').value = easternDateInputValue();
+  document.getElementById('log-time').value = easternTimeInputValue();
 
   renderScaleGroups();
 
@@ -268,7 +267,7 @@ async function saveLog() {
   const time = document.getElementById('log-time').value || '00:00';
   const notes = document.getElementById('log-notes').value.trim();
   if (!date) { showToast('Please select a date', 'error'); return; }
-  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const taken_at = parseEasternDateTime(date, time);
   const btn = document.getElementById('save-btn');
 
   btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
@@ -309,9 +308,8 @@ function clearLog() {
   document.getElementById('log-notes').value = '';
   editingId = null;
   document.getElementById('save-btn').textContent = 'Save Entry';
-  const now = new Date();
-  document.getElementById('log-date').value = now.toISOString().slice(0,10);
-  document.getElementById('log-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('log-date').value = easternDateInputValue();
+  document.getElementById('log-time').value = easternTimeInputValue();
 }
 
 function editLog(id) {
@@ -322,9 +320,8 @@ function editLog(id) {
   selectScale('texture', l.texture_score);
   selectScale('volume', l.volume_score);
   document.getElementById('log-notes').value = l.notes || '';
-  const d = new Date(l.taken_at);
-  document.getElementById('log-date').value = d.toISOString().slice(0,10);
-  document.getElementById('log-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('log-date').value = easternDateInputValue(l.taken_at);
+  document.getElementById('log-time').value = easternTimeInputValue(l.taken_at);
   document.getElementById('save-btn').textContent = 'Update Entry';
   showTab('log');
   window.scrollTo(0,0);
@@ -354,8 +351,8 @@ function showTab(name) {
   if (name==='history') renderHistory();
 }
 
-function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
-function fmtTime(iso){ return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+function fmtDate(iso){ return fmtEasternDate(iso); }
+function fmtTime(iso){ return fmtEasternTime(iso); }
 function colorSwatchFor(score) { return SCALES.color.options.find(o=>o.score===score)?.swatch || '#ccc'; }
 
 function renderHistory() {

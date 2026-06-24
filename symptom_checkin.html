@@ -277,11 +277,10 @@ const recentLocalWriteIds = new Set(); // ids this tab just wrote, to suppress d
 //  INIT
 // ══════════════════════════════════════════════════
 (async function init() {
-  const now = new Date();
   document.getElementById('checkin-date-display').textContent =
-    now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
-  document.getElementById('checkin-date').value = now.toISOString().slice(0,10);
-  document.getElementById('checkin-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    fmtEasternDate(new Date().toISOString(), {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById('checkin-date').value = easternDateInputValue();
+  document.getElementById('checkin-time').value = easternTimeInputValue();
 
   renderSymptomGroups();
 
@@ -440,11 +439,10 @@ function updateNudge() {
   const el = document.getElementById('checkin-nudge');
   if (!records.length) { el.className='nudge none'; el.textContent='Complete your first symptom check-in to start tracking'; return; }
   const last = records[records.length-1];
-  const lastDate = new Date(last.taken_at);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const lastDay = new Date(lastDate); lastDay.setHours(0,0,0,0);
+  const today = new Date(easternDateInputValue() + 'T00:00:00Z');
+  const lastDay = new Date(easternDateInputValue(last.taken_at) + 'T00:00:00Z');
   if (lastDay.getTime() === today.getTime()) { el.className='nudge ok'; el.textContent="✓ Today's check-in is saved"; return; }
-  const days = Math.floor((today - lastDay) / 86400000);
+  const days = Math.round((today - lastDay) / 86400000);
   if (days === 1) { el.className='nudge due'; el.textContent='⏰ Yesterday was your last check-in — log today to keep your streak'; }
   else { el.className='nudge due'; el.textContent=`⏰ Last check-in was ${days} days ago — log today`; }
 }
@@ -462,7 +460,7 @@ async function saveCheckin() {
   const btn = document.getElementById('save-btn');
 
   if (!date) { showToast('Please select a date', 'error'); return; }
-  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const taken_at = parseEasternDateTime(date, time);
 
   btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
   try {
@@ -500,9 +498,8 @@ function editCheckin(id) {
   const r = records.find(x => x.id === id);
   if (!r) return;
   editingId = id;
-  const d = new Date(r.taken_at);
-  document.getElementById('checkin-date').value = d.toISOString().slice(0,10);
-  document.getElementById('checkin-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('checkin-date').value = easternDateInputValue(r.taken_at);
+  document.getElementById('checkin-time').value = easternTimeInputValue(r.taken_at);
   document.getElementById('checkin-notes').value = r.notes || '';
   SYMPTOMS.forEach(s => {
     const val = r.symptoms ? r.symptoms[s.key] : s.defaultVal;
@@ -524,9 +521,8 @@ function resetCheckin() {
   updateWellnessPreview();
   editingId = null;
   document.getElementById('save-btn').textContent = 'Save Check-in';
-  const now = new Date();
-  document.getElementById('checkin-date').value = now.toISOString().slice(0,10);
-  document.getElementById('checkin-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('checkin-date').value = easternDateInputValue();
+  document.getElementById('checkin-time').value = easternTimeInputValue();
 }
 
 // ══════════════════════════════════════════════════
@@ -550,9 +546,8 @@ function renderHistory() {
   if (!recs.length) { el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No check-ins yet</div><div class="empty-sub">Your daily check-ins will appear here.</div></div>`; return; }
   el.innerHTML = recs.map(r => {
     const score = r.severity_score;
-    const dateObj = new Date(r.taken_at);
-    const dateStr = dateObj.toISOString().split('T')[0];
-    const timeStr = dateObj.toTimeString().slice(0,5);
+    const dateStr = easternDateInputValue(r.taken_at);
+    const timeStr = easternTimeInputValue(r.taken_at);
     const emojis = SYMPTOMS.map(s => {
       const val = r.symptoms ? r.symptoms[s.key] : null;
       const opt = s.options.find(o=>o.score===val) || s.options[Math.floor((val||5)/2)-1] || s.options[0];
@@ -629,7 +624,7 @@ function drawChart() {
   if (!ctx) return;
   trendChart = new Chart(ctx, {
     type:'line',
-    data:{ labels:data.map(r=>new Date(r.taken_at).toISOString().slice(5,10)), datasets:[{ label:'Wellness', data:data.map(r=>r.severity_score), borderColor:'#6B4FA8', backgroundColor:'rgba(107,79,168,0.1)', tension:0.3, pointRadius:4, pointBackgroundColor:'#6B4FA8', fill:true }]},
+    data:{ labels:data.map(r=>easternDateInputValue(r.taken_at).slice(5,10)), datasets:[{ label:'Wellness', data:data.map(r=>r.severity_score), borderColor:'#6B4FA8', backgroundColor:'rgba(107,79,168,0.1)', tension:0.3, pointRadius:4, pointBackgroundColor:'#6B4FA8', fill:true }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ min:0, max:100, grid:{color:'#E8EFF5'} }, x:{ grid:{display:false} } } }
   });
 }

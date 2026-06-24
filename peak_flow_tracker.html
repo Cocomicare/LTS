@@ -219,22 +219,21 @@ function showToast(msg, type='success') {
 
 function fmtDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  return fmtEasternDate(iso);
 }
 function fmtTime(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  return fmtEasternTime(iso);
 }
 function daysSince(iso) {
-  const d = new Date(iso); d.setHours(0,0,0,0);
-  const today = new Date(); today.setHours(0,0,0,0);
-  return Math.floor((today - d) / 86400000);
+  const d = new Date(easternDateInputValue(iso) + 'T00:00:00Z');
+  const today = new Date(easternDateInputValue() + 'T00:00:00Z');
+  return Math.round((today - d) / 86400000);
 }
 
 function initForm() {
-  const now = new Date();
-  document.getElementById('sessionDate').value = now.toISOString().slice(0,10);
-  document.getElementById('sessionTime').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('sessionDate').value = easternDateInputValue();
+  document.getElementById('sessionTime').value = easternTimeInputValue();
   document.getElementById('fev1Val').value = '';
   document.getElementById('saveBtn').disabled = true;
   document.getElementById('saveBtn').textContent = 'Save Reading';
@@ -256,7 +255,7 @@ async function saveSession() {
   if (!date) { showToast('Please select a date','error'); return; }
   if (isNaN(fev1)) { showToast('Enter a reading','error'); return; }
 
-  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const taken_at = parseEasternDateTime(date, time);
   const btn = document.getElementById('saveBtn');
   btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
 
@@ -313,9 +312,8 @@ function editSession(id) {
   const s = sessions.find(x => x.id === id);
   if (!s) return;
   editingId = id;
-  const d = new Date(s.taken_at);
-  document.getElementById('sessionDate').value = d.toISOString().slice(0,10);
-  document.getElementById('sessionTime').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('sessionDate').value = easternDateInputValue(s.taken_at);
+  document.getElementById('sessionTime').value = easternTimeInputValue(s.taken_at);
   document.getElementById('fev1Val').value = s.fev1 ?? '';
   document.getElementById('saveBtn').disabled = false;
   document.getElementById('saveBtn').textContent = 'Update Reading';
@@ -372,7 +370,7 @@ function exportData() {
   if (!sessions.length) { showToast('No data to export','error'); return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(sessions,null,2)],{type:'application/json'}));
-  a.download = `fev1_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `fev1_${easternDateInputValue()}.json`;
   a.click();
   showToast('Exported ✓');
 }

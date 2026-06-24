@@ -195,9 +195,8 @@ function showTab(name) {
 //  FORM
 // ══════════════════════════════════════════════════
 function initLogForm() {
-  const now = new Date();
-  document.getElementById('log-date').value = now.toISOString().slice(0,10);
-  document.getElementById('log-time').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('log-date').value = easternDateInputValue();
+  document.getElementById('log-time').value = easternTimeInputValue();
   document.getElementById('volume-val').value = '';
   document.getElementById('save-btn').disabled = true;
   document.getElementById('save-btn').textContent = 'Save Session';
@@ -217,7 +216,7 @@ async function saveSession() {
   if (!date) { showToast('Please select a date', 'error'); return; }
   if (isNaN(vol)) { showToast('Enter a volume', 'error'); return; }
 
-  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const taken_at = parseEasternDateTime(date, time);
   const btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
 
@@ -254,9 +253,8 @@ function editSession(id) {
   const s = sessions.find(x => x.id === id);
   if (!s) return;
   editingId = id;
-  const d = new Date(s.taken_at);
-  document.getElementById('log-date').value = d.toISOString().slice(0,10);
-  document.getElementById('log-time').value = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('log-date').value = easternDateInputValue(s.taken_at);
+  document.getElementById('log-time').value = easternTimeInputValue(s.taken_at);
   document.getElementById('volume-val').value = volumeOf(s) ?? '';
   document.getElementById('save-btn').disabled = false;
   document.getElementById('save-btn').textContent = 'Update Session';
@@ -281,8 +279,8 @@ async function deleteSession(id) {
 // ══════════════════════════════════════════════════
 //  HISTORY
 // ══════════════════════════════════════════════════
-function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
-function fmtTime(iso) { return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+function fmtDate(iso) { return fmtEasternDate(iso); }
+function fmtTime(iso) { return fmtEasternTime(iso); }
 
 function renderHistory() {
   const list = sessions.slice().reverse();

@@ -496,7 +496,7 @@ function showReview(parsed) {
   document.getElementById('loading-card').style.display = 'none';
   document.getElementById('review-card').style.display = 'block';
 
-  const collectionDate = parsed.collection_date && parsed.collection_date !== 'null' ? parsed.collection_date : new Date().toISOString().slice(0,10);
+  const collectionDate = parsed.collection_date && parsed.collection_date !== 'null' ? parsed.collection_date : easternDateInputValue();
   document.getElementById('review-date').value = collectionDate;
   document.getElementById('review-time').value = '00:00';
 
@@ -547,7 +547,7 @@ async function saveExtractedValues() {
   const date = document.getElementById('review-date').value;
   const time = document.getElementById('review-time').value || '00:00';
   if (!date) { showToast('Please select a date', 'error'); return; }
-  const taken_at = new Date(`${date}T${time}:00`).toISOString();
+  const taken_at = parseEasternDateTime(date, time);
 
   const toSave = extractedItems
     .map((item, i) => ({ ...item, checked: document.getElementById(`ec-${i}`).checked, value: parseFloat(document.getElementById(`ev-${i}`).value) }))
@@ -579,7 +579,7 @@ async function saveExtractedValues() {
 // ══════════════════════════════════════════════════
 //  HISTORY
 // ══════════════════════════════════════════════════
-function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtDate(iso){ return fmtEasternDate(iso); }
 function labDisplayName(labType) { return LAB_PARAMS[labType] ? LAB_PARAMS[labType].name : labType; }
 function isSignalLab(labType) { return LAB_PARAMS[labType] ? !!LAB_PARAMS[labType].signal : false; }
 
