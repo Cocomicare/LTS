@@ -33,6 +33,28 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .page{display:none;padding:20px;max-width:580px;margin:0 auto}
 .page.active{display:block}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px}
+.export-field-row { display:flex; gap:12px; margin-bottom:14px; }
+.export-field { flex:1; }
+.export-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink2); display:block; margin-bottom:6px; }
+.export-field input { width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 12px; font-size:14px; font-family:inherit; }
+.export-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; }
+.export-section h3 { font-weight:600; font-size:15px; margin-bottom:10px; }
+.export-chart-wrap { height:200px; margin-bottom:12px; }
+.export-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.export-table th { text-align:left; padding:5px 8px; border-bottom:2px solid var(--border); color:var(--ink2); font-weight:600; }
+.export-table td { padding:5px 8px; border-bottom:1px solid var(--border); }
+.export-header { text-align:center; margin-bottom:18px; display:none; }
+.export-header h1 { font-weight:700; font-size:20px; }
+.export-header p { font-size:12px; color:var(--ink2); margin-top:4px; }
+@media print {
+  header, .tabs, #export-controls, #toast { display:none !important; }
+  body { background:#fff; }
+  .page { display:none !important; }
+  .page#page-export { display:block !important; padding:0; }
+  .export-header { display:block !important; }
+  .export-section { break-inside:avoid; border:none; padding:10px 0; margin-bottom:10px; }
+  .export-chart-wrap { height:170px; }
+}
 .card-title{font-weight:600;font-size:15px;margin-bottom:16px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .form-group{display:flex;flex-direction:column;gap:6px}
@@ -88,6 +110,7 @@ textarea{resize:vertical;min-height:60px}
   <button class="tab active" id="tab-log" onclick="showTab('log')">Log Reading</button>
   <button class="tab" id="tab-history" onclick="showTab('history')">History</button>
   <button class="tab" id="tab-trends" onclick="showTab('trends')">Trends</button>
+  <button class="tab" id="tab-export" onclick="showTab('export')">📄 Export</button>
 </div>
 
 <!-- LOG -->
@@ -138,6 +161,23 @@ textarea{resize:vertical;min-height:60px}
   </div>
 </div>
 
+<!-- EXPORT / CLINIC VISIT REPORT -->
+<div class="page" id="page-export">
+  <div class="card" id="export-controls">
+    <div class="card-title">📄 Clinic Visit Report</div>
+    <div class="card-sub" style="font-size:12.5px;color:var(--ink3);margin-bottom:14px">Pick a date range, generate the report, then print or save as PDF to bring to your appointment.</div>
+    <div class="export-field-row">
+      <div class="export-field"><label>From</label><input type="date" id="export-from"></div>
+      <div class="export-field"><label>To</label><input type="date" id="export-to"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="generateExport()">Generate Report</button>
+      <button class="btn btn-ghost" id="export-print-btn" onclick="window.print()" style="display:none">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+  <div id="export-report"></div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -155,6 +195,8 @@ function markLocalWrite(id) {
 
 (async function init() {
   initForm();
+  document.getElementById('export-to').value = easternDateInputValue();
+  document.getElementById('export-from').value = easternDateMinusDays(30);
 
   currentUser = await getCurrentUser();
   if (!currentUser) {
@@ -364,6 +406,56 @@ function renderTrends() {
                x:{ticks:{color:'#8A9EAF',font:{size:11},maxTicksLimit:6},grid:{color:'#E8EAF0'}} }
     }
   });
+}
+
+// ══════════════════════════════════════════════════
+//  CLINIC VISIT REPORT — printable chart + table for a user-picked
+//  date range. Date filtering uses Eastern calendar dates, same as
+//  the rest of the app.
+// ══════════════════════════════════════════════════
+function easternDateMinusDays(days) {
+  const d = new Date(easternDateInputValue() + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0,10);
+}
+
+let exportChart = null;
+function generateExport() {
+  const from = document.getElementById('export-from').value;
+  const to = document.getElementById('export-to').value;
+  if (!from || !to) { showToast('Please pick both dates', 'error'); return; }
+  if (from > to) { showToast('"From" date is after "To" date', 'error'); return; }
+
+  const inRange = iso => { const d = easternDateInputValue(iso); return d >= from && d <= to; };
+  const rows = sessions.filter(s => inRange(s.taken_at));
+  const reportEl = document.getElementById('export-report');
+
+  let html = `<div class="export-header"><h1>LTS Care — FEV1 Report</h1><p>${fmtEasternDate(from+'T00:00:00Z')} – ${fmtEasternDate(to+'T00:00:00Z')} · Generated ${fmtEasternDate(new Date().toISOString())}</p></div>`;
+  html += `<div class="export-section"><h3>🟣 FEV1 (Liters)</h3><div class="export-chart-wrap"><canvas id="export-fev1-chart"></canvas></div><div id="export-fev1-table"></div></div>`;
+  reportEl.innerHTML = html;
+
+  const tableEl = document.getElementById('export-fev1-table');
+  if (!rows.length) {
+    tableEl.innerHTML = '<div class="empty" style="padding:10px 0;font-size:12.5px">No readings in this range</div>';
+  } else {
+    if (exportChart) { exportChart.destroy(); exportChart = null; }
+    exportChart = new Chart(document.getElementById('export-fev1-chart').getContext('2d'), {
+      type:'line',
+      data:{ labels: rows.map(r=>fmtDate(r.taken_at)), datasets:[
+        { label:'FEV1', data: rows.map(r=>Number(r.fev1)), borderColor:'#7C3AED', backgroundColor:'#7C3AED20', fill:true, tension:0.3, pointRadius:3, borderWidth:2 },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, animation:false,
+        plugins:{ legend:{display:false} },
+        scales:{ y:{ grid:{color:'#E8EAF0'} }, x:{ grid:{display:false} } }
+      }
+    });
+    tableEl.innerHTML = `<table class="export-table"><tr><th>Date</th><th>Time</th><th>FEV1 (L)</th></tr>${
+      rows.slice().reverse().map(r=>`<tr><td>${fmtDate(r.taken_at)}</td><td>${fmtTime(r.taken_at)}</td><td>${r.fev1}</td></tr>`).join('')
+    }</table>`;
+  }
+
+  document.getElementById('export-print-btn').style.display = 'inline-flex';
+  showToast('Report generated ✓', 'success');
 }
 
 function exportData() {
