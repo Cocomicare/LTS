@@ -67,7 +67,20 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .field-group textarea { resize:vertical; min-height:60px; }
 .field-row { display:flex; gap:12px; }
 .field-row .field-group { flex:1; }
+.review-item { border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; background:var(--bg); }
+.review-item-top { display:flex; align-items:flex-start; gap:10px; }
+.review-check { width:18px; height:18px; accent-color:var(--accent); margin-top:3px; flex-shrink:0; }
+.review-fields { flex:1; }
+.review-fields input { width:100%; background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13.5px; margin-bottom:6px; font-family:'DM Sans',sans-serif; }
+.review-fields .row2 { display:flex; gap:8px; }
+.review-fields .row2 input { flex:1; }
+.review-more-toggle { font-size:12px; color:var(--accent); cursor:pointer; margin-top:2px; }
+.review-more { display:none; margin-top:6px; }
+.review-more.open { display:block; }
+.review-more textarea { width:100%; background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:7px 10px; font-size:12.5px; margin-bottom:6px; font-family:'DM Sans',sans-serif; min-height:44px; resize:vertical; }
+.review-more label { font-size:10px; font-weight:600; text-transform:uppercase; color:var(--ink3); display:block; margin-bottom:3px; }
 .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; }
+
 
 .detail-row { padding:10px 0; border-bottom:1px solid var(--border); }
 .detail-row:last-child { border-bottom:none; }
@@ -122,6 +135,16 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   <div class="card" id="loading-card" style="display:none;text-align:center">
     <div class="spinner"></div>
     <div style="font-size:13px;color:var(--ink2)">Reading the label…</div>
+  </div>
+
+  <div class="card" id="review-card" style="display:none">
+    <div class="card-title">Review Extracted Medications</div>
+    <div class="card-sub">We found <span id="review-count">0</span> medication(s). Uncheck anything that's wrong or you don't want to save, and correct any fields directly. Refill date isn't extracted — add that per medication after saving.</div>
+    <div id="review-list"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="cancelReview()">Cancel</button>
+      <button class="btn btn-primary" id="review-save-btn" onclick="saveReviewedMeds()">Save Selected</button>
+    </div>
   </div>
 
   <div class="card" style="text-align:center;padding:14px">
@@ -356,6 +379,88 @@ async function saveForm() {
 }
 
 // ══════════════════════════════════════════════════
+//  MULTI-ITEM REVIEW — one upload can contain a full medication
+//  list, not just a single drug. Each extracted item gets its own
+//  checkbox/editable row; saving inserts one row per checked item.
+// ══════════════════════════════════════════════════
+let reviewItems = [];
+
+function showReviewList(items) {
+  reviewItems = items;
+  document.getElementById('review-count').textContent = items.length;
+  const list = document.getElementById('review-list');
+  list.innerHTML = items.map((m, i) => `
+    <div class="review-item">
+      <div class="review-item-top">
+        <input type="checkbox" class="review-check" id="rc-${i}" checked>
+        <div class="review-fields">
+          <input type="text" id="rn-${i}" value="${(m.name||'').replace(/"/g,'&quot;')}" placeholder="Medication name">
+          <div class="row2">
+            <input type="text" id="rd-${i}" value="${(m.dosage||'').replace(/"/g,'&quot;')}" placeholder="Dosage">
+            <input type="text" id="rf-${i}" value="${(m.frequency||'').replace(/"/g,'&quot;')}" placeholder="Frequency">
+          </div>
+          <div class="review-more-toggle" onclick="toggleReviewMore(${i})">▾ Purpose / side effects / notes</div>
+          <div class="review-more" id="rm-${i}">
+            <label>Purpose</label><textarea id="rp-${i}">${m.purpose||''}</textarea>
+            <label>Side Effects</label><textarea id="rse-${i}">${m.side_effects||''}</textarea>
+            <label>Other Notes</label><textarea id="ron-${i}">${m.other_notes||''}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+  document.getElementById('review-card').style.display = 'block';
+  showToast(`Found ${items.length} medication${items.length>1?'s':''} — review before saving`, 'success');
+}
+
+function toggleReviewMore(i) {
+  document.getElementById('rm-'+i).classList.toggle('open');
+}
+
+function cancelReview() {
+  reviewItems = [];
+  document.getElementById('review-card').style.display = 'none';
+  document.getElementById('upload-card').style.display = 'block';
+}
+
+async function saveReviewedMeds() {
+  const toSave = reviewItems
+    .map((m, i) => ({
+      checked: document.getElementById(`rc-${i}`).checked,
+      name: document.getElementById(`rn-${i}`).value.trim(),
+      dosage: document.getElementById(`rd-${i}`).value.trim(),
+      frequency: document.getElementById(`rf-${i}`).value.trim(),
+      purpose: document.getElementById(`rp-${i}`).value.trim(),
+      side_effects: document.getElementById(`rse-${i}`).value.trim(),
+      other_notes: document.getElementById(`ron-${i}`).value.trim(),
+    }))
+    .filter(m => m.checked && m.name);
+
+  if (!toSave.length) { showToast('Nothing checked to save', 'error'); return; }
+
+  const btn = document.getElementById('review-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    for (const m of toSave) {
+      const { checked, ...fields } = m;
+      const inserted = await insertRow('medications', {
+        user_id: currentUser.id, ...fields,
+        refill_date: null, reminder_days_before: 7, active: true,
+      });
+      markLocalWrite(inserted.id);
+      meds.push(inserted);
+    }
+    renderList();
+    cancelReview();
+    showTab('list');
+    showToast(`Saved ${toSave.length} medication${toSave.length>1?'s':''} ✓`, 'success');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Selected';
+  }
+}
+
+// ══════════════════════════════════════════════════
 //  PDF/IMAGE EXTRACTION — reuses the extract-labs Edge Function,
 //  which is just a generic Anthropic proxy; only the prompt differs.
 // ══════════════════════════════════════════════════
@@ -385,16 +490,20 @@ async function processMedFile(file) {
         ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
         : { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } },
     ];
-    const prompt = `This is a photo or document showing a prescription medication — a pill bottle label, pharmacy printout, or medication instruction sheet. Extract what you can find and respond with ONLY raw JSON, no markdown fences, no other text, in this exact shape:
-{
-  "name": "medication name (brand and/or generic)",
-  "dosage": "e.g. 5mg",
-  "frequency": "e.g. Twice daily, morning and evening",
-  "purpose": "what it's for, if stated or you know it",
-  "side_effects": "common side effects, brief, if stated on the label or you know them",
-  "other_notes": "any other relevant instructions visible (e.g. take with food, avoid grapefruit, etc.)"
-}
-If a field truly isn't determinable, use an empty string for it. Do not include a refill date — that's entered separately by the user.`;
+    const prompt = `This is a photo or document related to prescription medications — it could be a single pill bottle label, OR a full medication list/schedule covering multiple medications (e.g. a pharmacy printout, a "Medication Instructions" sheet, or a discharge med list). Extract EVERY distinct medication you can find — do not stop after the first one.
+
+Respond with ONLY raw JSON, no markdown fences, no other text: an ARRAY of objects, one per medication, in this exact shape:
+[
+  {
+    "name": "medication name (brand and/or generic)",
+    "dosage": "e.g. 5mg",
+    "frequency": "e.g. Twice daily, morning and evening",
+    "purpose": "what it's for, if stated or you know it",
+    "side_effects": "common side effects, brief, if stated on the label or you know them",
+    "other_notes": "any other relevant instructions visible (e.g. take with food, avoid grapefruit, etc.)"
+  }
+]
+If a field truly isn't determinable for a given medication, use an empty string for it. Do not include a refill date for any medication — that's entered separately by the user. If you only find one medication, still return it as a single-item array, not a bare object.`;
 
     const { data: sessionData } = await sb.auth.getSession();
     const accessToken = sessionData?.session?.access_token;
@@ -407,12 +516,16 @@ If a field truly isn't determinable, use an empty string for it. Do not include 
     const data = await response.json();
     const textBlock = data.content.find(b => b.type === 'text');
     const cleaned = (textBlock?.text || '').replace(/```json|```/g, '').trim();
-    pendingExtraction = JSON.parse(cleaned);
+    let parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) parsed = [parsed]; // defensive: model returned a bare object
 
     document.getElementById('loading-card').style.display = 'none';
-    document.getElementById('upload-card').style.display = 'block';
-    openForm(null);
-    showToast('Extracted — review before saving', 'success');
+    if (!parsed.length) {
+      document.getElementById('upload-card').style.display = 'block';
+      showToast('Nothing recognized — try a clearer photo', 'error');
+      return;
+    }
+    showReviewList(parsed);
   } catch (e) {
     document.getElementById('loading-card').style.display = 'none';
     document.getElementById('upload-card').style.display = 'block';
