@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Communication & Care Partnership</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --accent:#0D5C6B; --warn:#E07B39; --warn-bg:#FDF0E8; --danger:#C94040; --danger-bg:#FAEAEA; --good:#2D9E6B; --good-bg:#E8F7F1; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:16px; }
+.card h2 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:10px; }
+.card h3 { font-size:14px; font-weight:700; margin:14px 0 6px; color:var(--ink); }
+.card p { line-height:1.6; margin-bottom:8px; color:var(--ink2); }
+.card ul { margin:6px 0 6px 20px; line-height:1.7; color:var(--ink2); }
+.card li { margin-bottom:4px; }
+.intro-quote { font-style:italic; color:var(--ink2); line-height:1.6; border-left:3px solid var(--accent); padding-left:14px; margin-bottom:10px; }
+.tier-box { border-radius:8px; padding:13px 15px; margin-bottom:10px; }
+.tier-box.emergent { background:var(--danger-bg); border:1px solid #f0c0c0; }
+.tier-box.urgent { background:var(--warn-bg); border:1px solid #f0d8b8; }
+.tier-box.routine { background:var(--good-bg); border:1px solid #c5e8d5; }
+.tier-label { font-weight:700; font-size:13px; margin-bottom:3px; }
+.tier-box.emergent .tier-label { color:var(--danger); }
+.tier-box.urgent .tier-label { color:#9a5a1f; }
+.tier-box.routine .tier-label { color:var(--good); }
+.tier-box p { font-size:13px; margin-bottom:0; color:var(--ink2); }
+.danger-box { background:var(--danger-bg); border:1px solid #f0c0c0; border-radius:8px; padding:12px 14px; margin:10px 0; color:var(--danger); font-weight:600; line-height:1.5; }
+.note-box { background:#EEF3FA; border-radius:8px; padding:11px 14px; margin:10px 0; font-size:12.5px; color:var(--ink2); line-height:1.5; font-style:italic; }
+.contact-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.contact-row:last-child { border-bottom:none; }
+.contact-label { color:var(--ink3); }
+.contact-val { font-weight:600; text-align:right; }
+.empty { text-align:center; padding:60px 20px; color:var(--ink3); }
+.source-note { font-size:11px; color:var(--ink3); text-align:center; margin-top:20px; }
+.signoff { text-align:center; font-size:13px; color:var(--ink2); line-height:1.7; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="reference_hub.html" style="display:inline-block;font-size:13px;color:#3B82C4;text-decoration:none;font-weight:600;margin-bottom:6px">← Reference Guide</a><br>
+  <div class="logo-title">Communication & Care Partnership</div>
+  <div class="logo-sub">Post-Transplant Reference Guide</div>
+</header>
+<div class="page" id="content"></div>
+
+<script>
+(async function init() {
+  const user = await getCurrentUser();
+  if (!user) {
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the PLTS Care dashboard to view this guide.</div>';
+    return;
+  }
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h2>🤝 Memorandum of Understanding</h2>
+      <p class="intro-quote">"It is a privilege to be part of your care journey. We recognize that transplant is not only a medical experience, but also a deeply personal one. Our team is committed to walking alongside you with compassion, expertise, and unwavering support."</p>
+      <p>To provide the highest quality, safest, and most timely care, UF Health's Lung Transplant Program asks that you work together with them in a shared partnership — built on clear communication, mutual respect, and realistic expectations.</p>
+    </div>
+
+    <div class="card">
+      <h2>✓ Their Commitment to You</h2>
+      <p>The team promises to:</p>
+      <ul>
+        <li>Provide expert, evidence-based transplant care</li>
+        <li>Respond to your concerns in a timely and thoughtful manner</li>
+        <li>Treat you and your loved ones with respect, dignity, and compassion</li>
+        <li>Communicate clearly about your care plan, medications, and next steps</li>
+        <li>Be available for urgent needs and guide you during emergencies</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Your Partnership in Care</h2>
+
+      <h3>1. Use the Right Communication Channel</h3>
+      <ul>
+        <li>Call the lung transplant office at <strong>352-265-8940</strong> for emergent/urgent symptoms (shortness of breath, fever, chest pain…)</li>
+        <li>Use <strong>MyChart</strong> for non-urgent questions or updates</li>
+        <li><strong>Do not use MyChart for emergencies</strong> — it is not monitored after hours, weekends, or holidays</li>
+        <li>Keep your MyChart contact info current so the team can reach you about changes in your plan of care</li>
+      </ul>
+
+      <h3>2. Allow Appropriate Response Time</h3>
+      <p>Every message is carefully reviewed to ensure safe and accurate guidance:</p>
+
+      <div class="tier-box emergent">
+        <div class="tier-label">🚨 Emergent Concerns — addressed immediately</div>
+        <p>If your available coordinator isn't reachable, ask to speak with ANY available coordinator. Examples: sudden shortness of breath, chest pain, bleeding or uncontrolled vomiting, fever over 100°F.</p>
+      </div>
+      <div class="tier-box urgent">
+        <div class="tier-label">⚠️ Urgent Concerns — same business day (M–F 8:00–4:30 PM, no holidays/weekends)</div>
+        <p>Examples: running low or out of immunosuppressive medications, new medication side effects, new decline in FEV1 for 3 days in a row, scheduling issues affecting the next business day, or being on your way to/at an Emergency Center or Urgent Care.</p>
+      </div>
+      <div class="tier-box routine">
+        <div class="tier-label">📋 Routine Questions — within 1–2 business days</div>
+        <p>Triaged by the clinical team. Examples: schedule change requests, clarification of treatment plans, discussion of routine testing and results.</p>
+      </div>
+
+      <div class="note-box">"Sending multiple messages or calls about the same issue may delay response times for all patients. We appreciate your patience and trust while we review your concern."</div>
+
+      <h3>3. Help Us Prioritize Your Care</h3>
+      <p>When reaching out:</p>
+      <ul>
+        <li>Clearly describe your symptoms or question</li>
+        <li>Include relevant details (temperature, oxygen levels, medication changes)</li>
+        <li>Notify the team if your condition worsens</li>
+      </ul>
+
+      <h3>4. Respectful Communication</h3>
+      <p>UF Health is committed to a culture of kindness and respect — they ask that all interactions, whether in person, by phone, or through messaging, remain respectful and collaborative.</p>
+
+      <h3>5. Medication & Care Responsibility</h3>
+      <ul>
+        <li>Take medications exactly as prescribed</li>
+        <li>Notify the team immediately of missed doses or side effects</li>
+        <li>Attend all scheduled appointments and lab draws</li>
+      </ul>
+      <p>Your active participation is essential to your transplant success.</p>
+
+      <h3>6. Emergency Situations</h3>
+      <p>If you experience severe shortness of breath, chest pain, high fever, or any life-threatening symptoms:</p>
+      <div class="danger-box">If you are experiencing an emergency situation — Call 911 or go to the nearest Emergency Department immediately.</div>
+    </div>
+
+    <div class="card">
+      <h2>Why This Matters</h2>
+      <p>Timely and appropriate communication allows the team to:</p>
+      <ul>
+        <li>Respond quickly to patients with the most urgent needs</li>
+        <li>Provide thoughtful, accurate medical guidance</li>
+        <li>Reduce delays in care</li>
+        <li>Maintain the highest standards of safety and outcomes</li>
+      </ul>
+      <p>By working together, this creates a system that supports every patient fairly and effectively.</p>
+    </div>
+
+    <div class="card">
+      <h2>A Shared Commitment</h2>
+      <p>"This is a partnership. Our goal is not only to care for your transplant — but to support you in living well beyond it. We are honored to be part of your journey and are committed to providing you with exceptional care every step of the way."</p>
+      <div class="signoff">With gratitude,<br><strong>Your Lung Transplant Team</strong><br>University of Florida Health</div>
+    </div>
+
+    <div class="source-note">Source: UF Health Lung Transplant Program — Patient Communication & Care Partnership Agreement (Memorandum of Understanding)</div>
+  `;
+})();
+</script>
+</body>
+</html>

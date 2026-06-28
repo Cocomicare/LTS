@@ -636,7 +636,7 @@ function generateExport() {
     return;
   }
 
-  let html = `<div class="export-header"><h1>LTS Care — Medication List</h1><p>Generated ${fmtEasternDate(new Date().toISOString())} at ${fmtEasternTime(new Date().toISOString())}</p></div>`;
+  let html = `<div class="export-header"><h1>PLTS Care — Medication List</h1><p>Generated ${fmtEasternDate(new Date().toISOString())} at ${fmtEasternTime(new Date().toISOString())}</p></div>`;
   html += list.map(m => `
     <div class="export-med-row${m.active ? '' : ' inactive'}">
       <div class="export-med-top">

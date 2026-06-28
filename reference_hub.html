@@ -77,7 +77,7 @@ let isLoggedIn = false;
   const user = await getCurrentUser();
   const content = document.getElementById('content');
   if (!user) {
-    content.innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    content.innerHTML = '<div class="empty">🔒 Please log in via the PLTS Care dashboard to view this guide.</div>';
     document.getElementById('search').style.display = 'none';
     return;
   }

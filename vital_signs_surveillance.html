@@ -278,7 +278,7 @@ function buildVitalPages() {
 
   currentUser = await getCurrentUser();
   if (!currentUser) {
-    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the PLTS Care dashboard.</div></div>';
     return;
   }
 
@@ -625,7 +625,7 @@ function generateExport() {
   const inRange = iso => { const d = easternDateInputValue(iso); return d >= from && d <= to; };
   const reportEl = document.getElementById('export-report');
 
-  let html = `<div class="export-header"><h1>LTS Care — Vital Signs Report</h1><p>${fmtEasternDate(from+'T00:00:00Z')} – ${fmtEasternDate(to+'T00:00:00Z')} · Generated ${fmtEasternDate(new Date().toISOString())}</p></div>`;
+  let html = `<div class="export-header"><h1>PLTS Care — Vital Signs Report</h1><p>${fmtEasternDate(from+'T00:00:00Z')} – ${fmtEasternDate(to+'T00:00:00Z')} · Generated ${fmtEasternDate(new Date().toISOString())}</p></div>`;
   VITALS.forEach(v => {
     const m = VITAL_META[v];
     html += `<div class="export-section"><h3>${m.icon} ${m.name}</h3><div class="export-chart-wrap"><canvas id="export-${v}-chart"></canvas></div><div id="export-${v}-table"></div></div>`;

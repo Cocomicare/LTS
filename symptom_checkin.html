@@ -328,7 +328,7 @@ const recentLocalWriteIds = new Set(); // ids this tab just wrote, to suppress d
 
   currentUser = await getCurrentUser();
   if (!currentUser) {
-    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the PLTS Care dashboard.</div></div>';
     return;
   }
 
@@ -696,7 +696,7 @@ function generateExport() {
   const rows = records.filter(r => inRange(r.taken_at));
   const reportEl = document.getElementById('export-report');
 
-  let html = `<div class="export-header"><h1>LTS Care — Symptom Check-in Report</h1><p>${fmtEasternDate(from+'T00:00:00Z')} – ${fmtEasternDate(to+'T00:00:00Z')} · Generated ${fmtEasternDate(new Date().toISOString())}</p></div>`;
+  let html = `<div class="export-header"><h1>PLTS Care — Symptom Check-in Report</h1><p>${fmtEasternDate(from+'T00:00:00Z')} – ${fmtEasternDate(to+'T00:00:00Z')} · Generated ${fmtEasternDate(new Date().toISOString())}</p></div>`;
   html += `<div class="export-section"><h3>🧠 Wellness Score Over Time</h3><div class="export-chart-wrap"><canvas id="export-symptom-chart"></canvas></div><div id="export-symptom-table"></div></div>`;
   reportEl.innerHTML = html;
 

@@ -249,7 +249,7 @@ function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => rece
 (async function init() {
   currentUser = await getCurrentUser();
   if (!currentUser) {
-    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the LTS Care dashboard.</div></div>';
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the PLTS Care dashboard.</div></div>';
     return;
   }
   labs = await fetchRows('lab_results', currentUser.id, 'taken_at', true);
