@@ -262,6 +262,9 @@ function buildVitalPages() {
         <div class="chart-wrap"><canvas id="${v}-chart"></canvas></div>
       </div>
 
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button class="btn btn-ghost" onclick="addEntryForDate('${v}')">+ Add Entry for a Date</button>
+      </div>
       <div id="${v}-history"></div>
     </div>`;
   }).join('');
@@ -396,6 +399,17 @@ function clearVitalForm(vital) {
   initVitalDateTime(vital);
   document.getElementById(vital+'-save-btn').disabled = true;
   delete editState[vital];
+}
+
+// Clears any in-progress edit and brings the log form into view with the
+// date field focused — for adding a reading for a date other than today,
+// without needing to know the date field on the regular form is editable.
+function addEntryForDate(vital) {
+  clearVitalForm(vital);
+  const card = document.querySelector(`#page-${vital} .vital-input-card`);
+  if (card) card.scrollIntoView({ behavior:'smooth', block:'start' });
+  const dateInput = document.getElementById(vital+'-date');
+  setTimeout(() => { dateInput.focus(); if (dateInput.showPicker) { try { dateInput.showPicker(); } catch(e){} } }, 300);
 }
 
 const editState = {}; // vital -> {sysId, diaId} or {id} when editing existing reading

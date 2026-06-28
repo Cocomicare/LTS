@@ -149,6 +149,9 @@ textarea{resize:vertical;min-height:60px}
 <!-- HISTORY -->
 <div class="page" id="page-history">
   <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="btn btn-ghost" onclick="addEntryForDate()">+ Add Entry for a Date</button>
+  </div>
   <div id="historyContent"></div>
 </div>
 
@@ -288,6 +291,18 @@ function onValInput() {
 }
 
 function clearForm() { initForm(); }
+
+// Clears any in-progress edit, switches to the Log tab, and focuses the
+// date field — for adding a reading for a date other than today, without
+// needing to know the date field on the regular form is editable.
+function addEntryForDate() {
+  clearForm();
+  showTab('log');
+  const card = document.querySelector('#page-log .card');
+  if (card) card.scrollIntoView({ behavior:'smooth', block:'start' });
+  const dateInput = document.getElementById('sessionDate');
+  setTimeout(() => { dateInput.focus(); if (dateInput.showPicker) { try { dateInput.showPicker(); } catch(e){} } }, 300);
+}
 
 async function saveSession() {
   const date  = document.getElementById('sessionDate').value;
