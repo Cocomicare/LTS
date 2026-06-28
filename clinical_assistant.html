@@ -52,6 +52,8 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .send-btn:disabled { opacity:.5; cursor:not-allowed; }
 .upload-btn { background:none; border:1.5px solid var(--border); color:var(--ink2); border-radius:var(--radius-sm); padding:10px 12px; font-size:16px; cursor:pointer; flex-shrink:0; }
 .upload-btn:hover { border-color:var(--accent); color:var(--accent); }
+.upload-btn.listening { background:var(--danger-bg); border-color:var(--danger); color:var(--danger); animation:pulse-mic 1.2s infinite; }
+@keyframes pulse-mic { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 #doc-file-input { display:none; }
 
 .modal-backdrop { position:fixed; inset:0; background:rgba(20,30,40,0.55); display:none; align-items:center; justify-content:center; z-index:200; padding:20px; }
@@ -95,6 +97,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   <div class="input-row">
     <button class="upload-btn" onclick="document.getElementById('doc-file-input').click()" title="Upload a reference document (image or PDF)">📎</button>
     <button class="upload-btn" onclick="pasteFromClipboardAssistant()" title="Paste an image from clipboard">📋</button>
+    <button class="upload-btn" id="mic-btn" onclick="toggleVoiceInput()" title="Speak your question">🎤</button>
     <input type="file" id="doc-file-input" accept="image/*,application/pdf" onchange="onDocFileSelected(event)">
     <textarea id="question-input" placeholder="Ask a question…" rows="1" onkeydown="handleInputKeydown(event)"></textarea>
     <button class="send-btn" id="send-btn" onclick="sendQuestion()">Send</button>
@@ -142,6 +145,7 @@ let pendingDocSummaryRaw = null;
     return;
   }
   setupPasteListener();
+  setupVoiceInput();
 })();
 
 // ══════════════════════════════════════════════════
@@ -198,6 +202,68 @@ function setupPasteListener() {
       }
     }
   });
+}
+
+// ══════════════════════════════════════════════════
+//  VOICE INPUT — speech-to-text for the question box only, using
+//  the browser's built-in Web Speech API. This is input-only: the
+//  assistant still answers in text, never speaks back. Support
+//  varies by browser (solid on Chrome desktop/Android, inconsistent
+//  on iOS Safari), so this degrades gracefully if unavailable.
+// ══════════════════════════════════════════════════
+let recognizer = null;
+let isListening = false;
+
+function setupVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micBtn = document.getElementById('mic-btn');
+  if (!SpeechRecognition) {
+    micBtn.style.display = 'none'; // hide rather than show a button that can't work
+    return;
+  }
+  recognizer = new SpeechRecognition();
+  recognizer.lang = 'en-US';
+  recognizer.continuous = false;
+  recognizer.interimResults = true;
+
+  const input = document.getElementById('question-input');
+  let baseText = '';
+
+  recognizer.onstart = () => {
+    isListening = true;
+    baseText = input.value ? input.value.trim() + ' ' : '';
+    micBtn.classList.add('listening');
+    micBtn.title = 'Listening… tap to stop';
+  };
+
+  recognizer.onresult = (e) => {
+    let transcript = '';
+    for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+    input.value = baseText + transcript;
+  };
+
+  recognizer.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'permission-denied') {
+      appendMessage('error', 'Microphone access was denied — check your browser/site permissions to use voice input.');
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      appendMessage('error', 'Voice input error: ' + e.error);
+    }
+  };
+
+  recognizer.onend = () => {
+    isListening = false;
+    micBtn.classList.remove('listening');
+    micBtn.title = 'Speak your question';
+  };
+}
+
+function toggleVoiceInput() {
+  if (!recognizer) return;
+  if (isListening) {
+    recognizer.stop();
+  } else {
+    try { recognizer.start(); } catch (e) { /* already started — ignore */ }
+  }
 }
 
 function handleInputKeydown(e) {
