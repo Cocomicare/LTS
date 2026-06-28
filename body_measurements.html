@@ -35,8 +35,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .card-sub { font-size:12.5px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
 
 .body-diagram-wrap { display:flex; justify-content:center; padding:10px 0 6px; }
-.body-svg { width:100%; max-width:280px; height:auto; }
-.hotspot { fill:var(--body-fill); stroke:#fff; stroke-width:2; cursor:pointer; transition:fill .15s; }
+.diagram-stack { position:relative; width:100%; max-width:240px; }
+.body-img { width:100%; height:auto; display:block; }
+.body-svg { position:absolute; inset:0; width:100%; height:100%; }
+.hotspot { fill:var(--body-fill); stroke:#fff; stroke-width:10; cursor:pointer; transition:fill .15s; }
 .hotspot:hover, .hotspot.active-touch { fill:var(--body-fill-hover); }
 .hotspot.has-data { fill:var(--accent); opacity:0.85; }
 .hotspot.measured-today { fill:var(--good); }
@@ -132,7 +134,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
     <div class="card-title">📏 Tap a Spot to Log a Measurement</div>
     <div class="card-sub">Left/Right are as shown, facing you. Measurements in centimeters. Tapping a spot that already has data today lets you correct it.</div>
     <div class="body-diagram-wrap">
-      <svg class="body-svg" viewBox="-70 0 360 400" id="body-svg"></svg>
+      <div class="diagram-stack">
+        <img src="body_diagram.png" class="body-img" alt="Body diagram">
+        <svg class="body-svg" viewBox="0 0 894 2112" preserveAspectRatio="none" id="body-svg"></svg>
+      </div>
     </div>
     <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;flex-wrap:wrap">
       <div class="legend-row"><span class="legend-dot" style="background:var(--body-fill)"></span> No data yet</div>
@@ -206,25 +211,25 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 //  left/right — simplest convention for personal tracking.
 // ══════════════════════════════════════════════════
 const SITES = [
-  { key:'waist',         name:'Waist',          x:100, y:148, r:13,
+  { key:'waist',         name:'Waist',          x:447, y:697,  r:20,
     tip:'Measure around your natural waistline, at the navel. Stand relaxed, don\'t pull the tape tight.' },
-  { key:'glutes',        name:'Glutes / Hips',  x:250, y:188, r:13, leaderTo:{x:122,y:186},
+  { key:'glutes',        name:'Glutes / Hips',  x:760, y:1000, r:20, leaderTo:{x:653,y:1000},
     tip:'Measure around the widest part of your hips/glutes, standing with feet together.' },
-  { key:'bicep_left',    name:'Left Bicep',     x:48,  y:95,  r:10,
+  { key:'bicep_left',    name:'Left Bicep',     x:230, y:557,  r:18,
     tip:'Measure at the midpoint between shoulder and elbow, arm relaxed at your side.' },
-  { key:'bicep_right',   name:'Right Bicep',    x:152, y:95,  r:10,
+  { key:'bicep_right',   name:'Right Bicep',    x:664, y:557,  r:18,
     tip:'Measure at the midpoint between shoulder and elbow, arm relaxed at your side.' },
-  { key:'forearm_left',  name:'Left Forearm',   x:41,  y:152, r:9,
+  { key:'forearm_left',  name:'Left Forearm',   x:147, y:833,  r:15,
     tip:'Measure at the widest point of the forearm, just below the elbow.' },
-  { key:'forearm_right', name:'Right Forearm',  x:159, y:152, r:9,
+  { key:'forearm_right', name:'Right Forearm',  x:747, y:833,  r:15,
     tip:'Measure at the widest point of the forearm, just below the elbow.' },
-  { key:'thigh_left',    name:'Left Thigh',     x:78,  y:228, r:12,
+  { key:'thigh_left',    name:'Left Thigh',     x:334, y:1252, r:22,
     tip:'Measure at the midpoint between hip and knee — or whatever spot feels widest, as long as you measure the same spot every time.' },
-  { key:'thigh_right',   name:'Right Thigh',    x:122, y:228, r:12,
+  { key:'thigh_right',   name:'Right Thigh',    x:560, y:1252, r:22,
     tip:'Measure at the midpoint between hip and knee — or whatever spot feels widest, as long as you measure the same spot every time.' },
-  { key:'calf_left',     name:'Left Calf',      x:75,  y:320, r:10,
+  { key:'calf_left',     name:'Left Calf',      x:343, y:1610, r:18,
     tip:'Measure around the widest point of the calf, standing with weight evenly on both feet.' },
-  { key:'calf_right',    name:'Right Calf',     x:125, y:320, r:10,
+  { key:'calf_right',    name:'Right Calf',     x:551, y:1610, r:18,
     tip:'Measure around the widest point of the calf, standing with weight evenly on both feet.' },
 ];
 const SITE_MAP = {}; SITES.forEach(s => SITE_MAP[s.key] = s);
@@ -287,45 +292,37 @@ function easternDateMinusDays(days) {
 // ══════════════════════════════════════════════════
 function buildBodySvg() {
   const svg = document.getElementById('body-svg');
-  const bodyShape = `
-    <circle cx="100" cy="28" r="18" fill="var(--body-fill)"/>
-    <rect x="93" y="44" width="14" height="12" fill="var(--body-fill)"/>
-    <path d="M70,56 Q100,50 130,56 L135,178 Q100,188 65,178 Z" fill="var(--body-fill)"/>
-    <path d="M70,60 Q50,90 48,140 Q47,160 45,178 L60,181 Q63,150 65,120 Q68,90 80,65 Z" fill="var(--body-fill)"/>
-    <path d="M130,60 Q150,90 152,140 Q153,160 155,178 L140,181 Q137,150 135,120 Q132,90 120,65 Z" fill="var(--body-fill)"/>
-    <path d="M68,180 Q60,230 62,300 Q63,340 65,378 L85,378 Q83,330 84,290 Q85,230 92,182 Z" fill="var(--body-fill)"/>
-    <path d="M132,180 Q140,230 138,300 Q137,340 135,378 L115,378 Q117,330 116,290 Q115,230 108,182 Z" fill="var(--body-fill)"/>
-  `;
 
   // Leader lines drawn first so hotspot circles + labels sit on top.
   const leaders = SITES.filter(s => s.leaderTo).map(s => `
-    <line x1="${s.leaderTo.x}" y1="${s.leaderTo.y}" x2="${s.x}" y2="${s.y}" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <line x1="${s.leaderTo.x}" y1="${s.leaderTo.y}" x2="${s.x}" y2="${s.y}" stroke="#8A9EAF" stroke-width="6" stroke-dasharray="14,10"/>
   `).join('');
 
+  const FONT = 24; // viewBox units — image is 894x2112, scaled to display at the same ratio everywhere
   const hotspotsAndLabels = SITES.map(s => {
-    const isLeft = s.x < 90 && !s.leaderTo;
-    const isRight = s.x > 110 && !s.leaderTo;
+    const isLeft = s.x < 400 && !s.leaderTo;
+    const isRight = s.x > 500 && !s.leaderTo;
     let labelEl;
     if (s.key === 'waist') {
-      labelEl = `<text x="${s.x}" y="${s.y - s.r - 8}" text-anchor="middle" class="hotspot-label">${s.name}</text>`;
+      labelEl = `<text x="${s.x}" y="${s.y - s.r - 14}" text-anchor="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     } else if (s.leaderTo) {
-      // off-body callout (glutes) — label centered below the circle
-      labelEl = `<text x="${s.x}" y="${s.y + s.r + 13}" text-anchor="middle" class="hotspot-label">${s.name}</text>`;
+      labelEl = `<text x="${s.x}" y="${s.y + s.r + 28}" text-anchor="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     } else if (isLeft) {
-      labelEl = `<text x="${s.x - s.r - 6}" y="${s.y}" text-anchor="end" dominant-baseline="middle" class="hotspot-label">${s.name}</text>`;
+      labelEl = `<text x="${s.x - s.r - 14}" y="${s.y}" text-anchor="end" dominant-baseline="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     } else if (isRight) {
-      labelEl = `<text x="${s.x + s.r + 6}" y="${s.y}" text-anchor="start" dominant-baseline="middle" class="hotspot-label">${s.name}</text>`;
+      labelEl = `<text x="${s.x + s.r + 14}" y="${s.y}" text-anchor="start" dominant-baseline="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     } else {
-      labelEl = `<text x="${s.x}" y="${s.y - s.r - 6}" text-anchor="middle" class="hotspot-label">${s.name}</text>`;
+      labelEl = `<text x="${s.x}" y="${s.y - s.r - 14}" text-anchor="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     }
     return `
       <g class="hotspot-group" onclick="openLogModal('${s.key}')" style="cursor:pointer">
+        <circle cx="${s.x}" cy="${s.y}" r="42" fill="rgba(0,0,0,0.001)"></circle>
         <circle class="hotspot" id="hs-${s.key}" cx="${s.x}" cy="${s.y}" r="${s.r}"></circle>
         ${labelEl}
       </g>`;
   }).join('');
 
-  svg.innerHTML = leaders + bodyShape + hotspotsAndLabels;
+  svg.innerHTML = leaders + hotspotsAndLabels;
 }
 
 function refreshHotspotStyling() {
