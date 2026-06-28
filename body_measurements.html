@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Body Measurements</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8;
+  --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF;
+  --accent:#C9456A; --accent-bg:#FBE8ED;
+  --good:#2D9E6B; --good-bg:#E8F7F1;
+  --warn:#E07B39; --warn-bg:#FDF0E8;
+  --danger:#C94040; --danger-bg:#FAEAEA;
+  --body-fill:#D8E2EC; --body-fill-hover:#C4D2E2;
+  --radius:12px; --radius-sm:8px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.5px; margin-left:8px; }
+.tabs { display:flex; background:#E8EFF5; border-bottom:1px solid var(--border); padding:0 16px; overflow-x:auto; }
+.tab { padding:11px 14px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; white-space:nowrap; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.page { display:none; padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.page.active { display:block; }
+
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:14px; }
+.card-title { font-family:'DM Serif Display',serif; font-size:16px; margin-bottom:6px; }
+.card-sub { font-size:12.5px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
+
+.body-diagram-wrap { display:flex; justify-content:center; padding:10px 0 6px; }
+.body-svg { width:100%; max-width:280px; height:auto; }
+.hotspot { fill:var(--body-fill); stroke:#fff; stroke-width:2; cursor:pointer; transition:fill .15s; }
+.hotspot:hover, .hotspot.active-touch { fill:var(--body-fill-hover); }
+.hotspot.has-data { fill:var(--accent); opacity:0.85; }
+.hotspot.measured-today { fill:var(--good); }
+.legend-row { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink2); }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all .15s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:#b03a5b; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:none; border:1px solid var(--border); color:var(--ink2); }
+.btn-danger { background:none; border:1px solid #f0c0c0; color:var(--danger); }
+.btn-icon { background:none; border:none; color:var(--ink3); cursor:pointer; font-size:14px; padding:4px 6px; }
+.btn-icon:hover { color:var(--accent); }
+
+.field-group { margin-bottom:14px; }
+.field-group label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink2); display:block; margin-bottom:6px; }
+.field-group input, .field-group select { width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 12px; font-size:14px; font-family:'DM Sans',sans-serif; }
+
+.today-list-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+.today-list-row:last-child { border-bottom:none; }
+.today-site-name { flex:1; font-size:13.5px; font-weight:600; }
+.today-val { font-family:'DM Mono',monospace; font-size:15px; font-weight:600; color:var(--accent); }
+
+.hist-day-label { font-size:11px; font-weight:600; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; margin:16px 4px 8px; }
+.hist-day-label:first-child { margin-top:0; }
+.hist-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; margin-bottom:8px; display:flex; align-items:center; gap:12px; }
+.hist-site { flex:1; font-size:13.5px; font-weight:600; }
+.hist-val { font-family:'DM Mono',monospace; font-size:16px; font-weight:600; }
+
+.chart-wrap { height:220px; margin-top:6px; }
+.stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--bg); border-radius:10px; padding:10px 12px; text-align:center; }
+.stat-label { font-size:10px; color:var(--ink3); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
+.stat-val { font-family:'DM Mono',monospace; font-size:18px; font-weight:600; }
+
+.export-field-row { display:flex; gap:12px; margin-bottom:14px; }
+.export-field { flex:1; }
+.export-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink2); display:block; margin-bottom:6px; }
+.export-field input { width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 12px; font-size:14px; }
+.export-site-check { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; }
+.export-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; }
+.export-section h3 { font-family:'DM Serif Display',serif; font-size:15px; margin-bottom:10px; }
+.export-chart-wrap { height:160px; margin-bottom:10px; }
+.export-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.export-table th { text-align:left; padding:5px 8px; border-bottom:2px solid var(--border); color:var(--ink2); font-weight:600; }
+.export-table td { padding:5px 8px; border-bottom:1px solid var(--border); }
+.export-header { text-align:center; margin-bottom:18px; display:none; }
+.export-header h1 { font-family:'DM Serif Display',serif; font-size:20px; }
+.export-header p { font-size:12px; color:var(--ink2); margin-top:4px; }
+@media print {
+  header, .tabs, #export-controls, .toast { display:none !important; }
+  body { background:#fff; }
+  .page { display:none !important; }
+  .page#page-export { display:block !important; padding:0; }
+  .export-header { display:block !important; }
+  .export-section { break-inside:avoid; border:none; padding:10px 0; margin-bottom:10px; }
+}
+
+.modal-backdrop { display:none; position:fixed; inset:0; height:100vh; height:100dvh; background:rgba(20,30,40,0.55); z-index:200; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; overflow-y:auto; }
+.modal-backdrop.show { display:flex; }
+.modal-card { background:var(--surface); border-radius:var(--radius); padding:22px; max-width:380px; width:100%; margin:auto; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:17px; color:var(--ink2); margin-bottom:5px; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px; z-index:999; opacity:0; transition:all .25s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.toast.success { background:var(--good); }
+.toast.error { background:var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo-title">Body Measurements</span>
+    <span class="logo-sub">Rehab Progress</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('track')" id="tab-track">Track</button>
+  <button class="tab" onclick="showTab('history')" id="tab-history">History</button>
+  <button class="tab" onclick="showTab('trends')" id="tab-trends">Trends</button>
+  <button class="tab" onclick="showTab('export')" id="tab-export">📄 Export</button>
+</div>
+
+<!-- TRACK -->
+<div class="page active" id="page-track">
+  <div class="card">
+    <div class="card-title">📏 Tap a Spot to Log a Measurement</div>
+    <div class="card-sub">Left/Right are as shown, facing you. Measurements in centimeters. Tapping a spot that already has data today lets you correct it.</div>
+    <div class="body-diagram-wrap">
+      <svg class="body-svg" viewBox="0 0 200 400" id="body-svg"></svg>
+    </div>
+    <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+      <div class="legend-row"><span class="legend-dot" style="background:var(--body-fill)"></span> No data yet</div>
+      <div class="legend-row"><span class="legend-dot" style="background:var(--accent)"></span> Has data</div>
+      <div class="legend-row"><span class="legend-dot" style="background:var(--good)"></span> Measured today</div>
+    </div>
+  </div>
+
+  <div class="card" id="today-card" style="display:none">
+    <div class="card-title">Today's Measurements</div>
+    <div id="today-list"></div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <div class="sync-note" style="font-size:11px;color:var(--ink3);text-align:center;margin-bottom:10px">🔄 Live — updates instantly across all your devices</div>
+  <div id="history-content"></div>
+</div>
+
+<!-- TRENDS -->
+<div class="page" id="page-trends">
+  <div class="card">
+    <div class="field-group" style="margin-bottom:6px">
+      <label>Site</label>
+      <select id="trend-site-select" onchange="renderTrend()"></select>
+    </div>
+  </div>
+  <div id="trend-content"></div>
+</div>
+
+<!-- EXPORT -->
+<div class="page" id="page-export">
+  <div class="card" id="export-controls">
+    <div class="card-title">📄 Clinic Visit Report</div>
+    <div class="card-sub">Pick a date range and which sites to include, then print or save as PDF.</div>
+    <div class="export-field-row">
+      <div class="export-field"><label>From</label><input type="date" id="export-from"></div>
+      <div class="export-field"><label>To</label><input type="date" id="export-to"></div>
+    </div>
+    <div id="export-site-checks" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="generateExport()">Generate Report</button>
+      <button class="btn btn-ghost" id="export-print-btn" onclick="window.print()" style="display:none">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+  <div id="export-report"></div>
+</div>
+
+<!-- LOG MODAL -->
+<div class="modal-backdrop" id="log-modal">
+  <div class="modal-card">
+    <div class="card-title" id="log-modal-title">Log Measurement</div>
+    <div class="field-group"><label>Value (cm)</label><input type="number" step="0.1" id="log-value"></div>
+    <div class="field-group"><label>Date</label><input type="date" id="log-date"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeLogModal()">Cancel</button>
+      <button class="btn btn-primary" id="log-save-btn" onclick="saveLogModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  SITE DEFINITIONS
+//  x/y are coordinates in the body-svg's 0–200 / 0–400 viewBox.
+//  Left/Right are as displayed (facing the viewer), not anatomical
+//  left/right — simplest convention for personal tracking.
+// ══════════════════════════════════════════════════
+const SITES = [
+  { key:'waist',         name:'Waist',          x:100, y:148, r:13 },
+  { key:'glutes',        name:'Glutes / Hips',  x:100, y:190, r:13 },
+  { key:'bicep_left',    name:'Left Bicep',     x:48,  y:95,  r:10 },
+  { key:'bicep_right',   name:'Right Bicep',    x:152, y:95,  r:10 },
+  { key:'forearm_left',  name:'Left Forearm',   x:41,  y:152, r:9  },
+  { key:'forearm_right', name:'Right Forearm',  x:159, y:152, r:9  },
+  { key:'thigh_left',    name:'Left Thigh',     x:78,  y:228, r:12 },
+  { key:'thigh_right',   name:'Right Thigh',    x:122, y:228, r:12 },
+  { key:'calf_left',     name:'Left Calf',      x:75,  y:320, r:10 },
+  { key:'calf_right',    name:'Right Calf',     x:125, y:320, r:10 },
+];
+const SITE_MAP = {}; SITES.forEach(s => SITE_MAP[s.key] = s);
+
+let currentUser = null;
+let measurements = []; // all rows from body_measurements
+let realtimeChannel = null;
+let activeLogSite = null;
+const recentLocalWriteIds = new Set();
+function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
+
+(async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div></div>';
+    return;
+  }
+  buildBodySvg();
+  populateTrendSiteSelect();
+  document.getElementById('export-to').value = easternDateInputValue();
+  document.getElementById('export-from').value = easternDateMinusDays(60);
+  buildExportSiteChecks();
+
+  measurements = await fetchRows('body_measurements', currentUser.id, 'taken_at', true);
+  renderTrack();
+  renderHistory();
+
+  realtimeChannel = subscribeToTable('body_measurements', currentUser.id, handleRealtimeChange);
+})();
+
+function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwn = recentLocalWriteIds.has(id);
+  if (payload.eventType === 'INSERT') { if (!measurements.some(m=>m.id===payload.new.id)) measurements.push(payload.new); }
+  else if (payload.eventType === 'UPDATE') { const i=measurements.findIndex(m=>m.id===payload.new.id); if(i>=0) measurements[i]=payload.new; }
+  else if (payload.eventType === 'DELETE') { measurements = measurements.filter(m=>m.id!==payload.old.id); }
+  renderTrack();
+  if (document.getElementById('page-history').classList.contains('active')) renderHistory();
+  if (document.getElementById('page-trends').classList.contains('active')) renderTrend();
+  if (!isOwn) showToast('Updated from another device', 'success');
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('page-'+name).classList.add('active');
+  if (name === 'history') renderHistory();
+  if (name === 'trends') renderTrend();
+}
+
+function easternDateMinusDays(days) {
+  const d = new Date(easternDateInputValue() + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0,10);
+}
+
+// ══════════════════════════════════════════════════
+//  BODY DIAGRAM
+// ══════════════════════════════════════════════════
+function buildBodySvg() {
+  const svg = document.getElementById('body-svg');
+  const bodyShape = `
+    <circle cx="100" cy="28" r="18" fill="var(--body-fill)"/>
+    <rect x="93" y="44" width="14" height="12" fill="var(--body-fill)"/>
+    <path d="M70,56 Q100,50 130,56 L135,178 Q100,188 65,178 Z" fill="var(--body-fill)"/>
+    <path d="M70,60 Q50,90 48,140 Q47,160 45,178 L60,181 Q63,150 65,120 Q68,90 80,65 Z" fill="var(--body-fill)"/>
+    <path d="M130,60 Q150,90 152,140 Q153,160 155,178 L140,181 Q137,150 135,120 Q132,90 120,65 Z" fill="var(--body-fill)"/>
+    <path d="M68,180 Q60,230 62,300 Q63,340 65,378 L85,378 Q83,330 84,290 Q85,230 92,182 Z" fill="var(--body-fill)"/>
+    <path d="M132,180 Q140,230 138,300 Q137,340 135,378 L115,378 Q117,330 116,290 Q115,230 108,182 Z" fill="var(--body-fill)"/>
+  `;
+  const hotspots = SITES.map(s => `
+    <g class="hotspot-group" onclick="openLogModal('${s.key}')" style="cursor:pointer">
+      <circle class="hotspot" id="hs-${s.key}" cx="${s.x}" cy="${s.y}" r="${s.r}"></circle>
+    </g>
+  `).join('');
+  svg.innerHTML = bodyShape + hotspots;
+}
+
+function refreshHotspotStyling() {
+  const todayStr = easternDateInputValue();
+  SITES.forEach(s => {
+    const rows = measurements.filter(m => m.site === s.key);
+    const el = document.getElementById('hs-'+s.key);
+    if (!el) return;
+    el.classList.remove('has-data','measured-today');
+    if (rows.some(r => r.taken_at === todayStr)) el.classList.add('measured-today');
+    else if (rows.length) el.classList.add('has-data');
+  });
+}
+
+function renderTrack() {
+  refreshHotspotStyling();
+  const todayStr = easternDateInputValue();
+  const todays = measurements.filter(m => m.taken_at === todayStr);
+  const card = document.getElementById('today-card');
+  const list = document.getElementById('today-list');
+  if (!todays.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = todays.map(m => `
+    <div class="today-list-row">
+      <div class="today-site-name">${SITE_MAP[m.site]?.name || m.site}</div>
+      <div class="today-val">${m.value} cm</div>
+      <button class="btn-icon" onclick="openLogModal('${m.site}')" title="Edit">✏️</button>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  LOG MODAL — saving upserts by (site, date): re-measuring the
+//  same site on the same day corrects that day's entry rather than
+//  creating a duplicate row.
+// ══════════════════════════════════════════════════
+function openLogModal(siteKey) {
+  activeLogSite = siteKey;
+  const site = SITE_MAP[siteKey];
+  document.getElementById('log-modal-title').textContent = site.name;
+  const todayStr = easternDateInputValue();
+  const existingToday = measurements.find(m => m.site === siteKey && m.taken_at === todayStr);
+  document.getElementById('log-value').value = existingToday ? existingToday.value : '';
+  document.getElementById('log-date').value = todayStr;
+  document.getElementById('log-modal').classList.add('show');
+}
+function closeLogModal() {
+  document.getElementById('log-modal').classList.remove('show');
+  activeLogSite = null;
+}
+
+async function saveLogModal() {
+  const value = parseFloat(document.getElementById('log-value').value);
+  const date = document.getElementById('log-date').value;
+  if (isNaN(value) || value <= 0) { showToast('Enter a valid measurement', 'error'); return; }
+  if (!date) { showToast('Please pick a date', 'error'); return; }
+
+  const btn = document.getElementById('log-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const existing = measurements.find(m => m.site === activeLogSite && m.taken_at === date);
+    if (existing) {
+      const updated = await updateRow('body_measurements', existing.id, { value });
+      markLocalWrite(updated.id);
+      const i = measurements.findIndex(m => m.id === existing.id); if (i>=0) measurements[i] = updated;
+    } else {
+      const inserted = await insertRow('body_measurements', {
+        user_id: currentUser.id, site: activeLogSite, value, unit:'cm', taken_at: date,
+      });
+      markLocalWrite(inserted.id);
+      measurements.push(inserted);
+    }
+    renderTrack();
+    closeLogModal();
+    showToast('Saved ✓', 'success');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════════
+function renderHistory() {
+  const el = document.getElementById('history-content');
+  if (!measurements.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📏</div><div class="empty-title">No measurements yet</div><div class="empty-sub">Tap a spot on the Track tab to log your first one.</div></div>`;
+    return;
+  }
+  const byDate = {};
+  measurements.forEach(m => { if (!byDate[m.taken_at]) byDate[m.taken_at] = []; byDate[m.taken_at].push(m); });
+  const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+  el.innerHTML = dates.map(d => `
+    <div class="hist-day-label">${fmtDateLong(d)}</div>
+    ${byDate[d].map(m => `
+      <div class="hist-row">
+        <div class="hist-site">${SITE_MAP[m.site]?.name || m.site}</div>
+        <div class="hist-val">${m.value} cm</div>
+        <button class="btn-icon" onclick="editHistoryEntry('${m.id}')" title="Edit">✏️</button>
+        <button class="btn-icon" onclick="deleteHistoryEntry('${m.id}')" title="Delete">🗑</button>
+      </div>`).join('')}
+  `).join('');
+}
+
+function fmtDateLong(dateStr) {
+  return new Date(dateStr+'T00:00:00Z').toLocaleDateString('en-US', { timeZone:'UTC', month:'long', day:'numeric', year:'numeric' });
+}
+
+async function editHistoryEntry(id) {
+  const m = measurements.find(x => x.id === id);
+  if (!m) return;
+  const input = prompt(`New value for ${SITE_MAP[m.site]?.name || m.site} (cm):`, m.value);
+  if (input === null) return;
+  const val = parseFloat(input);
+  if (isNaN(val) || val <= 0) { alert('Please enter a valid number'); return; }
+  try {
+    const updated = await updateRow('body_measurements', id, { value: val });
+    markLocalWrite(updated.id);
+    const i = measurements.findIndex(x => x.id === id); if (i>=0) measurements[i] = updated;
+    renderHistory(); renderTrack();
+    showToast('Updated ✓', 'success');
+  } catch (e) { showToast('Update failed: ' + e.message, 'error'); }
+}
+
+async function deleteHistoryEntry(id) {
+  if (!confirm('Delete this measurement?')) return;
+  try {
+    await deleteRow('body_measurements', id);
+    markLocalWrite(id);
+    measurements = measurements.filter(x => x.id !== id);
+    renderHistory(); renderTrack();
+    showToast('Deleted', 'success');
+  } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
+}
+
+// ══════════════════════════════════════════════════
+//  TRENDS
+// ══════════════════════════════════════════════════
+function populateTrendSiteSelect() {
+  const sel = document.getElementById('trend-site-select');
+  sel.innerHTML = SITES.map(s => `<option value="${s.key}">${s.name}</option>`).join('');
+}
+
+let trendChart = null;
+function renderTrend() {
+  const siteKey = document.getElementById('trend-site-select').value;
+  const rows = measurements.filter(m => m.site === siteKey).sort((a,b) => a.taken_at.localeCompare(b.taken_at));
+  const el = document.getElementById('trend-content');
+  if (trendChart) { try{trendChart.destroy();}catch(e){} trendChart = null; }
+
+  if (rows.length < 2) {
+    el.innerHTML = `<div class="card"><div class="empty"><div class="empty-icon">📈</div><div class="empty-title">Not enough history yet</div><div class="empty-sub">Log this site at least twice to see a trend.</div></div></div>`;
+    return;
+  }
+  const first = rows[0].value, latest = rows[rows.length-1].value;
+  const change = latest - first;
+  const sign = change >= 0 ? '+' : '';
+  el.innerHTML = `
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-label">Latest</div><div class="stat-val">${latest}</div></div>
+        <div class="stat-card"><div class="stat-label">First Logged</div><div class="stat-val">${first}</div></div>
+        <div class="stat-card"><div class="stat-label">Change</div><div class="stat-val" style="color:${change>0?'var(--good)':change<0?'var(--danger)':'var(--ink)'}">${sign}${change.toFixed(1)}</div></div>
+      </div>
+      <div class="chart-wrap"><canvas id="trend-canvas"></canvas></div>
+    </div>`;
+
+  trendChart = new Chart(document.getElementById('trend-canvas'), {
+    type:'line',
+    data:{ labels: rows.map(r=>fmtDateLong(r.taken_at).replace(/, \d{4}$/,'')), datasets:[
+      { label: SITE_MAP[siteKey].name + ' (cm)', data: rows.map(r=>r.value), borderColor:'#C9456A', backgroundColor:'rgba(201,69,106,0.08)', borderWidth:2.5, pointRadius:4, fill:true, tension:0.3 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ y:{ grid:{color:'#E8EFF5'} }, x:{ grid:{display:false} } }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════
+function buildExportSiteChecks() {
+  const el = document.getElementById('export-site-checks');
+  el.innerHTML = SITES.map(s => `
+    <label class="export-site-check">
+      <input type="checkbox" class="export-site-cb" value="${s.key}" checked> ${s.name}
+    </label>`).join('');
+}
+
+let exportCharts = {};
+function generateExport() {
+  const from = document.getElementById('export-from').value;
+  const to = document.getElementById('export-to').value;
+  if (!from || !to) { showToast('Please pick both dates', 'error'); return; }
+  if (from > to) { showToast('"From" date is after "To" date', 'error'); return; }
+  const selectedSites = Array.from(document.querySelectorAll('.export-site-cb:checked')).map(cb => cb.value);
+  if (!selectedSites.length) { showToast('Select at least one site', 'error'); return; }
+
+  const reportEl = document.getElementById('export-report');
+  let html = `<div class="export-header"><h1>PLTS Care — Body Measurements Report</h1><p>${fmtDateLong(from)} – ${fmtDateLong(to)} · Generated ${fmtDateLong(easternDateInputValue())}</p></div>`;
+  selectedSites.forEach(key => {
+    html += `<div class="export-section"><h3>${SITE_MAP[key].name}</h3><div class="export-chart-wrap"><canvas id="export-${key}-chart"></canvas></div><div id="export-${key}-table"></div></div>`;
+  });
+  reportEl.innerHTML = html;
+
+  Object.values(exportCharts).forEach(c => { try{c.destroy();}catch(e){} });
+  exportCharts = {};
+
+  selectedSites.forEach(key => {
+    const rows = measurements.filter(m => m.site === key && m.taken_at >= from && m.taken_at <= to)
+      .sort((a,b) => a.taken_at.localeCompare(b.taken_at));
+    const tableEl = document.getElementById(`export-${key}-table`);
+    if (!rows.length) {
+      tableEl.innerHTML = '<div class="empty" style="padding:10px 0;font-size:12.5px">No measurements in this range</div>';
+      return;
+    }
+    exportCharts[key] = new Chart(document.getElementById(`export-${key}-chart`).getContext('2d'), {
+      type:'line',
+      data:{ labels: rows.map(r=>fmtDateLong(r.taken_at).replace(/, \d{4}$/,'')), datasets:[
+        { label:'cm', data: rows.map(r=>r.value), borderColor:'#C9456A', backgroundColor:'rgba(201,69,106,0.08)', fill:true, tension:0.3, pointRadius:3, borderWidth:2 },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, animation:false,
+        plugins:{ legend:{display:false} },
+        scales:{ y:{ grid:{color:'#E8EFF5'} }, x:{ grid:{display:false} } }
+      }
+    });
+    tableEl.innerHTML = `<table class="export-table"><tr><th>Date</th><th>Value (cm)</th></tr>${
+      rows.slice().reverse().map(r=>`<tr><td>${fmtDateLong(r.taken_at)}</td><td>${r.value}</td></tr>`).join('')
+    }</table>`;
+  });
+
+  document.getElementById('export-print-btn').style.display = 'inline-flex';
+  showToast('Report generated ✓', 'success');
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => t.className = 'toast', 3200);
+}
+
+window.addEventListener('beforeunload', () => { if (realtimeChannel) sb.removeChannel(realtimeChannel); });
+</script>
+</body>
+</html>

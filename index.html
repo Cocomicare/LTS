@@ -293,6 +293,7 @@ const MODULES = [
   { id:'health',   name:'Early Warning Signal', icon:'📊', file:'health_index.html',         table:'health_index_history', dateField:'computed_at' },
   { id:'assistant',name:'Clinical Assistant', icon:'💬', file:'clinical_assistant.html',     table:null,                   dateField:null },
   { id:'medications',name:'Medications', icon:'💊', file:'medications.html',                table:'medications',          dateField:'refill_date' },
+  { id:'bodymeasure',name:'Body Measurements', icon:'📏', file:'body_measurements.html',     table:'body_measurements',    dateField:'taken_at' },
 ];
 
 // Modules shown as data-driven tracking tiles on the dashboard.
@@ -580,6 +581,15 @@ function renderAssistantTile() {
   const container = document.getElementById('assistant-tile-container');
   if (!container) return;
   let html = '';
+  html += `
+    <div class="ref-tile" onclick="openModule('bodymeasure')" style="margin-bottom:10px">
+      <span class="ref-tile-icon">📏</span>
+      <div>
+        <div class="ref-tile-name">Body Measurements</div>
+        <div class="ref-tile-desc">Track rehab progress — thighs, glutes, calves & more</div>
+      </div>
+      <span class="ref-tile-chevron">→</span>
+    </div>`;
   html += `
     <div class="ref-tile" onclick="openModule('medications')" style="margin-bottom:10px">
       <span class="ref-tile-icon">💊</span>
