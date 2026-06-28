@@ -213,7 +213,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 const SITES = [
   { key:'waist',         name:'Waist',          x:447, y:697,  r:20,
     tip:'Measure around your natural waistline, at the navel. Stand relaxed, don\'t pull the tape tight.' },
-  { key:'glutes',        name:'Glutes',  x:760, y:1000, r:20, leaderTo:{x:653,y:1000},
+  { key:'glutes',        name:'Glutes',  x:653, y:995, r:20, calloutBend:{x:830,y:910}, calloutEnd:{x:1010,y:910},
     tip:'Measure around the widest part of your hips/glutes, standing with feet together.' },
   { key:'bicep_right',   name:'R Bicep',    x:230, y:557,  r:18,
     tip:'Measure at the midpoint between shoulder and elbow, arm relaxed at your side.' },
@@ -294,19 +294,19 @@ function buildBodySvg() {
   const svg = document.getElementById('body-svg');
 
   // Leader lines drawn first so hotspot circles + labels sit on top.
-  const leaders = SITES.filter(s => s.leaderTo).map(s => `
-    <line x1="${s.leaderTo.x}" y1="${s.leaderTo.y}" x2="${s.x}" y2="${s.y}" stroke="#8A9EAF" stroke-width="6" stroke-dasharray="14,10"/>
+  const leaders = SITES.filter(s => s.calloutBend).map(s => `
+    <polyline points="${s.x},${s.y} ${s.calloutBend.x},${s.calloutBend.y} ${s.calloutEnd.x},${s.calloutEnd.y}" fill="none" stroke="#8A9EAF" stroke-width="6" stroke-dasharray="14,10"/>
   `).join('');
 
   const FONT = 58; // viewBox units — at max-width:320px this renders ~21 display px
   const hotspotsAndLabels = SITES.map(s => {
-    const isLeft = s.x < 400 && !s.leaderTo;
-    const isRight = s.x > 500 && !s.leaderTo;
+    const isLeft = s.x < 400 && !s.calloutBend;
+    const isRight = s.x > 500 && !s.calloutBend;
     let labelEl;
     if (s.key === 'waist') {
       labelEl = `<text x="${s.x}" y="${s.y - s.r - 80}" text-anchor="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
-    } else if (s.leaderTo) {
-      labelEl = `<text x="${s.x}" y="${s.y + s.r + 110}" text-anchor="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
+    } else if (s.calloutBend) {
+      labelEl = `<text x="${s.calloutEnd.x + 16}" y="${s.calloutEnd.y}" text-anchor="start" dominant-baseline="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     } else if (isLeft) {
       labelEl = `<text x="${s.x - s.r - 80}" y="${s.y}" text-anchor="end" dominant-baseline="middle" font-size="${FONT}" class="hotspot-label">${s.name}</text>`;
     } else if (isRight) {
