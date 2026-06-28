@@ -101,7 +101,7 @@ textarea{resize:vertical;min-height:60px}
     <p>Forced Expiratory Volume Surveillance</p>
   </div>
   <div style="display:flex;gap:8px">
-    <button class="btn btn-ghost" onclick="exportData()">↓ Export</button>
+    <button class="btn btn-ghost" onclick="showTab('export')">↓ Export</button>
     <button class="btn btn-primary" onclick="showTab('log')">+ New Reading</button>
   </div>
 </header>
@@ -456,15 +456,6 @@ function generateExport() {
 
   document.getElementById('export-print-btn').style.display = 'inline-flex';
   showToast('Report generated ✓', 'success');
-}
-
-function exportData() {
-  if (!sessions.length) { showToast('No data to export','error'); return; }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(sessions,null,2)],{type:'application/json'}));
-  a.download = `fev1_${easternDateInputValue()}.json`;
-  a.click();
-  showToast('Exported ✓');
 }
 
 window.addEventListener('beforeunload', () => {
