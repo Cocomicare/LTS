@@ -307,7 +307,7 @@ function buildBodySvg() {
     const isRight = s.x > 110 && !s.leaderTo;
     let labelEl;
     if (s.key === 'waist') {
-      labelEl = `<text x="${s.x + s.r + 30}" y="${s.y}" text-anchor="start" dominant-baseline="middle" class="hotspot-label">${s.name}</text>`;
+      labelEl = `<text x="${s.x}" y="${s.y - s.r - 8}" text-anchor="middle" class="hotspot-label">${s.name}</text>`;
     } else if (s.leaderTo) {
       // off-body callout (glutes) — label centered below the circle
       labelEl = `<text x="${s.x}" y="${s.y + s.r + 13}" text-anchor="middle" class="hotspot-label">${s.name}</text>`;
