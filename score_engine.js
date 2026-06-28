@@ -137,6 +137,24 @@ function ewsComputeCfdnaScore(latest) {
   return 10;
 }
 
+// Linearly interpolates a score between named calibration points instead
+// of snapping to discrete buckets. `points` is [[x, score], ...] sorted
+// ascending by x. The calibration meaning at each named point is preserved
+// exactly (e.g. "5% off = 85" is still true) — only the space *between*
+// points is now a smooth ramp instead of a flat step with a cliff edge.
+function interpolateScore(x, points) {
+  if (x <= points[0][0]) return points[0][1];
+  for (let i = 1; i < points.length; i++) {
+    if (x <= points[i][0]) {
+      const [x0, y0] = points[i-1], [x1, y1] = points[i];
+      const t = (x - x0) / (x1 - x0);
+      return y0 + t * (y1 - y0);
+    }
+  }
+  return points[points.length - 1][1];
+}
+function round1(n) { return Math.round(n * 10) / 10; }
+
 function ewsComputeParamScore(param, latest, baseline) {
   if (latest === null || latest === undefined) return null;
 
@@ -149,37 +167,21 @@ function ewsComputeParamScore(param, latest, baseline) {
 
   if (param.key === 'spo2') {
     const pctDev = ((base - latest) / base) * 100;
-    if (pctDev <= 0) return 100;
-    if (pctDev <= 0.5) return 95;
-    if (pctDev <= 1.0) return 85;
-    if (pctDev <= 2.0) return 65;
-    if (pctDev <= 3.0) return 40;
-    return Math.max(0, Math.round(20 - (pctDev - 3) * 5));
+    return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[0.5,95],[1.0,85],[2.0,65],[3.0,40],[7,0]])));
   }
   if (param.direction === 'higher_better') {
     const ratio = latest / base;
-    if (ratio >= 0.98) return 100;
-    if (ratio >= 0.95) return 85;
-    if (ratio >= 0.90) return 65;
-    if (ratio >= 0.85) return 40;
-    return Math.max(0, Math.round(ratio * 47));
+    // ratio decreases as things get worse, so points must ascend by ratio.
+    return round1(Math.max(0, interpolateScore(ratio, [[0,0],[0.85,40],[0.90,65],[0.95,85],[0.98,100],[1,100]])));
   }
   if (param.direction === 'lower_better') {
     const pctDev = Math.abs((latest - base) / base) * 100;
-    if (pctDev <= 0.5) return 100;
-    if (pctDev <= 1.0) return 85;
-    if (pctDev <= 1.5) return 65;
-    if (pctDev <= 2.5) return 40;
-  return Math.max(0, Math.round(20 - pctDev * 4));
+    return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[0.5,100],[1.0,85],[1.5,65],[2.5,40],[5,0]])));
   }
   // 'stable' — deviation in EITHER direction is concerning (e.g. CRP, WBC,
   // neutrophils/lymphocytes, heart rate, weight)
   const pctDev = Math.abs((latest - base) / base) * 100;
-  if (pctDev <= 2) return 100;
-  if (pctDev <= 5) return 85;
-  if (pctDev <= 10) return 65;
-  if (pctDev <= 15) return 40;
-  return Math.max(0, Math.round(20 - (pctDev - 15)));
+  return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[2,100],[5,85],[10,65],[15,40],[30,0]])));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -266,7 +268,7 @@ async function ewsComputeAndSave(userId) {
     return { score: null, breakdown, missingCount, missingRequired, settingsRow, historyRows };
   }
 
-  let finalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null;
+  let finalScore = totalWeight > 0 ? round1(weightedSum / totalWeight) : null;
   if (finalScore !== null) finalScore = Math.max(0, Math.min(100, finalScore));
 
   // ── Apply the single-parameter floor rule ──
@@ -279,7 +281,7 @@ async function ewsComputeAndSave(userId) {
       if (b.score === null) continue;
       const floor = EWS_FLOOR_OVERRIDES[b.param.key] ?? EWS_FLOOR_THRESHOLD;
       if (b.score <= floor && b.score < finalScore) {
-        finalScore = Math.round(b.score);
+        finalScore = round1(b.score);
         floorTriggeredBy = b.param.name;
       }
     }
