@@ -6,6 +6,7 @@
 <title>Medications</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 :root {
@@ -104,6 +105,12 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 
 .detail-row { padding:10px 0; border-bottom:1px solid var(--border); }
+.hist-entry-list { margin-top:4px; }
+.hist-entry-row { display:flex; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+.hist-entry-row:last-child { border-bottom:none; }
+.hist-entry-date { color:var(--ink3); font-size:12px; flex-shrink:0; width:90px; }
+.hist-entry-detail { color:var(--ink); font-weight:500; }
+.hist-entry-note { color:var(--ink3); font-weight:400; font-style:italic; }
 .detail-row:last-child { border-bottom:none; }
 .detail-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink3); margin-bottom:3px; }
 .detail-val { font-size:14px; color:var(--ink); line-height:1.5; }
@@ -236,6 +243,20 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   </div>
 </div>
 
+<!-- MEDICATION HISTORY MODAL -->
+<div id="history-modal" style="display:none;position:fixed;inset:0;height:100vh;height:100dvh;background:rgba(20,30,40,0.55);z-index:200;overflow-y:auto;padding:20px;box-sizing:border-box">
+  <div style="max-width:480px;margin:0 auto;padding-bottom:40px">
+    <div class="card">
+      <div class="card-title" id="history-modal-title">History</div>
+      <div class="card-sub">Dosage and frequency changes over time. Tracking starts from when this feature was added — earlier changes aren't included.</div>
+      <div id="history-modal-body"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-ghost" onclick="closeHistoryModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <button class="fab" onclick="showTab('add')" title="Add medication">+</button>
 
@@ -340,6 +361,7 @@ function showDetail(id) {
     <div class="detail-row"><div class="detail-label">Status</div><div class="detail-val">${m.active ? 'Active' : 'Inactive'}</div></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-danger" onclick="deleteMed('${m.id}')">Delete</button>
+      <button class="btn btn-ghost" onclick="showMedHistory('${m.id}', '${m.name.replace(/'/g,"\\'")}')">📈 History</button>
       <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
       <button class="btn btn-primary" onclick="closeDetail(); openForm('${m.id}')">Edit</button>
     </div>`;
@@ -380,6 +402,81 @@ function openForm(id) {
 }
 function closeForm() { document.getElementById('form-modal').style.display = 'none'; }
 
+// ══════════════════════════════════════════════════
+//  MEDICATION HISTORY — a dated record of dosage/frequency changes,
+//  so tapering (e.g. Prednisone stepping down over months) is
+//  visible as a timeline rather than silently overwritten. History
+//  only starts accumulating from whenever this was deployed — past
+//  changes made before that aren't backfilled.
+// ══════════════════════════════════════════════════
+async function recordMedHistory(medicationId, dosage, frequency, note) {
+  try {
+    await insertRow('medication_history', {
+      user_id: currentUser.id, medication_id: medicationId, dosage, frequency,
+      changed_at: new Date().toISOString(), note: note || null,
+    });
+  } catch (e) {
+    console.error('Failed to record medication history:', e);
+  }
+}
+
+// Pulls a leading numeric dose (e.g. "20mg" -> 20) for charting.
+// Medications with non-numeric dosing (e.g. "1 tablet", "as needed")
+// simply won't get a chart — they still get the dated text list.
+function parseDoseNumber(dosage) {
+  if (!dosage) return null;
+  const match = dosage.match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : null;
+}
+
+let historyChart = null;
+async function showMedHistory(medicationId, medName) {
+  document.getElementById('history-modal-title').textContent = medName + ' — History';
+  document.getElementById('history-modal-body').innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
+  document.getElementById('history-modal').classList.add('show');
+
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('medication_history').select('*')
+      .eq('medication_id', medicationId).order('changed_at', { ascending: true });
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    document.getElementById('history-modal-body').innerHTML = `<div class="empty" style="padding:20px 0">Could not load history: ${e.message}</div>`;
+    return;
+  }
+
+  if (!rows.length) {
+    document.getElementById('history-modal-body').innerHTML = `<div class="empty" style="padding:20px 0"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div><div class="empty-sub">Changes made from now on will appear here.</div></div>`;
+    return;
+  }
+
+  const listHtml = rows.slice().reverse().map((r,i) => `
+    <div class="hist-entry-row">
+      <div class="hist-entry-date">${fmtEasternDate(r.changed_at)}</div>
+      <div class="hist-entry-detail">${r.dosage || '—'}${r.frequency ? ' · ' + r.frequency : ''}${r.note ? ' <span class="hist-entry-note">(' + r.note + ')</span>' : ''}</div>
+    </div>`).join('');
+
+  const numericRows = rows.filter(r => parseDoseNumber(r.dosage) !== null);
+  const chartHtml = numericRows.length >= 2
+    ? `<div class="chart-wrap" style="height:180px;margin-bottom:14px"><canvas id="history-chart-canvas"></canvas></div>`
+    : '';
+
+  document.getElementById('history-modal-body').innerHTML = chartHtml + `<div class="hist-entry-list">${listHtml}</div>`;
+
+  if (historyChart) { try{historyChart.destroy();}catch(e){} historyChart = null; }
+  if (numericRows.length >= 2) {
+    historyChart = new Chart(document.getElementById('history-chart-canvas').getContext('2d'), {
+      type:'line',
+      data:{ labels: numericRows.map(r=>fmtEasternDate(r.changed_at)), datasets:[
+        { label:'Dose', data: numericRows.map(r=>parseDoseNumber(r.dosage)), borderColor:'#7B5EA7', backgroundColor:'rgba(123,94,167,0.08)', stepped:true, borderWidth:2.5, pointRadius:4, fill:true },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ grid:{color:'#E8EAF0'} }, x:{ grid:{display:false} } } }
+    });
+  }
+}
+function closeHistoryModal() { document.getElementById('history-modal').classList.remove('show'); }
+
 async function saveForm() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('Name is required', 'error'); return; }
@@ -398,13 +495,18 @@ async function saveForm() {
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     if (editingId) {
+      const before = meds.find(m => m.id === editingId);
       const updated = await updateRow('medications', editingId, fields);
       markLocalWrite(updated.id);
       const i = meds.findIndex(m => m.id === editingId); if (i>=0) meds[i] = updated;
+      if (before && (before.dosage !== fields.dosage || before.frequency !== fields.frequency)) {
+        await recordMedHistory(editingId, fields.dosage, fields.frequency);
+      }
     } else {
       const inserted = await insertRow('medications', { user_id: currentUser.id, ...fields });
       markLocalWrite(inserted.id);
       meds.push(inserted);
+      await recordMedHistory(inserted.id, fields.dosage, fields.frequency, 'Started');
     }
     renderList();
     closeForm();
@@ -487,6 +589,7 @@ async function saveReviewedMeds() {
       });
       markLocalWrite(inserted.id);
       meds.push(inserted);
+      await recordMedHistory(inserted.id, fields.dosage, fields.frequency, 'Started');
     }
     renderList();
     cancelReview();
