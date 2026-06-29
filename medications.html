@@ -440,7 +440,7 @@ async function showMedHistory(medicationId, medName) {
   editingHistoryId = null;
   document.getElementById('history-modal-title').textContent = medName + ' — History';
   document.getElementById('history-modal-body').innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
-  document.getElementById('history-modal').classList.add('show');
+  document.getElementById('history-modal').style.display = 'flex';
   await reloadHistoryModal();
 }
 
@@ -557,7 +557,7 @@ async function deleteHistoryEntry(id) {
   }
 }
 
-function closeHistoryModal() { document.getElementById('history-modal').classList.remove('show'); }
+function closeHistoryModal() { document.getElementById('history-modal').style.display = 'none'; }
 
 async function saveForm() {
   const name = document.getElementById('f-name').value.trim();
