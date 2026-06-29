@@ -40,7 +40,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 (async function init() {
   const user = await getCurrentUser();
   if (!user) {
-    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the LTS Care dashboard to view this guide.</div>';
+    document.getElementById('content').innerHTML = '<div class="empty">🔒 Please log in via the PLTS Care dashboard to view this guide.</div>';
     return;
   }
   document.getElementById('content').innerHTML = `

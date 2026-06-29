@@ -1158,7 +1158,7 @@ dialContainer.addEventListener('click', e => {
 (async function gate() {
   const user = await getCurrentUser();
   if (!user) {
-    document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted);font-family:\'Libre Baskerville\',serif;"><div style="font-size:32px;margin-bottom:12px;">🔒</div><div style="font-size:18px;color:var(--text);margin-bottom:6px;">Please log in</div><div>Open this module from the LTS Care dashboard.</div></div>';
+    document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted);font-family:\'Libre Baskerville\',serif;"><div style="font-size:32px;margin-bottom:12px;">🔒</div><div style="font-size:18px;color:var(--text);margin-bottom:6px;">Please log in</div><div>Open this module from the PLTS Care dashboard.</div></div>';
     return;
   }
   update();
