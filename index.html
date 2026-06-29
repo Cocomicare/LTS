@@ -245,7 +245,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
     <div class="ref-tile" onclick="openModule('refhub')">
       <span class="ref-tile-icon">📖</span>
       <div>
-        <div class="ref-tile-name">Post-Transplant Reference Guide</div>
+        <div class="ref-tile-name">Post Transplant References</div>
         <div class="ref-tile-desc">Medications, nutrition, exercise, immunizations & more</div>
       </div>
       <span class="ref-tile-chevron">→</span>
@@ -675,7 +675,7 @@ async function renderTiles() {
 function openModule(id) {
   const mod = MODULES.find(m => m.id === id);
   const file = mod ? mod.file : REFERENCE_FILES[id];
-  const name = mod ? mod.name : (id === 'refhub' ? 'Reference Guide' : null);
+  const name = mod ? mod.name : (id === 'refhub' ? 'Post Transplant References' : null);
   if (!file) return;
   document.getElementById('screen-dashboard').style.display = 'none';
   document.getElementById('view-module').classList.add('active');
