@@ -430,39 +430,65 @@ function parseDoseNumber(dosage) {
 }
 
 let historyChart = null;
+let currentHistoryMedId = null;
+let currentHistoryMedName = null;
+let editingHistoryId = null;
+
 async function showMedHistory(medicationId, medName) {
+  currentHistoryMedId = medicationId;
+  currentHistoryMedName = medName;
+  editingHistoryId = null;
   document.getElementById('history-modal-title').textContent = medName + ' — History';
   document.getElementById('history-modal-body').innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
   document.getElementById('history-modal').classList.add('show');
+  await reloadHistoryModal();
+}
 
+async function reloadHistoryModal() {
   let rows = [];
   try {
     const { data, error } = await sb.from('medication_history').select('*')
-      .eq('medication_id', medicationId).order('changed_at', { ascending: true });
+      .eq('medication_id', currentHistoryMedId).order('changed_at', { ascending: true });
     if (error) throw error;
     rows = data || [];
   } catch (e) {
     document.getElementById('history-modal-body').innerHTML = `<div class="empty" style="padding:20px 0">Could not load history: ${e.message}</div>`;
     return;
   }
+  renderHistoryModalBody(rows);
+}
 
-  if (!rows.length) {
-    document.getElementById('history-modal-body').innerHTML = `<div class="empty" style="padding:20px 0"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div><div class="empty-sub">Changes made from now on will appear here.</div></div>`;
-    return;
-  }
-
-  const listHtml = rows.slice().reverse().map((r,i) => `
-    <div class="hist-entry-row">
-      <div class="hist-entry-date">${fmtEasternDate(r.changed_at)}</div>
-      <div class="hist-entry-detail">${r.dosage || '—'}${r.frequency ? ' · ' + r.frequency : ''}${r.note ? ' <span class="hist-entry-note">(' + r.note + ')</span>' : ''}</div>
-    </div>`).join('');
-
+function renderHistoryModalBody(rows) {
   const numericRows = rows.filter(r => parseDoseNumber(r.dosage) !== null);
   const chartHtml = numericRows.length >= 2
     ? `<div class="chart-wrap" style="height:180px;margin-bottom:14px"><canvas id="history-chart-canvas"></canvas></div>`
     : '';
 
-  document.getElementById('history-modal-body').innerHTML = chartHtml + `<div class="hist-entry-list">${listHtml}</div>`;
+  const listHtml = rows.length ? rows.slice().reverse().map(r => `
+    <div class="hist-entry-row">
+      <div class="hist-entry-date">${fmtEasternDate(r.changed_at)}</div>
+      <div class="hist-entry-detail">${r.dosage || '—'}${r.frequency ? ' · ' + r.frequency : ''}${r.note ? ' <span class="hist-entry-note">(' + r.note + ')</span>' : ''}</div>
+      <button class="btn-icon" onclick='openHistoryEntryForm(${JSON.stringify(r).replace(/'/g,"&apos;")})' title="Edit">✏️</button>
+      <button class="btn-icon" onclick="deleteHistoryEntry('${r.id}')" title="Delete">🗑</button>
+    </div>`).join('')
+    : `<div class="empty" style="padding:14px 0"><div class="empty-sub">No history yet — add one below, or changes made from now on will appear here automatically.</div></div>`;
+
+  document.getElementById('history-modal-body').innerHTML = `
+    ${chartHtml}
+    <div class="hist-entry-list">${listHtml}</div>
+    <button class="btn btn-ghost" style="margin-top:12px;width:100%;justify-content:center" onclick="openHistoryEntryForm(null)">+ Add a Past Entry</button>
+    <div id="history-entry-form" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+      <div class="field-group"><label>Date</label><input type="date" id="he-date"></div>
+      <div class="field-row">
+        <div class="field-group"><label>Dosage</label><input type="text" id="he-dosage" placeholder="e.g. 5mg"></div>
+        <div class="field-group"><label>Frequency</label><input type="text" id="he-frequency" placeholder="e.g. Twice daily"></div>
+      </div>
+      <div class="field-group"><label>Note (optional)</label><input type="text" id="he-note" placeholder="e.g. Reduced per coordinator"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeHistoryEntryForm()">Cancel</button>
+        <button class="btn btn-primary" id="he-save-btn" onclick="saveHistoryEntry()">Save</button>
+      </div>
+    </div>`;
 
   if (historyChart) { try{historyChart.destroy();}catch(e){} historyChart = null; }
   if (numericRows.length >= 2) {
@@ -475,6 +501,62 @@ async function showMedHistory(medicationId, medName) {
     });
   }
 }
+
+function openHistoryEntryForm(row) {
+  editingHistoryId = row ? row.id : null;
+  document.getElementById('he-date').value = row ? easternDateInputValue(row.changed_at) : easternDateInputValue();
+  document.getElementById('he-dosage').value = row ? (row.dosage || '') : '';
+  document.getElementById('he-frequency').value = row ? (row.frequency || '') : '';
+  document.getElementById('he-note').value = row ? (row.note || '') : '';
+  document.getElementById('history-entry-form').style.display = 'block';
+  document.getElementById('history-entry-form').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function closeHistoryEntryForm() {
+  editingHistoryId = null;
+  document.getElementById('history-entry-form').style.display = 'none';
+}
+
+async function saveHistoryEntry() {
+  const date = document.getElementById('he-date').value;
+  const dosage = document.getElementById('he-dosage').value.trim();
+  const frequency = document.getElementById('he-frequency').value.trim();
+  const note = document.getElementById('he-note').value.trim();
+  if (!date) { showToast('Please pick a date', 'error'); return; }
+  if (!dosage && !frequency) { showToast('Enter at least a dosage or frequency', 'error'); return; }
+
+  const btn = document.getElementById('he-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const changed_at = parseEasternDateTime(date, '00:00');
+    if (editingHistoryId) {
+      await updateRow('medication_history', editingHistoryId, { dosage, frequency, note: note || null, changed_at });
+    } else {
+      await insertRow('medication_history', {
+        user_id: currentUser.id, medication_id: currentHistoryMedId,
+        dosage, frequency, note: note || null, changed_at,
+      });
+    }
+    closeHistoryEntryForm();
+    await reloadHistoryModal();
+    showToast('Saved ✓', 'success');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+async function deleteHistoryEntry(id) {
+  if (!confirm('Delete this history entry?')) return;
+  try {
+    await deleteRow('medication_history', id);
+    await reloadHistoryModal();
+    showToast('Deleted', 'success');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
 function closeHistoryModal() { document.getElementById('history-modal').classList.remove('show'); }
 
 async function saveForm() {
