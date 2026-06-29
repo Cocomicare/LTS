@@ -45,9 +45,11 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 @keyframes bounce { 0%,80%,100% { transform:translateY(0); opacity:.4; } 40% { transform:translateY(-4px); opacity:1; } }
 
 .input-bar { background:var(--surface); border-top:1px solid var(--border); padding:12px 16px; flex-shrink:0; }
-.input-row { display:flex; gap:8px; max-width:640px; margin:0 auto; align-items:flex-end; }
-.input-row textarea { flex:1; resize:none; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:14px; min-height:64px; max-height:160px; overflow-y:auto; background:var(--bg); line-height:1.4; }
-.input-row textarea:focus { outline:none; border-color:var(--accent); }
+.input-stack { display:flex; flex-direction:column; gap:8px; max-width:640px; margin:0 auto; }
+.input-stack textarea { width:100%; resize:none; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:14px; min-height:64px; max-height:160px; overflow-y:auto; background:var(--bg); line-height:1.4; box-sizing:border-box; }
+.input-stack textarea:focus { outline:none; border-color:var(--accent); }
+.input-btn-row { display:flex; gap:8px; align-items:center; }
+.input-btn-row .send-btn { margin-left:auto; }
 .send-btn { background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer; flex-shrink:0; }
 .send-btn:disabled { opacity:.5; cursor:not-allowed; }
 .upload-btn { background:none; border:1.5px solid var(--border); color:var(--ink2); border-radius:var(--radius-sm); padding:10px 12px; font-size:16px; cursor:pointer; flex-shrink:0; }
@@ -94,13 +96,15 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 </div>
 
 <div class="input-bar">
-  <div class="input-row">
-    <button class="upload-btn" onclick="document.getElementById('doc-file-input').click()" title="Upload a reference document (image or PDF)">📎</button>
-    <button class="upload-btn" onclick="pasteFromClipboardAssistant()" title="Paste an image from clipboard">📋</button>
-    <button class="upload-btn" id="mic-btn" onclick="toggleVoiceInput()" title="Speak your question">🎤</button>
-    <input type="file" id="doc-file-input" accept="image/*,application/pdf" onchange="onDocFileSelected(event)">
+  <div class="input-stack">
     <textarea id="question-input" placeholder="Ask a question…" rows="3" onkeydown="handleInputKeydown(event)" oninput="autoGrowQuestionInput(this)"></textarea>
-    <button class="send-btn" id="send-btn" onclick="sendQuestion()">Send</button>
+    <div class="input-btn-row">
+      <button class="upload-btn" onclick="document.getElementById('doc-file-input').click()" title="Upload a reference document (image or PDF)">📎</button>
+      <button class="upload-btn" onclick="pasteFromClipboardAssistant()" title="Paste an image from clipboard">📋</button>
+      <button class="upload-btn" id="mic-btn" onclick="toggleVoiceInput()" title="Speak your question">🎤</button>
+      <input type="file" id="doc-file-input" accept="image/*,application/pdf" onchange="onDocFileSelected(event)">
+      <button class="send-btn" id="send-btn" onclick="sendQuestion()">Send</button>
+    </div>
   </div>
 </div>
 
