@@ -103,14 +103,10 @@ textarea{resize:vertical;min-height:60px}
     <h1>FEV1</h1>
     <p>Forced Expiratory Volume Surveillance</p>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-ghost" onclick="showTab('export')">↓ Export</button>
-    <button class="btn btn-primary" onclick="showTab('log')">+ New Reading</button>
-  </div>
 </header>
 
 <div class="tabs">
-  <button class="tab active" id="tab-log" onclick="showTab('log')">Log Reading</button>
+  <button class="tab active" id="tab-log" onclick="showTab('log')">Log</button>
   <button class="tab" id="tab-history" onclick="showTab('history')">History</button>
   <button class="tab" id="tab-trends" onclick="showTab('trends')">Trends</button>
   <button class="tab" id="tab-export" onclick="showTab('export')">📄 Export</button>
