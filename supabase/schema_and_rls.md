@@ -234,6 +234,30 @@ already been patched.
 
 ---
 
+## Edge Function secrets
+
+Checked via Supabase Dashboard → Edge Functions → Secrets on June 29, 2026.
+
+**Custom secrets (1):**
+| name | used by | last updated |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `extract-labs`, `clinical-assistant` (both functions share this single secret) | Jun 21, 2026 |
+
+**Default secrets:** `SUPABASE_URL`, `SUPABASE_DB_URL`, `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS`, `SUPABASE_ANON_KEY` (deprecated), `SUPABASE_SERVICE_ROLE_KEY` (deprecated), `SUPABASE_JWKS`, `SB_REGION`, `SB_EXECUTION_ID`, `DENO_DEPLOYMENT_ID` — these are reserved/auto-provided to every Supabase project, not specific to this app, and need no action.
+
+A from-scratch rebuild needs exactly one manual step here:
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref osasglxowihoygidhgwc
+```
+
+## Storage buckets
+
+**None.** Confirmed via Supabase Dashboard → Storage on June 29, 2026 —
+no buckets exist. All file uploads (lab reports, medication labels,
+etc.) are sent as base64 directly to the relevant Edge Function for
+extraction and are never persisted as files in Supabase Storage or
+anywhere else; only the extracted structured data is saved to Postgres.
+
 ## Database functions & triggers
 
 **None exist.** Checked via `pg_proc`/`information_schema.triggers` on
