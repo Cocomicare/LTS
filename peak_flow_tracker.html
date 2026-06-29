@@ -33,6 +33,9 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .page{display:none;padding:20px;max-width:580px;margin:0 auto}
 .page.active{display:block}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px}
+.time-select-row { display:flex; align-items:center; gap:4px; }
+.time-select { background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 6px; font-size:14px; font-family:inherit; color:var(--ink); flex:1; min-width:0; }
+.time-select-sep { font-weight:600; color:var(--ink2); flex-shrink:0; }
 .export-field-row { display:flex; gap:12px; margin-bottom:14px; }
 .export-field { flex:1; }
 .export-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink2); display:block; margin-bottom:6px; }
@@ -124,7 +127,12 @@ textarea{resize:vertical;min-height:60px}
       </div>
       <div class="form-group">
         <label>Time</label>
-        <input type="time" id="sessionTime">
+        <div class="time-select-row">
+          <select class="time-select" id="sessionTime-hour"></select>
+          <span class="time-select-sep">:</span>
+          <select class="time-select" id="sessionTime-min"></select>
+          <select class="time-select" id="sessionTime-ampm"></select>
+        </div>
       </div>
     </div>
   </div>
@@ -277,8 +285,9 @@ function daysSince(iso) {
 }
 
 function initForm() {
+  buildTimeSelectOptions('sessionTime-hour', 'sessionTime-min', 'sessionTime-ampm');
   document.getElementById('sessionDate').value = easternDateInputValue();
-  document.getElementById('sessionTime').value = easternTimeInputValue();
+  setTimeSelectValue('sessionTime-hour', 'sessionTime-min', 'sessionTime-ampm', easternTimeInputValue());
   document.getElementById('fev1Val').value = '';
   document.getElementById('saveBtn').disabled = true;
   document.getElementById('saveBtn').textContent = 'Save Reading';
@@ -306,7 +315,7 @@ function addEntryForDate() {
 
 async function saveSession() {
   const date  = document.getElementById('sessionDate').value;
-  const time  = document.getElementById('sessionTime').value || '00:00';
+  const time  = getTimeSelectValue('sessionTime-hour', 'sessionTime-min', 'sessionTime-ampm');
   const fev1  = parseFloat(document.getElementById('fev1Val').value);
 
   if (!date) { showToast('Please select a date','error'); return; }
@@ -370,7 +379,7 @@ function editSession(id) {
   if (!s) return;
   editingId = id;
   document.getElementById('sessionDate').value = easternDateInputValue(s.taken_at);
-  document.getElementById('sessionTime').value = easternTimeInputValue(s.taken_at);
+  setTimeSelectValue('sessionTime-hour', 'sessionTime-min', 'sessionTime-ampm', easternTimeInputValue(s.taken_at));
   document.getElementById('fev1Val').value = s.fev1 ?? '';
   document.getElementById('saveBtn').disabled = false;
   document.getElementById('saveBtn').textContent = 'Update Reading';

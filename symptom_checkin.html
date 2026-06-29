@@ -39,6 +39,9 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .nudge.none { background:var(--surface2); color:var(--ink3); }
 
 .checkin-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:14px; border-left:4px solid var(--sym); }
+.time-select-row { display:flex; align-items:center; gap:4px; }
+.time-select { background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 6px; font-size:14px; font-family:inherit; color:var(--ink); flex:1; min-width:0; }
+.time-select-sep { font-weight:600; color:var(--ink2); flex-shrink:0; }
 .export-field-row { display:flex; gap:12px; margin-bottom:14px; }
 .export-field { flex:1; }
 .export-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; color:var(--ink2); display:block; margin-bottom:6px; }
@@ -198,7 +201,12 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
       </div>
       <div style="flex:1">
         <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Time</label>
-        <input type="time" id="checkin-time" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%">
+        <div class="time-select-row">
+          <select class="time-select" id="checkin-time-hour"></select>
+          <span class="time-select-sep">:</span>
+          <select class="time-select" id="checkin-time-min"></select>
+          <select class="time-select" id="checkin-time-ampm"></select>
+        </div>
       </div>
     </div>
     <div id="symptom-groups-container"></div>
@@ -317,10 +325,11 @@ const recentLocalWriteIds = new Set(); // ids this tab just wrote, to suppress d
 //  INIT
 // ══════════════════════════════════════════════════
 (async function init() {
+  buildTimeSelectOptions('checkin-time-hour', 'checkin-time-min', 'checkin-time-ampm');
   document.getElementById('checkin-date-display').textContent =
     fmtEasternDate(new Date().toISOString(), {weekday:'long', month:'long', day:'numeric'});
   document.getElementById('checkin-date').value = easternDateInputValue();
-  document.getElementById('checkin-time').value = easternTimeInputValue();
+  setTimeSelectValue('checkin-time-hour', 'checkin-time-min', 'checkin-time-ampm', easternTimeInputValue());
   document.getElementById('export-to').value = easternDateInputValue();
   document.getElementById('export-from').value = easternDateMinusDays(30);
 
@@ -498,7 +507,7 @@ async function saveCheckin() {
   const score = calcWellness(vals);
   const notes = document.getElementById('checkin-notes').value.trim();
   const date = document.getElementById('checkin-date').value;
-  const time = document.getElementById('checkin-time').value || '00:00';
+  const time = getTimeSelectValue('checkin-time-hour', 'checkin-time-min', 'checkin-time-ampm');
   const btn = document.getElementById('save-btn');
 
   if (!date) { showToast('Please select a date', 'error'); return; }
@@ -541,7 +550,7 @@ function editCheckin(id) {
   if (!r) return;
   editingId = id;
   document.getElementById('checkin-date').value = easternDateInputValue(r.taken_at);
-  document.getElementById('checkin-time').value = easternTimeInputValue(r.taken_at);
+  setTimeSelectValue('checkin-time-hour', 'checkin-time-min', 'checkin-time-ampm', easternTimeInputValue(r.taken_at));
   document.getElementById('checkin-notes').value = r.notes || '';
   SYMPTOMS.forEach(s => {
     const val = r.symptoms ? r.symptoms[s.key] : s.defaultVal;
@@ -564,7 +573,7 @@ function resetCheckin() {
   editingId = null;
   document.getElementById('save-btn').textContent = 'Save Check-in';
   document.getElementById('checkin-date').value = easternDateInputValue();
-  document.getElementById('checkin-time').value = easternTimeInputValue();
+  setTimeSelectValue('checkin-time-hour', 'checkin-time-min', 'checkin-time-ampm', easternTimeInputValue());
 }
 
 // ══════════════════════════════════════════════════

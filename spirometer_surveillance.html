@@ -44,7 +44,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
 .form-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px; }
 label { font-size:11px; font-weight:500; color:var(--ink2); letter-spacing:.3px; text-transform:uppercase; }
-input[type="date"], input[type="time"] { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); width:100%; }
+input[type="date"] { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); width:100%; }
+.time-select-row { display:flex; align-items:center; gap:4px; }
+.time-select { background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 6px; font-size:14px; font-family:inherit; color:var(--ink); flex:1; min-width:0; }
+.time-select-sep { font-weight:600; color:var(--ink2); flex-shrink:0; }
 input:focus { outline:none; border-color:var(--spiro); }
 
 .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all .15s; }
@@ -128,7 +131,14 @@ input:focus { outline:none; border-color:var(--spiro); }
     </div>
     <div class="form-row">
       <div class="form-group"><label>Date</label><input type="date" id="log-date"></div>
-      <div class="form-group"><label>Time</label><input type="time" id="log-time"></div>
+      <div class="form-group"><label>Time</label>
+        <div class="time-select-row">
+          <select class="time-select" id="log-time-hour"></select>
+          <span class="time-select-sep">:</span>
+          <select class="time-select" id="log-time-min"></select>
+          <select class="time-select" id="log-time-ampm"></select>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="clearLog()">Clear</button>
@@ -240,8 +250,9 @@ function showTab(name) {
 //  FORM
 // ══════════════════════════════════════════════════
 function initLogForm() {
+  buildTimeSelectOptions('log-time-hour', 'log-time-min', 'log-time-ampm');
   document.getElementById('log-date').value = easternDateInputValue();
-  document.getElementById('log-time').value = easternTimeInputValue();
+  setTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm', easternTimeInputValue());
   document.getElementById('volume-val').value = '';
   document.getElementById('save-btn').disabled = true;
   document.getElementById('save-btn').textContent = 'Save Session';
@@ -268,7 +279,7 @@ function onVolInput() {
 
 async function saveSession() {
   const date = document.getElementById('log-date').value;
-  const time = document.getElementById('log-time').value || '00:00';
+  const time = getTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm');
   const vol  = parseFloat(document.getElementById('volume-val').value);
   if (!date) { showToast('Please select a date', 'error'); return; }
   if (isNaN(vol)) { showToast('Enter a volume', 'error'); return; }
@@ -311,7 +322,7 @@ function editSession(id) {
   if (!s) return;
   editingId = id;
   document.getElementById('log-date').value = easternDateInputValue(s.taken_at);
-  document.getElementById('log-time').value = easternTimeInputValue(s.taken_at);
+  setTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm', easternTimeInputValue(s.taken_at));
   document.getElementById('volume-val').value = volumeOf(s) ?? '';
   document.getElementById('save-btn').disabled = false;
   document.getElementById('save-btn').textContent = 'Update Session';

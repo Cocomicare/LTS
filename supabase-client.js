@@ -246,3 +246,46 @@ function fmtEasternTime(iso, opts) {
 function isEasternToday(iso) {
   return easternDateInputValue(iso) === easternDateInputValue();
 }
+
+// ══════════════════════════════════════════════════
+//  CUSTOM TIME-SELECT HELPERS
+//  Native <input type="time"> pickers are inconsistent across mobile
+//  browsers — some Android/Chrome combinations render a clock dialog
+//  with no visible confirm button at all, leaving the field stuck.
+//  These helpers back a simple 3-dropdown (hour/minute/AM-PM) input
+//  instead, which renders identically everywhere and always has a
+//  reachable way to set a value.
+// ══════════════════════════════════════════════════
+
+/** Populates the hour/minute/AM-PM <select> elements with their options. Call once at page init. */
+function buildTimeSelectOptions(hourId, minId, ampmId) {
+  const hourEl = document.getElementById(hourId);
+  const minEl = document.getElementById(minId);
+  const ampmEl = document.getElementById(ampmId);
+  if (!hourEl || !minEl || !ampmEl) return;
+  hourEl.innerHTML = Array.from({ length: 12 }, (_, i) => i + 1)
+    .map(h => `<option value="${h}">${h}</option>`).join('');
+  minEl.innerHTML = Array.from({ length: 60 }, (_, i) => i)
+    .map(m => `<option value="${m}">${String(m).padStart(2, '0')}</option>`).join('');
+  ampmEl.innerHTML = `<option value="AM">AM</option><option value="PM">PM</option>`;
+}
+
+/** Reads the three selects and returns a 24-hour "HH:MM" string. */
+function getTimeSelectValue(hourId, minId, ampmId) {
+  let h = parseInt(document.getElementById(hourId).value, 10);
+  const m = parseInt(document.getElementById(minId).value, 10);
+  const ampm = document.getElementById(ampmId).value;
+  if (ampm === 'AM') { if (h === 12) h = 0; } else { if (h !== 12) h += 12; }
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+
+/** Sets the three selects from a 24-hour "HH:MM" string (defaults to 00:00 if blank). */
+function setTimeSelectValue(hourId, minId, ampmId, timeStr) {
+  if (!timeStr) timeStr = '00:00';
+  const [hh, mm] = timeStr.split(':').map(Number);
+  let h12 = hh % 12; if (h12 === 0) h12 = 12;
+  const ampm = hh < 12 ? 'AM' : 'PM';
+  document.getElementById(hourId).value = String(h12);
+  document.getElementById(minId).value = String(mm);
+  document.getElementById(ampmId).value = ampm;
+}

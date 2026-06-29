@@ -93,7 +93,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
 .form-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px; }
 label { font-size:11px; font-weight:500; color:var(--ink2); letter-spacing:.3px; text-transform:uppercase; }
-input[type="date"], input[type="time"] { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); width:100%; }
+input[type="date"] { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); width:100%; }
+.time-select-row { display:flex; align-items:center; gap:4px; }
+.time-select { background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 6px; font-size:14px; font-family:inherit; color:var(--ink); flex:1; min-width:0; }
+.time-select-sep { font-weight:600; color:var(--ink2); flex-shrink:0; }
 input:focus { outline:none; border-color:var(--accent); }
 
 .sync-note { font-size:11px; color:var(--ink3); text-align:center; margin-bottom:10px; }
@@ -245,7 +248,14 @@ function buildVitalPages() {
         ${inputsHtml}
         <div class="form-row" style="margin-top:14px">
           <div class="form-group"><label>Date</label><input type="date" id="${v}-date"></div>
-          <div class="form-group"><label>Time</label><input type="time" id="${v}-time"></div>
+          <div class="form-group"><label>Time</label>
+            <div class="time-select-row">
+              <select class="time-select" id="${v}-time-hour"></select>
+              <span class="time-select-sep">:</span>
+              <select class="time-select" id="${v}-time-min"></select>
+              <select class="time-select" id="${v}-time-ampm"></select>
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
           <button class="btn btn-ghost" onclick="clearVitalForm('${v}')">Clear</button>
@@ -292,8 +302,9 @@ function buildVitalPages() {
 })();
 
 function initVitalDateTime(vital) {
+  buildTimeSelectOptions(vital+'-time-hour', vital+'-time-min', vital+'-time-ampm');
   document.getElementById(vital+'-date').value = easternDateInputValue();
-  document.getElementById(vital+'-time').value = easternTimeInputValue();
+  setTimeSelectValue(vital+'-time-hour', vital+'-time-min', vital+'-time-ampm', easternTimeInputValue());
 }
 
 function handleRealtimeChange(payload) {
@@ -417,7 +428,7 @@ const editState = {}; // vital -> {sysId, diaId} or {id} when editing existing r
 async function saveVital(vital) {
   const m = VITAL_META[vital];
   const date = document.getElementById(vital+'-date').value;
-  const time = document.getElementById(vital+'-time').value || '00:00';
+  const time = getTimeSelectValue(vital+'-time-hour', vital+'-time-min', vital+'-time-ampm');
   if (!date) { showToast('Please select a date', 'error'); return; }
   const taken_at = parseEasternDateTime(date, time);
   const btn = document.getElementById(vital+'-save-btn');
@@ -478,14 +489,14 @@ function editReading(vital, key) {
     document.getElementById(vital+'-sys').value = p.sys;
     document.getElementById(vital+'-dia').value = p.dia;
     document.getElementById(vital+'-date').value = easternDateInputValue(p.taken_at);
-    document.getElementById(vital+'-time').value = easternTimeInputValue(p.taken_at);
+    setTimeSelectValue(vital+'-time-hour', vital+'-time-min', vital+'-time-ampm', easternTimeInputValue(p.taken_at));
   } else {
     const row = readings.find(r => r.id === key);
     if (!row) return;
     editState[vital] = { id: row.id };
     document.getElementById(vital+'-val').value = row.value;
     document.getElementById(vital+'-date').value = easternDateInputValue(row.taken_at);
-    document.getElementById(vital+'-time').value = easternTimeInputValue(row.taken_at);
+    setTimeSelectValue(vital+'-time-hour', vital+'-time-min', vital+'-time-ampm', easternTimeInputValue(row.taken_at));
   }
   document.getElementById(vital+'-save-btn').disabled = false;
   document.getElementById(vital+'-save-btn').textContent = 'Update Reading';

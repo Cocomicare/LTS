@@ -16,6 +16,9 @@
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+.time-select-row { display:flex; align-items:center; gap:4px; }
+.time-select { background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:9px 6px; font-size:14px; font-family:inherit; color:var(--ink); flex:1; min-width:0; }
+.time-select-sep { font-weight:600; color:var(--ink2); flex-shrink:0; }
 header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
 .logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
 .logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:0.5px; margin-left:8px; }
@@ -105,7 +108,12 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
       </div>
       <div style="flex:1">
         <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Time</label>
-        <input type="time" id="log-time" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);width:100%">
+        <div class="time-select-row">
+          <select class="time-select" id="log-time-hour"></select>
+          <span class="time-select-sep">:</span>
+          <select class="time-select" id="log-time-min"></select>
+          <select class="time-select" id="log-time-ampm"></select>
+        </div>
       </div>
     </div>
 
@@ -187,9 +195,10 @@ function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => rece
 //  INIT
 // ══════════════════════════════════════════════════
 (async function init() {
+  buildTimeSelectOptions('log-time-hour', 'log-time-min', 'log-time-ampm');
   document.getElementById('date-display').textContent = fmtEasternDate(new Date().toISOString(), {weekday:'long', month:'long', day:'numeric'});
   document.getElementById('log-date').value = easternDateInputValue();
-  document.getElementById('log-time').value = easternTimeInputValue();
+  setTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm', easternTimeInputValue());
 
   renderScaleGroups();
 
@@ -264,7 +273,7 @@ async function saveLog() {
     return;
   }
   const date = document.getElementById('log-date').value;
-  const time = document.getElementById('log-time').value || '00:00';
+  const time = getTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm');
   const notes = document.getElementById('log-notes').value.trim();
   if (!date) { showToast('Please select a date', 'error'); return; }
   const taken_at = parseEasternDateTime(date, time);
@@ -309,7 +318,7 @@ function clearLog() {
   editingId = null;
   document.getElementById('save-btn').textContent = 'Save Entry';
   document.getElementById('log-date').value = easternDateInputValue();
-  document.getElementById('log-time').value = easternTimeInputValue();
+  setTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm', easternTimeInputValue());
 }
 
 function editLog(id) {
@@ -321,7 +330,7 @@ function editLog(id) {
   selectScale('volume', l.volume_score);
   document.getElementById('log-notes').value = l.notes || '';
   document.getElementById('log-date').value = easternDateInputValue(l.taken_at);
-  document.getElementById('log-time').value = easternTimeInputValue(l.taken_at);
+  setTimeSelectValue('log-time-hour', 'log-time-min', 'log-time-ampm', easternTimeInputValue(l.taken_at));
   document.getElementById('save-btn').textContent = 'Update Entry';
   showTab('log');
   window.scrollTo(0,0);
