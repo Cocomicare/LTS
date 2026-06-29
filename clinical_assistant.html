@@ -46,7 +46,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 .input-bar { background:var(--surface); border-top:1px solid var(--border); padding:12px 16px; flex-shrink:0; }
 .input-row { display:flex; gap:8px; max-width:640px; margin:0 auto; align-items:flex-end; }
-.input-row textarea { flex:1; resize:none; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:14px; max-height:100px; background:var(--bg); }
+.input-row textarea { flex:1; resize:none; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:14px; min-height:64px; max-height:160px; overflow-y:auto; background:var(--bg); line-height:1.4; }
 .input-row textarea:focus { outline:none; border-color:var(--accent); }
 .send-btn { background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer; flex-shrink:0; }
 .send-btn:disabled { opacity:.5; cursor:not-allowed; }
@@ -99,7 +99,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
     <button class="upload-btn" onclick="pasteFromClipboardAssistant()" title="Paste an image from clipboard">📋</button>
     <button class="upload-btn" id="mic-btn" onclick="toggleVoiceInput()" title="Speak your question">🎤</button>
     <input type="file" id="doc-file-input" accept="image/*,application/pdf" onchange="onDocFileSelected(event)">
-    <textarea id="question-input" placeholder="Ask a question…" rows="1" onkeydown="handleInputKeydown(event)"></textarea>
+    <textarea id="question-input" placeholder="Ask a question…" rows="3" onkeydown="handleInputKeydown(event)" oninput="autoGrowQuestionInput(this)"></textarea>
     <button class="send-btn" id="send-btn" onclick="sendQuestion()">Send</button>
   </div>
 </div>
@@ -240,6 +240,7 @@ function setupVoiceInput() {
     let transcript = '';
     for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
     input.value = baseText + transcript;
+    autoGrowQuestionInput(input);
   };
 
   recognizer.onerror = (e) => {
@@ -266,6 +267,15 @@ function toggleVoiceInput() {
   }
 }
 
+// Grows the textarea with content up to the CSS max-height, beyond
+// which it scrolls internally (overflow-y:auto handles that part) —
+// so the box always shows what's actually being typed instead of
+// staying pinned at a single visible line.
+function autoGrowQuestionInput(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
 function handleInputKeydown(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -274,7 +284,9 @@ function handleInputKeydown(e) {
 }
 
 function askSuggested(el) {
-  document.getElementById('question-input').value = el.textContent;
+  const qInput = document.getElementById('question-input');
+  qInput.value = el.textContent;
+  autoGrowQuestionInput(qInput);
   sendQuestion();
 }
 
@@ -306,6 +318,7 @@ async function sendQuestion() {
   const question = input.value.trim();
   if (!question) return;
   input.value = '';
+  input.style.height = 'auto';
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
 
