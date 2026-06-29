@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contacts</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --teal:#0D5C6B; --teal-bg:#E5F0F2; --danger:#C94040; --danger-bg:#FAEAEA; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.back-link { display:inline-block; font-size:13px; color:var(--teal); text-decoration:none; font-weight:600; margin-bottom:6px; }
+.page { padding:20px 16px 50px; max-width:640px; margin:0 auto; }
+.intro { font-size:13px; color:var(--ink3); margin-bottom:16px; line-height:1.5; }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; border:none; font-family:'DM Sans',sans-serif; }
+.btn-primary { background:var(--teal); color:#fff; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:none; border:1.5px solid var(--border); color:var(--ink2); }
+.btn-icon { background:none; border:none; color:var(--ink3); cursor:pointer; font-size:15px; padding:4px; }
+.btn-icon:hover { color:var(--teal); }
+.btn-icon.danger:hover { color:var(--danger); }
+
+.add-bar { margin-bottom:16px; }
+
+.form-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
+.form-card-title { font-family:'DM Serif Display',serif; font-size:16px; margin-bottom:14px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group.full { grid-column:1/-1; }
+label { font-size:11px; font-weight:600; color:var(--ink3); text-transform:uppercase; letter-spacing:.05em; }
+input { padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-family:'DM Sans',sans-serif; font-size:14px; background:var(--bg); color:var(--ink); outline:none; width:100%; }
+input:focus { border-color:var(--teal); }
+.form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:6px; }
+@media(max-width:480px) { .form-row { grid-template-columns:1fr; } }
+
+.contact-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; display:flex; align-items:flex-start; gap:12px; }
+.contact-icon { font-size:20px; flex-shrink:0; margin-top:1px; }
+.contact-info { flex:1; min-width:0; }
+.contact-name { font-size:14px; font-weight:600; color:var(--ink); }
+.contact-role { font-size:12px; color:var(--teal); font-weight:600; margin-top:1px; }
+.contact-detail { font-size:13px; color:var(--ink2); margin-top:5px; display:flex; align-items:center; gap:6px; }
+.contact-detail a { color:var(--ink2); text-decoration:none; }
+.contact-detail a:hover { color:var(--teal); text-decoration:underline; }
+.contact-actions { display:flex; gap:4px; flex-shrink:0; }
+
+.empty { text-align:center; padding:50px 20px; color:var(--ink3); }
+.empty-icon { font-size:32px; margin-bottom:10px; }
+.empty-title { font-family:'DM Serif Display',serif; font-size:16px; color:var(--ink2); margin-bottom:5px; }
+
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px; z-index:999; opacity:0; transition:all .25s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.toast.success { background:#2D9E6B; }
+.toast.error { background:var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <a href="reference_hub.html" class="back-link">← Reference Guide</a><br>
+  <div class="logo-title">Contacts</div>
+  <div class="logo-sub">Care Team Directory</div>
+</header>
+<div class="page">
+  <div class="intro" id="intro">Your transplant care team's contact information — coordinator, transplant physician, pharmacy, and anyone else you want quick access to. Saved to your account and synced across all your devices.</div>
+
+  <div class="add-bar">
+    <button class="btn btn-primary" id="add-toggle-btn" onclick="showAddForm()">+ Add Contact</button>
+  </div>
+
+  <div class="form-card" id="form-card" style="display:none">
+    <div class="form-card-title" id="form-title">Add Contact</div>
+    <div class="form-row">
+      <div class="form-group full">
+        <label>Name</label>
+        <input type="text" id="f-name" placeholder="e.g. Dr. Sarah Chen">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group full">
+        <label>Role / Relationship</label>
+        <input type="text" id="f-role" placeholder="e.g. Transplant Coordinator">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" id="f-phone" placeholder="(352) 555-0100">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="f-email" placeholder="name@ufhealth.org">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideAddForm()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveContact()">Save Contact</button>
+    </div>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentUser = null;
+let contacts = [];
+let realtimeChannel = null;
+let editingId = null;
+const recentLocalWriteIds = new Set();
+function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
+
+(async function init() {
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this page from the PLTS Care dashboard.</div></div>';
+    return;
+  }
+  contacts = await fetchRows('care_team_contacts', currentUser.id, 'created_at', true);
+  renderContacts();
+  realtimeChannel = subscribeToTable('care_team_contacts', currentUser.id, handleRealtimeChange);
+})();
+
+function handleRealtimeChange(payload) {
+  const id = payload.new ? payload.new.id : payload.old.id;
+  const isOwn = recentLocalWriteIds.has(id);
+  if (payload.eventType === 'INSERT') { if (!contacts.some(c=>c.id===payload.new.id)) contacts.push(payload.new); }
+  else if (payload.eventType === 'UPDATE') { const i=contacts.findIndex(c=>c.id===payload.new.id); if(i>=0) contacts[i]=payload.new; else contacts.push(payload.new); }
+  else if (payload.eventType === 'DELETE') { contacts = contacts.filter(c=>c.id!==payload.old.id); }
+  contacts.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  renderContacts();
+  if (!isOwn) showToast('Updated from another device', 'success');
+}
+
+function showAddForm() {
+  editingId = null;
+  document.getElementById('form-title').textContent = 'Add Contact';
+  document.getElementById('save-btn').textContent = 'Save Contact';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-role').value = '';
+  document.getElementById('f-phone').value = '';
+  document.getElementById('f-email').value = '';
+  document.getElementById('form-card').style.display = 'block';
+  document.getElementById('add-toggle-btn').style.display = 'none';
+  document.getElementById('f-name').focus();
+}
+
+function hideAddForm() {
+  editingId = null;
+  document.getElementById('form-card').style.display = 'none';
+  document.getElementById('add-toggle-btn').style.display = 'inline-flex';
+}
+
+function editContact(id) {
+  const c = contacts.find(x => x.id === id);
+  if (!c) return;
+  editingId = id;
+  document.getElementById('form-title').textContent = 'Edit Contact';
+  document.getElementById('save-btn').textContent = 'Update Contact';
+  document.getElementById('f-name').value = c.name || '';
+  document.getElementById('f-role').value = c.role || '';
+  document.getElementById('f-phone').value = c.phone || '';
+  document.getElementById('f-email').value = c.email || '';
+  document.getElementById('form-card').style.display = 'block';
+  document.getElementById('add-toggle-btn').style.display = 'none';
+  document.getElementById('form-card').scrollIntoView({ behavior:'smooth', block:'start' });
+  document.getElementById('f-name').focus();
+}
+
+async function saveContact() {
+  const name = document.getElementById('f-name').value.trim();
+  const role = document.getElementById('f-role').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+
+  if (!name) { showToast('Name is required', 'error'); return; }
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = editingId ? 'Updating…' : 'Saving…';
+
+  try {
+    if (editingId) {
+      const updated = await updateRow('care_team_contacts', editingId, { name, role, phone, email });
+      markLocalWrite(updated.id);
+      const i = contacts.findIndex(c => c.id === editingId);
+      if (i >= 0) contacts[i] = updated;
+      showToast('Contact updated ✓', 'success');
+    } else {
+      const inserted = await insertRow('care_team_contacts', { user_id: currentUser.id, name, role, phone, email });
+      markLocalWrite(inserted.id);
+      contacts.push(inserted);
+      showToast('Contact added ✓', 'success');
+    }
+    renderContacts();
+    hideAddForm();
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = editingId ? 'Update Contact' : 'Save Contact';
+  }
+}
+
+async function deleteContact(id) {
+  if (!confirm('Delete this contact?')) return;
+  try {
+    await deleteRow('care_team_contacts', id);
+    markLocalWrite(id);
+    contacts = contacts.filter(c => c.id !== id);
+    renderContacts();
+    showToast('Deleted');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderContacts() {
+  const el = document.getElementById('content');
+  if (!contacts.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📇</div><div class="empty-title">No contacts yet</div><div class="empty-sub">Add your transplant coordinator, physician, pharmacy, and more.</div></div>`;
+    return;
+  }
+  el.innerHTML = contacts.map(c => `
+    <div class="contact-card">
+      <span class="contact-icon">👤</span>
+      <div class="contact-info">
+        <div class="contact-name">${escapeHtml(c.name)}</div>
+        ${c.role ? `<div class="contact-role">${escapeHtml(c.role)}</div>` : ''}
+        ${c.phone ? `<div class="contact-detail">📞 <a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a></div>` : ''}
+        ${c.email ? `<div class="contact-detail">✉️ <a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a></div>` : ''}
+      </div>
+      <div class="contact-actions">
+        <button class="btn-icon" onclick="editContact('${c.id}')" title="Edit">✏️</button>
+        <button class="btn-icon danger" onclick="deleteContact('${c.id}')" title="Delete">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => t.className = 'toast', 3200);
+}
+
+window.addEventListener('beforeunload', () => { if (realtimeChannel) sb.removeChannel(realtimeChannel); });
+</script>
+</body>
+</html>
