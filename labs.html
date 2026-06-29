@@ -26,6 +26,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .tab { padding:11px 14px; font-size:12px; font-weight:500; color:var(--ink2); cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }
 .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
 .page { display:none; padding:20px 16px 40px; max-width:600px; margin:0 auto; }
+.review-actions-sticky { position:sticky; bottom:0; background:var(--bg); padding:12px 0 8px; margin-top:16px; border-top:1px solid var(--border); z-index:10; }
 .page.active { display:block; }
 .sync-note { font-size:11px; color:var(--ink3); text-align:center; margin-bottom:10px; }
 
@@ -153,7 +154,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
       </div>
     </div>
     <div id="extract-rows"></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+    <div class="review-actions-sticky" style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="resetUpload()">Cancel</button>
       <button class="btn btn-primary" id="save-extract-btn" onclick="saveExtractedValues()">Save Selected Values</button>
     </div>
