@@ -234,6 +234,20 @@ already been patched.
 
 ---
 
+## Database functions & triggers
+
+**None exist.** Checked via `pg_proc`/`information_schema.triggers` on
+June 29, 2026 — zero custom functions, zero triggers in the `public`
+schema. All logic lives at the app layer.
+
+In particular, `updated_at` columns are **not** auto-maintained by the
+database — they're set manually by the shared `updateRow()` helper in
+`supabase-client.js`, which appends `updated_at: new Date().toISOString()`
+to every update call. Since every module routes writes through this one
+helper, this is reliable — but if a future module ever calls
+`sb.from(...).update(...)` directly instead of through `updateRow()`,
+its `updated_at` would silently go stale.
+
 ## Re-running this snapshot
 
 ```sql
@@ -258,4 +272,24 @@ select relname as table_name, relrowsecurity as rls_enabled
 from pg_class
 where relnamespace = 'public'::regnamespace and relkind = 'r'
 order by relname;
+```
+
+```sql
+-- Custom database functions
+select p.proname as function_name, pg_get_function_arguments(p.oid) as arguments,
+  pg_get_function_result(p.oid) as returns, l.lanname as language
+from pg_proc p
+join pg_namespace n on p.pronamespace = n.oid
+join pg_language l on p.prolang = l.oid
+where n.nspname = 'public'
+order by p.proname;
+```
+
+```sql
+-- Triggers on your tables
+select event_object_table as table_name, trigger_name, action_timing,
+  event_manipulation as fires_on, action_statement
+from information_schema.triggers
+where trigger_schema = 'public'
+order by event_object_table, trigger_name;
 ```
