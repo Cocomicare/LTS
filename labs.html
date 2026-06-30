@@ -97,6 +97,11 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .btn-mychart:hover { background:#244870; }
 .paste-hint { font-size:11px; color:var(--ink3); text-align:center; margin-top:10px; }
 .new-key-row .extract-name { font-style:italic; }
+.review-group { border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px; background:var(--bg); }
+.review-group-date-row { display:flex; gap:10px; margin-bottom:12px; }
+.review-group-notes { font-size:12px; color:var(--ink2); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-top:10px; line-height:1.5; }
+.review-group-notes-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink3); margin-bottom:3px; }
+.hist-notes { font-size:11.5px; color:var(--ink2); background:var(--surface2); border-radius:6px; padding:7px 10px; margin:-4px 0 8px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -123,7 +128,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
   <div class="card" id="upload-card">
     <div class="card-title">📷 Upload Lab Report(s)</div>
-    <div class="card-sub">Select multiple screenshots or PDFs at once — e.g. a CBC and a Metabolic Panel together — and they'll all be read in one pass. We extract every value we can find, not just the ones used for scoring.</div>
+    <div class="card-sub">Select multiple screenshots or PDFs at once — e.g. a CBC and a Metabolic Panel together, or a formal PFT/spirometry report from the lab. We extract every value we can find. If a PFT report includes a historical trend table, every past date in it gets extracted as its own entry automatically.</div>
     <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
       <div class="icon">🧪</div>
       <div class="label">Tap to choose files</div>
@@ -153,23 +158,8 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
   <div class="card" id="review-card" style="display:none">
     <div class="card-title">Review Extracted Values</div>
-    <div class="card-sub">Uncheck anything that looks wrong, or correct the number directly. Only checked rows will be saved. <strong>Signal</strong> values feed your Early Warning Signal score; <strong>Reference</strong> values are stored for your records and for the Clinical Assistant, but don't affect scoring.</div>
-    <div style="display:flex;gap:12px;margin-bottom:16px">
-      <div style="flex:1">
-        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Date Drawn</label>
-        <input type="date" id="review-date" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;width:100%">
-      </div>
-      <div style="flex:1">
-        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Time</label>
-        <div class="time-select-row">
-          <select class="time-select" id="review-time-hour"></select>
-          <span class="time-select-sep">:</span>
-          <select class="time-select" id="review-time-min"></select>
-          <select class="time-select" id="review-time-ampm"></select>
-        </div>
-      </div>
-    </div>
-    <div id="extract-rows"></div>
+    <div class="card-sub">Uncheck anything that looks wrong, or correct the number directly. Only checked rows will be saved. <strong>Signal</strong> values feed your Early Warning Signal score; <strong>Reference</strong> values are stored for your records and for the Clinical Assistant, but don't affect scoring. Reports like a PFT trend table that include several past dates will show up as separate date groups below — review each one.</div>
+    <div id="review-groups"></div>
     <div class="review-actions-sticky" style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="resetUpload()">Cancel</button>
       <button class="btn btn-primary" id="save-extract-btn" onclick="saveExtractedValues()">Save Selected Values</button>
@@ -257,18 +247,27 @@ const LAB_PARAMS = {
   iga:                { name:'IgA', unit:'mg/dL' },
   igm:                { name:'IgM', unit:'mg/dL' },
   tac_trough:         { name:'Tacrolimus/Cyclosporine Trough', unit:'ng/mL' },
+
+  // ── Pulmonary Function Test (formal lab-administered spirometry) ──
+  // Distinct from the home Spirometer/FEV1 modules (separate tables,
+  // separate devices) — these come from UF Health PFT lab reports and
+  // include parameters the home device doesn't measure at all.
+  pft_fvc:            { name:'PFT — FVC', unit:'L' },
+  pft_fev1:           { name:'PFT — FEV1', unit:'L' },
+  pft_fev1_fvc_ratio: { name:'PFT — FEV1/FVC', unit:'%' },
+  pft_fef2575:        { name:'PFT — FEF25-75%', unit:'L/s' },
+  pft_pef:            { name:'PFT — PEF', unit:'L/s' },
+  pft_dlco:           { name:'PFT — DLCO', unit:'mL/min/mmHg' },
 };
 
 let currentUser = null;
 let labs = [];
 let realtimeChannel = null;
-let extractedItems = [];
 let selectedFiles = [];
 const recentLocalWriteIds = new Set();
 function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
 
 (async function init() {
-  buildTimeSelectOptions('review-time-hour', 'review-time-min', 'review-time-ampm');
   currentUser = await getCurrentUser();
   if (!currentUser) {
     document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the PLTS Care dashboard.</div></div>';
@@ -414,7 +413,7 @@ function removeFile(i) {
 
 function resetUpload() {
   selectedFiles = [];
-  extractedItems = [];
+  reviewGroups = [];
   document.getElementById('file-input').value = '';
   document.getElementById('upload-card').style.display = 'block';
   document.getElementById('preview-card').style.display = 'none';
@@ -459,21 +458,30 @@ async function runExtraction() {
 
     const knownList = Object.entries(LAB_PARAMS).map(([k,v]) => `${k} ("${v.name}"${v.unit?`, unit ~${v.unit}`:''})`).join(', ');
 
-    const prompt = `These images/PDFs are lab results report(s) for a lung transplant patient — there may be multiple separate panels (e.g. a CBC and a Metabolic Panel) included together, possibly across several files.
+    const prompt = `These images/PDFs are medical report(s) for a lung transplant patient — could be bloodwork (e.g. a CBC and a Metabolic Panel), or a Pulmonary Function Test (PFT/spirometry) report, possibly across several files.
 
-Extract EVERY numeric lab value you can find across ALL the provided files — do not limit yourself to a fixed list. For each value found:
-- If it matches one of these known parameters (match by common lab names/abbreviations), use the exact key given: ${knownList}
-- If it doesn't match any known parameter, invent a short, descriptive snake_case key for it yourself (e.g. "magnesium", "vitamin_d_25oh") and use the lab report's own label as a guide.
+Extract EVERY numeric value you can find across ALL the provided files — do not limit yourself to a fixed list. For each value found:
+- If it matches one of these known parameters (match by common lab/PFT names or abbreviations), use the exact key given: ${knownList}
+- If it doesn't match any known parameter, invent a short, descriptive snake_case key for it yourself (e.g. "magnesium", "vitamin_d_25oh") and use the report's own label as a guide.
+
+IMPORTANT — PFT reports often include a "Trend Data" or "Trend Graph" table showing several PAST visit dates (e.g. a table of FVC/FEV1/FEF25-75 or DLCO values across multiple dates going back months or years). If you see a table like that, extract EVERY date row in it as its OWN separate record — don't just extract the most recent one. Each date becomes a separate entry in the "records" array below, each with its own set of values.
+
+If the report includes a physician's written interpretation, impression, or significant technician comments (e.g. "possible restriction", "ATS standards not met", quality grade flags), include a short plain-text summary of that as "notes" on the record for that specific test date — only on the date that interpretation actually applies to.
 
 Respond with ONLY a raw JSON object, no other text, no markdown fences, in this exact shape:
 {
-  "collection_date": "YYYY-MM-DD or null if not visible",
-  "values": [
-    { "key": "neutrophils_abs", "value": 4.1, "unit": "K/uL", "label": "Neutrophils Absolute" }
+  "records": [
+    {
+      "date": "YYYY-MM-DD",
+      "notes": "Optional short summary of physician interpretation or quality flags for this date, or null",
+      "values": [
+        { "key": "pft_fev1", "value": 1.59, "unit": "L", "label": "FEV1" }
+      ]
+    }
   ]
 }
 
-Every entry in "values" must include a human-readable "label" (use the known parameter's name if it matched one, otherwise use the name as it appeared on the report). If a value appears in more than one of the files, include it once using the most recent/clearest instance. If you find nothing at all, return an empty values array.`;
+Every value must include a human-readable "label" (use the known parameter's name if it matched one, otherwise the name as it appeared on the report). If the same value appears in more than one of the files for the SAME date, include it once using the clearest instance. If a single file contains a current result plus a historical trend table, that's multiple records — one per date. If you find nothing at all, return an empty records array.`;
 
     const { data: sessionData } = await sb.auth.getSession();
     const accessToken = sessionData?.session?.access_token;
@@ -514,81 +522,148 @@ Every entry in "values" must include a human-readable "label" (use the known par
   }
 }
 
+// ══════════════════════════════════════════════════
+//  REVIEW — supports MULTIPLE date groups from one upload, since a
+//  PFT report's embedded trend table can backfill several past
+//  visit dates in a single extraction. Each group gets its own
+//  date/time picker and its own checklist. A plain bloodwork upload
+//  just produces a single group, same as before.
+// ══════════════════════════════════════════════════
+let reviewGroups = []; // [{ date, notes, items:[{key,name,value,unit,signal,isNew}] }]
+
 function showReview(parsed) {
   document.getElementById('loading-card').style.display = 'none';
   document.getElementById('review-card').style.display = 'block';
 
-  const collectionDate = parsed.collection_date && parsed.collection_date !== 'null' ? parsed.collection_date : easternDateInputValue();
-  document.getElementById('review-date').value = collectionDate;
-  setTimeSelectValue('review-time-hour', 'review-time-min', 'review-time-ampm', '00:00');
+  // Back-compat: tolerate the old single-record shape if it's ever returned.
+  const records = Array.isArray(parsed.records) ? parsed.records
+    : (parsed.values ? [{ date: parsed.collection_date, notes: null, values: parsed.values }] : []);
 
-  extractedItems = (parsed.values || []).map(v => {
-    const known = LAB_PARAMS[v.key];
+  reviewGroups = records.map(rec => {
+    const items = (rec.values || []).map(v => {
+      const known = LAB_PARAMS[v.key];
+      return {
+        key: v.key,
+        name: known ? known.name : (v.label || v.key),
+        value: v.value,
+        unit: v.unit || (known ? known.unit : ''),
+        signal: known ? !!known.signal : false,
+        isNew: !known,
+      };
+    });
     return {
-      key: v.key,
-      name: known ? known.name : (v.label || v.key),
-      value: v.value,
-      unit: v.unit || (known ? known.unit : ''),
-      signal: known ? !!known.signal : false,
-      isNew: !known,
+      date: (rec.date && rec.date !== 'null') ? rec.date : easternDateInputValue(),
+      notes: (rec.notes && rec.notes !== 'null') ? rec.notes : null,
+      items,
     };
-  });
+  }).filter(g => g.items.length);
 
-  const rowsEl = document.getElementById('extract-rows');
-  if (!extractedItems.length) {
-    rowsEl.innerHTML = `<div class="empty" style="padding:20px"><div class="empty-icon">🤷</div><div class="empty-title">Nothing recognized</div><div class="empty-sub">Try clearer or more zoomed-in images.</div></div>`;
+  // Newest date first, so today's result (if present) appears at the top.
+  reviewGroups.sort((a,b) => b.date.localeCompare(a.date));
+
+  renderReviewGroups();
+}
+
+function renderReviewGroups() {
+  const container = document.getElementById('review-groups');
+  if (!reviewGroups.length) {
+    container.innerHTML = `<div class="empty" style="padding:20px"><div class="empty-icon">🤷</div><div class="empty-title">Nothing recognized</div><div class="empty-sub">Try clearer or more zoomed-in images.</div></div>`;
     return;
   }
 
-  const signalItems = extractedItems.filter(i => i.signal);
-  const refItems = extractedItems.filter(i => !i.signal);
-
-  function rowHtml(item, i) {
+  function rowHtml(item, g, i) {
     return `
       <div class="extract-row${item.isNew ? ' new-key-row' : ''}">
-        <input type="checkbox" class="extract-check" id="ec-${i}" checked>
+        <input type="checkbox" class="extract-check" id="ec-${g}-${i}" checked>
         <div class="extract-name">${item.name}</div>
-        <input type="number" step="0.01" class="extract-input" id="ev-${i}" value="${item.value}">
+        <input type="number" step="0.01" class="extract-input" id="ev-${g}-${i}" value="${item.value}">
         <div class="extract-unit">${item.unit}</div>
       </div>`;
   }
 
-  let html = '';
-  if (signalItems.length) {
-    html += `<div class="section-label"><span class="signal-dot"></span> Signal — feeds Early Warning Signal</div>`;
-    html += signalItems.map(item => rowHtml(item, extractedItems.indexOf(item))).join('');
-  }
-  if (refItems.length) {
-    html += `<div class="section-label"><span class="ref-dot"></span> Reference — stored only</div>`;
-    html += refItems.map(item => rowHtml(item, extractedItems.indexOf(item))).join('');
-  }
-  rowsEl.innerHTML = html;
+  container.innerHTML = reviewGroups.map((group, g) => {
+    const signalItems = group.items.filter(i => i.signal);
+    const refItems = group.items.filter(i => !i.signal);
+    let rowsHtml = '';
+    if (signalItems.length) {
+      rowsHtml += `<div class="section-label"><span class="signal-dot"></span> Signal — feeds Early Warning Signal</div>`;
+      rowsHtml += signalItems.map(item => rowHtml(item, g, group.items.indexOf(item))).join('');
+    }
+    if (refItems.length) {
+      rowsHtml += `<div class="section-label"><span class="ref-dot"></span> Reference — stored only</div>`;
+      rowsHtml += refItems.map(item => rowHtml(item, g, group.items.indexOf(item))).join('');
+    }
+    return `
+      <div class="review-group">
+        <div class="review-group-date-row">
+          <div style="flex:1">
+            <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Date${reviewGroups.length>1 ? ` — Group ${g+1} of ${reviewGroups.length}` : ' Drawn'}</label>
+            <input type="date" class="review-group-date" id="rg-date-${g}" value="${group.date}" style="background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;width:100%">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink2);display:block;margin-bottom:6px">Time</label>
+            <div class="time-select-row">
+              <select class="time-select" id="rg-hour-${g}"></select>
+              <span class="time-select-sep">:</span>
+              <select class="time-select" id="rg-min-${g}"></select>
+              <select class="time-select" id="rg-ampm-${g}"></select>
+            </div>
+          </div>
+        </div>
+        ${rowsHtml}
+        ${group.notes ? `<div class="review-group-notes"><div class="review-group-notes-label">📋 Interpretation / Notes</div>${group.notes}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  // Build time-select options per group (12:00 AM default — most reports are date-only anyway).
+  reviewGroups.forEach((g, i) => {
+    buildTimeSelectOptions(`rg-hour-${i}`, `rg-min-${i}`, `rg-ampm-${i}`);
+    setTimeSelectValue(`rg-hour-${i}`, `rg-min-${i}`, `rg-ampm-${i}`, '00:00');
+  });
 }
 
 async function saveExtractedValues() {
-  const date = document.getElementById('review-date').value;
-  const time = getTimeSelectValue('review-time-hour', 'review-time-min', 'review-time-ampm');
-  if (!date) { showToast('Please select a date', 'error'); return; }
-  const taken_at = parseEasternDateTime(date, time);
+  if (!reviewGroups.length) { showToast('Nothing to save', 'error'); return; }
 
-  const toSave = extractedItems
-    .map((item, i) => ({ ...item, checked: document.getElementById(`ec-${i}`).checked, value: parseFloat(document.getElementById(`ev-${i}`).value) }))
-    .filter(item => item.checked && !isNaN(item.value));
-
-  if (!toSave.length) { showToast('Nothing checked to save', 'error'); return; }
+  // Validate every group has a date before saving any of them.
+  for (let g = 0; g < reviewGroups.length; g++) {
+    if (!document.getElementById(`rg-date-${g}`).value) {
+      showToast(`Please select a date for group ${g+1}`, 'error');
+      return;
+    }
+  }
 
   const btn = document.getElementById('save-extract-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
+  let totalSaved = 0;
   try {
-    for (const item of toSave) {
-      const inserted = await insertRow('lab_results', {
-        user_id: currentUser.id, lab_type: item.key, value: item.value, unit: item.unit, taken_at,
-      });
-      markLocalWrite(inserted.id);
-      labs.push(inserted);
+    for (let g = 0; g < reviewGroups.length; g++) {
+      const group = reviewGroups[g];
+      const date = document.getElementById(`rg-date-${g}`).value;
+      const time = getTimeSelectValue(`rg-hour-${g}`, `rg-min-${g}`, `rg-ampm-${g}`);
+      const taken_at = parseEasternDateTime(date, time);
+
+      const toSave = group.items
+        .map((item, i) => {
+          const cb = document.getElementById(`ec-${g}-${i}`);
+          const valEl = document.getElementById(`ev-${g}-${i}`);
+          return { ...item, checked: cb && cb.checked, value: valEl ? parseFloat(valEl.value) : NaN };
+        })
+        .filter(item => item.checked && !isNaN(item.value));
+
+      for (const item of toSave) {
+        const inserted = await insertRow('lab_results', {
+          user_id: currentUser.id, lab_type: item.key, value: item.value, unit: item.unit, taken_at,
+          notes: group.notes || null,
+        });
+        markLocalWrite(inserted.id);
+        labs.push(inserted);
+        totalSaved++;
+      }
     }
     labs.sort((a,b)=>new Date(a.taken_at)-new Date(b.taken_at));
-    showToast(`Saved ${toSave.length} value${toSave.length>1?'s':''} ✓`, 'success');
+    if (totalSaved === 0) { showToast('Nothing checked to save', 'error'); return; }
+    showToast(`Saved ${totalSaved} value${totalSaved>1?'s':''} across ${reviewGroups.length} date${reviewGroups.length>1?'s':''} ✓`, 'success');
     resetUpload();
     showTab('history');
   } catch (e) {
@@ -643,8 +718,11 @@ function renderHistory() {
     groups[day].push(r);
   });
 
-  el.innerHTML = Object.entries(groups).map(([day, rows]) => `
+  el.innerHTML = Object.entries(groups).map(([day, rows]) => {
+    const dayNotes = rows.find(r => r.notes);
+    return `
     <div class="day-group-label">${day}</div>
+    ${dayNotes ? `<div class="hist-notes">📋 ${dayNotes.notes}</div>` : ''}
     ${rows.map(r => {
       const signal = isSignalLab(r.lab_type);
       return `<div class="hist-row${signal ? ' signal' : ''}">
@@ -656,7 +734,8 @@ function renderHistory() {
         </div>
       </div>`;
     }).join('')}
-  `).join('');
+  `;
+  }).join('');
 }
 
 function showToast(msg, type='') {
