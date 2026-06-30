@@ -139,29 +139,30 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 </header>
 
 <div class="tabs">
-  <button class="tab active" onclick="showTab('upload')" id="tab-upload">Upload</button>
-  <button class="tab" onclick="showTab('bloodwork')" id="tab-bloodwork">Bloodwork</button>
+  <button class="tab active" onclick="showTab('bloodwork')" id="tab-bloodwork">Bloodwork</button>
   <button class="tab" onclick="showTab('pft')" id="tab-pft">🫁 PFT</button>
 </div>
 
-<!-- UPLOAD -->
-<div class="page active" id="page-upload">
-  <div class="mychart-note">
-    <span class="mychart-text">🩺 What you upload here is a snapshot in time. For full historical trends and detailed lab history, MyChart is the best place to look.</span>
-    <a class="btn-mychart" href="https://mychart.shands.org/mychartprd/Authentication/Login" target="_blank" rel="noopener">MyChart →</a>
-  </div>
-  <div class="disclaimer">⚠️ AI-extracted values can be wrong. Always review against the original lab report before relying on these numbers, and verify anything unusual with your transplant team.</div>
-
-  <div id="upload-home-slot"></div>
-</div>
+<!-- Hidden parking spot for the upload widget when it's not actively
+     open in Bloodwork or PFT. Never shown directly — there's no
+     separate "Upload" tab anymore, since "+ Upload" inside Bloodwork
+     or PFT already opens the exact same widget right where you are. -->
+<div id="upload-home-slot" style="display:none"></div>
 
 <!-- The actual sophisticated upload UI — upload zone, paste button, Ctrl+V
      support, extraction, and the full multi-date review screen. This is a
      SINGLE shared widget, not duplicated per tab: when you tap "+ Upload"
      from Bloodwork or PFT, this entire block physically relocates into
      that tab (see relocateUploadWidget()), so it's always the identical,
-     fully-capable upload experience no matter where you launch it from. -->
+     fully-capable upload experience no matter where you launch it from.
+     The MyChart note and AI-accuracy disclaimer live INSIDE the widget
+     itself (not pinned to a specific tab) so they travel along with it. -->
 <div id="upload-widget" style="display:none">
+  <div class="mychart-note">
+    <span class="mychart-text">🩺 What you upload here is a snapshot in time. For full historical trends and detailed lab history, MyChart is the best place to look.</span>
+    <a class="btn-mychart" href="https://mychart.shands.org/mychartprd/Authentication/Login" target="_blank" rel="noopener">MyChart →</a>
+  </div>
+  <div class="disclaimer">⚠️ AI-extracted values can be wrong. Always review against the original lab report before relying on these numbers, and verify anything unusual with your transplant team.</div>
   <div class="card" id="upload-card">
     <div class="card-title">📷 Upload Lab Report(s)</div>
     <div class="card-sub">Select multiple screenshots or PDFs at once — e.g. a CBC and a Metabolic Panel together, or a formal PFT/spirometry report from the lab. We extract every value we can find. If a PFT report includes a historical trend table, every past date in it gets extracted as its own entry automatically.</div>
@@ -204,7 +205,7 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 </div>
 
 <!-- BLOODWORK -->
-<div class="page" id="page-bloodwork">
+<div class="page active" id="page-bloodwork">
   <div class="tab-upload-shortcut"><button class="btn btn-primary" onclick="relocateUploadWidget('bloodwork')">+ Upload</button></div>
   <div id="bloodwork-upload-slot"></div>
   <div class="mychart-note">
@@ -347,7 +348,6 @@ function showTab(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('page-'+name).classList.add('active');
-  if (name==='upload') homeUploadWidget();
   if (name==='bloodwork') renderBloodwork();
   if (name==='pft') renderPFT();
 }
@@ -825,7 +825,8 @@ async function saveExtractedValues() {
     // Land on whichever tab actually has the new data. If both kinds were
     // saved in one upload, prefer PFT since that's the rarer/more
     // deliberate upload and the one most worth confirming visually.
-    if (savedAnyPFT) showTab('pft'); else if (savedAnyBloodwork) showTab('bloodwork'); else showTab('upload');
+    // (totalSaved > 0 at this point guarantees at least one is true.)
+    if (savedAnyPFT) showTab('pft'); else showTab('bloodwork');
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error');
   } finally {
@@ -926,11 +927,25 @@ function renderPFT() {
   const latest = records[records.length - 1];
   const older = records.slice(0, -1).reverse(); // newest-of-the-rest first
 
-  const heroMetrics = [
-    { key:'pft_fev1', label:'FEV1' }, { key:'pft_fvc', label:'FVC' },
-    { key:'pft_fev1_fvc_ratio', label:'FEV1/FVC' }, { key:'pft_fef2575', label:'FEF25-75%' },
-    { key:'pft_pef', label:'PEF' }, { key:'pft_dlco', label:'DLCO' },
-  ].filter(m => latest.values[m.key] != null);
+  // Canonical display order/labels for the known PFT params. Any OTHER
+  // pft_ key present on a record (e.g. an older report's value that
+  // wasn't also measured at the most recent visit) still gets shown —
+  // it just falls back to its LAB_PARAMS name, or the raw key, instead
+  // of being silently dropped because it wasn't in some fixed list.
+  const CANONICAL_PFT_ORDER = ['pft_fev1','pft_fvc','pft_fev1_fvc_ratio','pft_fef2575','pft_pef','pft_dlco'];
+  function metricsForRecord(record) {
+    const keys = Object.keys(record.values);
+    keys.sort((a,b) => {
+      const ia = CANONICAL_PFT_ORDER.indexOf(a), ib = CANONICAL_PFT_ORDER.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    return keys.map(key => ({ key, label: labDisplayName(key).replace(/^PFT — /, '') }));
+  }
+
+  const heroMetrics = metricsForRecord(latest);
 
   const heroHtml = `
     <div class="pft-hero">
@@ -954,7 +969,10 @@ function renderPFT() {
   const olderHtml = older.length ? `
     <div class="pft-section-label">Earlier Results</div>
     ${older.map(r => {
-      const vals = heroMetrics.map(m => r.values[m.key] != null ? `<span>${m.label}: <b>${r.values[m.key]}${r.unit[m.key]||''}</b></span>` : '').filter(Boolean).join('');
+      const rMetrics = metricsForRecord(r);
+      const vals = rMetrics.length
+        ? rMetrics.map(m => `<span>${m.label}: <b>${r.values[m.key]}${r.unit[m.key]||''}</b></span>`).join('')
+        : '<span style="color:var(--ink3);font-style:italic">No values recorded for this date</span>';
       return `<div class="pft-compact-row">
         <div class="pft-compact-date">${r.day}</div>
         <div class="pft-compact-vals">${vals}</div>
