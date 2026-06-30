@@ -415,6 +415,8 @@ function resetUpload() {
   selectedFiles = [];
   reviewGroups = [];
   document.getElementById('file-input').value = '';
+  const oldBanner = document.getElementById('extract-error-banner');
+  if (oldBanner) oldBanner.remove();
   document.getElementById('upload-card').style.display = 'block';
   document.getElementById('preview-card').style.display = 'none';
   document.getElementById('loading-card').style.display = 'none';
@@ -440,6 +442,8 @@ function fileToBase64(file) {
 // ══════════════════════════════════════════════════
 async function runExtraction() {
   if (!selectedFiles.length) return;
+  const oldBanner = document.getElementById('extract-error-banner');
+  if (oldBanner) oldBanner.remove();
   document.getElementById('preview-card').style.display = 'none';
   document.getElementById('loading-card').style.display = 'block';
   document.getElementById('loading-text').textContent =
@@ -503,6 +507,9 @@ Every value must include a human-readable "label" (use the known parameter's nam
     }
 
     const data = await response.json();
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('The extracted result was too long and got cut off — try splitting this into fewer files per upload.');
+    }
     const textBlock = data.content.find(b => b.type === 'text');
     if (!textBlock) throw new Error('No text in response');
 
@@ -511,15 +518,27 @@ Every value must include a human-readable "label" (use the known parameter's nam
       const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
       parsed = JSON.parse(cleaned);
     } catch (e) {
-      throw new Error('Could not parse extraction result — try clearer images');
+      throw new Error('Could not parse the extraction result — the response may have been cut off. Try splitting this into fewer files per upload, or use clearer images.');
     }
 
     showReview(parsed);
   } catch (e) {
-    showToast('Extraction failed: ' + e.message, 'error');
-    document.getElementById('loading-card').style.display = 'none';
-    document.getElementById('preview-card').style.display = 'block';
+    showExtractionError(e.message);
   }
+}
+
+function showExtractionError(message) {
+  showToast('Extraction failed', 'error');
+  document.getElementById('loading-card').style.display = 'none';
+  document.getElementById('preview-card').style.display = 'block';
+  let banner = document.getElementById('extract-error-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'extract-error-banner';
+    banner.style.cssText = 'background:var(--danger-bg);border:1px solid #e8b8b8;border-radius:8px;padding:12px 14px;font-size:12.5px;color:var(--danger);line-height:1.5;margin-bottom:14px';
+    document.getElementById('preview-card').prepend(banner);
+  }
+  banner.textContent = '⚠️ ' + message;
 }
 
 // ══════════════════════════════════════════════════
