@@ -127,6 +127,22 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .pft-compact-date { font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
 .pft-compact-vals { font-size:12px; color:var(--ink2); display:flex; flex-wrap:wrap; gap:8px 14px; }
 .pft-compact-vals span b { color:var(--ink); font-family:'DM Mono',monospace; }
+.pft-metric { transition: background .15s; }
+.pft-metric:hover { background:rgba(255,255,255,0.18); }
+.pft-aux-toggle { font-size:11.5px; color:rgba(255,255,255,0.85); cursor:pointer; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.15); display:flex; align-items:center; gap:6px; }
+.pft-aux-list { display:none; margin-top:8px; }
+.pft-aux-list.open { display:block; }
+.pft-aux-row { display:flex; justify-content:space-between; font-size:12px; color:rgba(255,255,255,0.85); padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+.pft-aux-row b { font-family:'DM Mono',monospace; color:#fff; }
+.pft-compact-row .pft-aux-toggle { color:var(--ink3); border-top-color:var(--border); }
+.pft-compact-row .pft-aux-row { color:var(--ink2); border-bottom-color:var(--border); }
+.pft-compact-row .pft-aux-row b { color:var(--ink); }
+
+.pft-modal-overlay { display:none; position:fixed; inset:0; background:rgba(26,37,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.pft-modal-card { background:var(--surface); border-radius:var(--radius); padding:20px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; }
+.pft-modal-header { display:flex; align-items:center; justify-content:space-between; }
+.pft-modal-title { font-family:'DM Serif Display',serif; font-size:18px; }
+.pft-modal-summary { font-size:13px; color:var(--ink2); margin-top:8px; }
 </style>
 </head>
 <body>
@@ -226,6 +242,21 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   </div>
   <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
   <div id="pft-content"></div>
+</div>
+
+<!-- PFT PARAMETER DETAIL MODAL -->
+<div class="pft-modal-overlay" id="pft-detail-modal" onclick="if(event.target===this) closePFTDetail()">
+  <div class="pft-modal-card">
+    <div class="pft-modal-header">
+      <div class="pft-modal-title" id="pft-detail-title">Parameter</div>
+      <button class="btn-icon" onclick="closePFTDetail()" title="Close" style="font-size:20px">✕</button>
+    </div>
+    <div class="pft-modal-summary" id="pft-detail-summary"></div>
+    <div id="pft-detail-chart-wrap" style="height:240px;margin-top:14px">
+      <canvas id="pft-detail-canvas"></canvas>
+    </div>
+    <div id="pft-detail-single-note" style="display:none;text-align:center;padding:20px;color:var(--ink3);font-size:13px">Only one result on file for this parameter so far — once you've logged another PFT, a trend line will appear here.</div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -907,6 +938,14 @@ function renderBloodwork() {
 }
 
 let pftChart = null;
+let pftDetailChart = null;
+let pftAllRecords = []; // kept around so the detail modal can chart any param on demand
+
+// The handful of parameters worth a prominent tile + tap-to-see-trend.
+// Everything else (LLN, z-score, % predicted, FET100, FEV0.5/0.75, etc.)
+// still gets extracted and saved — it's just tucked behind the "more
+// detail" toggle per visit instead of competing for attention here.
+const PRIMARY_PFT_KEYS = ['pft_fev1','pft_fvc','pft_fev1_fvc_ratio','pft_fef2575','pft_pef','pft_dlco'];
 
 function renderPFT() {
   const el = document.getElementById('pft-content');
@@ -924,28 +963,24 @@ function renderPFT() {
     if (r.notes) byDay[day].notes = r.notes;
   });
   const records = Object.values(byDay).sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+  pftAllRecords = records;
   const latest = records[records.length - 1];
   const older = records.slice(0, -1).reverse(); // newest-of-the-rest first
 
-  // Canonical display order/labels for the known PFT params. Any OTHER
-  // pft_ key present on a record (e.g. an older report's value that
-  // wasn't also measured at the most recent visit) still gets shown —
-  // it just falls back to its LAB_PARAMS name, or the raw key, instead
-  // of being silently dropped because it wasn't in some fixed list.
-  const CANONICAL_PFT_ORDER = ['pft_fev1','pft_fvc','pft_fev1_fvc_ratio','pft_fef2575','pft_pef','pft_dlco'];
-  function metricsForRecord(record) {
-    const keys = Object.keys(record.values);
-    keys.sort((a,b) => {
-      const ia = CANONICAL_PFT_ORDER.indexOf(a), ib = CANONICAL_PFT_ORDER.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
-    return keys.map(key => ({ key, label: labDisplayName(key).replace(/^PFT — /, '') }));
+  function primaryMetricsForRecord(record) {
+    return PRIMARY_PFT_KEYS
+      .filter(key => record.values[key] != null)
+      .map(key => ({ key, label: labDisplayName(key).replace(/^PFT — /, '') }));
+  }
+  function auxMetricsForRecord(record) {
+    return Object.keys(record.values)
+      .filter(key => PRIMARY_PFT_KEYS.indexOf(key) === -1)
+      .sort()
+      .map(key => ({ key, label: labDisplayName(key).replace(/^PFT — /, '') }));
   }
 
-  const heroMetrics = metricsForRecord(latest);
+  const heroMetrics = primaryMetricsForRecord(latest);
+  const heroAux = auxMetricsForRecord(latest);
 
   const heroHtml = `
     <div class="pft-hero">
@@ -953,11 +988,13 @@ function renderPFT() {
       <div class="pft-hero-label">🫁 Latest PFT Result</div>
       <div class="pft-metric-grid">
         ${heroMetrics.map(m => `
-          <div class="pft-metric">
-            <div class="pft-metric-name">${m.label}</div>
+          <div class="pft-metric" onclick="openPFTDetail('${m.key}')" style="cursor:pointer">
+            <div class="pft-metric-name">${m.label} ›</div>
             <div class="pft-metric-val">${latest.values[m.key]}<span class="pft-metric-unit">${latest.unit[m.key]||''}</span></div>
           </div>`).join('')}
       </div>
+      ${heroAux.length ? `<div class="pft-aux-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('span').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">More detail for this visit (${heroAux.length}) <span>▼</span></div>
+      <div class="pft-aux-list">${heroAux.map(m => `<div class="pft-aux-row"><span>${m.label}</span><b>${latest.values[m.key]}${latest.unit[m.key]||''}</b></div>`).join('')}</div>` : ''}
       ${latest.notes ? `<div class="pft-hero-notes"><div class="pft-hero-notes-label">📋 Interpretation / Notes</div>${latest.notes}</div>` : ''}
     </div>`;
 
@@ -968,14 +1005,17 @@ function renderPFT() {
 
   const olderHtml = older.length ? `
     <div class="pft-section-label">Earlier Results</div>
-    ${older.map(r => {
-      const rMetrics = metricsForRecord(r);
+    ${older.map((r, idx) => {
+      const rMetrics = primaryMetricsForRecord(r);
+      const rAux = auxMetricsForRecord(r);
       const vals = rMetrics.length
-        ? rMetrics.map(m => `<span>${m.label}: <b>${r.values[m.key]}${r.unit[m.key]||''}</b></span>`).join('')
+        ? rMetrics.map(m => `<span onclick="openPFTDetail('${m.key}')" style="cursor:pointer;text-decoration:underline dotted">${m.label}: <b>${r.values[m.key]}${r.unit[m.key]||''}</b></span>`).join('')
         : '<span style="color:var(--ink3);font-style:italic">No values recorded for this date</span>';
       return `<div class="pft-compact-row">
         <div class="pft-compact-date">${r.day}</div>
         <div class="pft-compact-vals">${vals}</div>
+        ${rAux.length ? `<div class="pft-aux-toggle" style="margin-top:8px" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('span').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">More detail (${rAux.length}) <span>▼</span></div>
+        <div class="pft-aux-list">${rAux.map(m => `<div class="pft-aux-row"><span>${m.label}</span><b>${r.values[m.key]}${r.unit[m.key]||''}</b></div>`).join('')}</div>` : ''}
         ${r.notes ? `<div class="hist-notes" style="margin-top:8px">📋 ${r.notes}</div>` : ''}
       </div>`;
     }).join('')}` : '';
@@ -1005,6 +1045,57 @@ function renderPFT() {
     });
   }
 }
+
+// ══════════════════════════════════════════════════
+//  PFT PARAMETER DETAIL — tapping any primary metric tile opens a
+//  focused trend chart for JUST that one parameter, across every PFT
+//  visit on file (not just the ones shown in the combined overview
+//  chart). Reuses pftAllRecords already gathered by renderPFT().
+// ══════════════════════════════════════════════════
+function openPFTDetail(key) {
+  const points = pftAllRecords.filter(r => r.values[key] != null);
+  if (!points.length) return;
+  const label = labDisplayName(key).replace(/^PFT — /, '');
+  const unit = points[points.length - 1].unit[key] || '';
+
+  document.getElementById('pft-detail-title').textContent = label;
+  const latestVal = points[points.length - 1].values[key];
+  const firstVal = points[0].values[key];
+  const delta = points.length > 1 ? round2(latestVal - firstVal) : null;
+  document.getElementById('pft-detail-summary').innerHTML =
+    `Latest: <b>${latestVal}${unit}</b>` +
+    (delta !== null ? ` &nbsp;·&nbsp; Change since ${points[0].day}: <b style="color:${delta>=0?'var(--good)':'var(--danger)'}">${delta>=0?'+':''}${delta}${unit}</b>` : '');
+
+  document.getElementById('pft-detail-modal').style.display = 'flex';
+
+  if (pftDetailChart) { try{pftDetailChart.destroy();}catch(e){} pftDetailChart = null; }
+  if (points.length >= 2) {
+    document.getElementById('pft-detail-chart-wrap').style.display = 'block';
+    document.getElementById('pft-detail-single-note').style.display = 'none';
+    pftDetailChart = new Chart(document.getElementById('pft-detail-canvas').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: points.map(p => p.day),
+        datasets: [{ label, data: points.map(p => p.values[key]), borderColor:'#0D5C6B', backgroundColor:'rgba(13,92,107,0.08)', borderWidth:2.5, pointRadius:4, tension:.2, fill:true }],
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false } },
+        scales:{ y:{ grid:{color:'#E8EAF0'}, title:{display:true,text:unit,font:{size:10}} }, x:{ grid:{display:false}, ticks:{font:{size:10}} } }
+      }
+    });
+  } else {
+    document.getElementById('pft-detail-chart-wrap').style.display = 'none';
+    document.getElementById('pft-detail-single-note').style.display = 'block';
+  }
+}
+
+function closePFTDetail() {
+  document.getElementById('pft-detail-modal').style.display = 'none';
+  if (pftDetailChart) { try{pftDetailChart.destroy();}catch(e){} pftDetailChart = null; }
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
 
 function showToast(msg, type='') {
   const t = document.getElementById('toast');
