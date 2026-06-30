@@ -143,6 +143,18 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .pft-modal-header { display:flex; align-items:center; justify-content:space-between; }
 .pft-modal-title { font-family:'DM Serif Display',serif; font-size:18px; }
 .pft-modal-summary { font-size:13px; color:var(--ink2); margin-top:8px; }
+.pft-readmore-toggle { font-size:12px; color:var(--accent); font-weight:600; cursor:pointer; margin-top:16px; padding-top:12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+.pft-readmore-body { display:none; font-size:13px; color:var(--ink2); line-height:1.65; margin-top:10px; }
+.pft-readmore-body.open { display:block; }
+.pft-readmore-body p { margin-bottom:10px; }
+.pft-readmore-body ul { margin:6px 0 10px 18px; }
+.pft-readmore-body li { margin-bottom:4px; }
+.pft-info-body { font-size:13px; color:var(--ink2); line-height:1.65; margin-top:4px; }
+.pft-info-body h4 { font-family:'DM Serif Display',serif; font-size:14.5px; color:var(--ink); margin:18px 0 6px; }
+.pft-info-body h4:first-child { margin-top:4px; }
+.pft-info-body p { margin-bottom:10px; }
+.pft-info-body ul { margin:6px 0 10px 18px; }
+.pft-info-body li { margin-bottom:4px; }
 </style>
 </head>
 <body>
@@ -234,7 +246,10 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 
 <!-- PFT -->
 <div class="page" id="page-pft">
-  <div class="tab-upload-shortcut"><button class="btn btn-primary" onclick="relocateUploadWidget('pft')">+ Upload</button></div>
+  <div class="tab-upload-shortcut" style="justify-content:space-between">
+    <button class="btn btn-ghost" onclick="openPFTGeneralInfo()">📖 Understanding These Results</button>
+    <button class="btn btn-primary" onclick="relocateUploadWidget('pft')">+ Upload</button>
+  </div>
   <div id="pft-upload-slot"></div>
   <div class="mychart-note">
     <span class="mychart-text">🩺 Lab-administered PFT results. For full historical detail, check MyChart.</span>
@@ -242,6 +257,17 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   </div>
   <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
   <div id="pft-content"></div>
+</div>
+
+<!-- PFT GENERAL INFO MODAL -->
+<div class="pft-modal-overlay" id="pft-info-modal" onclick="if(event.target===this) closePFTGeneralInfo()">
+  <div class="pft-modal-card" style="max-width:560px">
+    <div class="pft-modal-header">
+      <div class="pft-modal-title">📖 Understanding Your PFT Results</div>
+      <button class="btn-icon" onclick="closePFTGeneralInfo()" title="Close" style="font-size:20px">✕</button>
+    </div>
+    <div class="pft-info-body" id="pft-info-body"></div>
+  </div>
 </div>
 
 <!-- PFT PARAMETER DETAIL MODAL -->
@@ -256,6 +282,8 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
       <canvas id="pft-detail-canvas"></canvas>
     </div>
     <div id="pft-detail-single-note" style="display:none;text-align:center;padding:20px;color:var(--ink3);font-size:13px">Only one result on file for this parameter so far — once you've logged another PFT, a trend line will appear here.</div>
+    <div class="pft-readmore-toggle" id="pft-readmore-toggle" onclick="document.getElementById('pft-readmore-body').classList.toggle('open'); this.querySelector('span').textContent = document.getElementById('pft-readmore-body').classList.contains('open') ? '▲' : '▼'">📖 Read more about this parameter <span>▼</span></div>
+    <div class="pft-readmore-body" id="pft-readmore-body"></div>
   </div>
 </div>
 
@@ -1052,6 +1080,59 @@ function renderPFT() {
 //  visit on file (not just the ones shown in the combined overview
 //  chart). Reuses pftAllRecords already gathered by renderPFT().
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  PFT EDUCATIONAL CONTENT — per-parameter explanations (shown via the
+//  "Read more" toggle inside the parameter detail modal) and a general
+//  overview covering patterns and how the parameters relate to each
+//  other (shown via "Understanding These Results" on the main tab).
+// ══════════════════════════════════════════════════
+const PFT_PARAM_INFO = {
+  pft_fev1: `<p><b>FEV1</b> is the volume of air exhaled during the first second of a forced exhale — one of the most important spirometry values, especially after lung transplant.</p>
+    <p>It reflects how quickly air can move out of the lungs, affected by airway caliber, lung elasticity, effort, lung volume, and mechanical limitations. A low FEV1 can come from airway obstruction, reduced lung volume, weak effort, pain, poor technique, infection, inflammation, airway narrowing, or rejection/chronic allograft dysfunction.</p>
+    <p>FEV1 should never be read alone — it's interpreted together with FVC and the FEV1/FVC ratio. The <b>trend</b> over time matters more than any single value: a stable or improving FEV1 is reassuring, while a persistent drop from baseline may need further evaluation.</p>`,
+  pft_fvc: `<p><b>FVC (Forced Vital Capacity)</b> is the total amount of air forcefully exhaled after the deepest possible breath — a rough sense of usable lung volume during the maneuver.</p>
+    <p>A low FVC can suggest a restrictive pattern, but also incomplete inhalation, early stopping, chest wall stiffness or pain, weakness, pleural issues, atelectasis, post-surgical mechanics, or even air trapping from obstruction.</p>
+    <p>After lung transplant, a low FVC is often seen during recovery — pain, weakness, shallow breathing, pleural fluid, or atelectasis are common explanations. If it stays low on a good-quality test, the care team may consider full lung volume testing (especially TLC) to check for true restriction.</p>`,
+  pft_fev1_fvc_ratio: `<p>The <b>FEV1/FVC ratio</b> compares how much air comes out in the first second to the total amount exhaled — it helps distinguish obstructive from restrictive patterns.</p>
+    <p><b>Low ratio</b> suggests an obstructive pattern — air coming out more slowly than expected, from airway narrowing, mucus, asthma-like or COPD-like physiology, bronchiolitis, or other small-airway problems. In transplant patients, new obstruction can raise concern for airway inflammation, infection, airway complications, or chronic lung allograft dysfunction.</p>
+    <p><b>Normal or high ratio</b> means airflow isn't disproportionately reduced relative to volume. If both FEV1 and FVC are low but the ratio is normal/high, that pattern points more toward restriction, low lung volume, post-surgical mechanics, or an incomplete maneuver — not obstruction. A high ratio doesn't mean "better than normal"; it usually means the available (possibly reduced) volume just comes out quickly.</p>`,
+  pft_fef2575: `<p><b>FEF25-75%</b> measures average airflow during the middle half of the forced exhale — sometimes discussed as a marker of smaller-airway function.</p>
+    <p>It's highly dependent on FVC and test quality, and can be misleading when FVC is low or the maneuver is technically imperfect. For that reason, it's best treated as a <b>secondary</b> parameter — FEV1, FVC, and FEV1/FVC matter more for the main interpretation.</p>`,
+  pft_pef: `<p><b>PEF (Peak Expiratory Flow)</b> is the highest airflow reached during the forced exhale.</p>
+    <p>PEF is strongly effort-dependent — a good PEF suggests a strong initial blast of air, while a low PEF may reflect poor effort, airway obstruction, weakness, pain, or upper-airway limitation. In home monitoring it can be useful day-to-day, but after lung transplant, FEV1 is usually the more clinically important number.</p>`,
+  pft_dlco: `<p><b>DLCO (Diffusing Capacity)</b> isn't part of basic spirometry, but is often included in full pulmonary function testing — it measures how well gas transfers from the air sacs into the blood.</p>
+    <p>It depends on alveolar surface area, the alveolar-capillary membrane, pulmonary blood volume, hemoglobin level, and ventilation/perfusion matching. DLCO can be reduced in interstitial lung disease, pulmonary vascular disease, emphysema, anemia, or other gas-exchange problems.</p>
+    <p>After lung transplant, DLCO adds useful information, but it's usually interpreted together with spirometry trends, imaging, symptoms, and oxygenation — not on its own.</p>`,
+};
+
+const PFT_GENERAL_INFO = `
+  <p>Spirometry measures how much air you can move in and out of your lungs, and how quickly. After lung transplant, it's one of the most important surveillance tools — but the most important idea is that <b>it's not about one number</b>. The pattern across several values, and how that pattern changes over time, is what matters most.</p>
+
+  <h4>Common Patterns</h4>
+  <ul>
+    <li><b>Normal:</b> FEV1, FVC, and FEV1/FVC all within normal range.</li>
+    <li><b>Obstructive:</b> reduced FEV1 and reduced FEV1/FVC ratio, FVC normal or reduced. Suggests airway narrowing, mucus, infection, or — in transplant patients — possible chronic lung allograft dysfunction. New obstruction or a declining FEV1 is worth flagging.</li>
+    <li><b>Restrictive / low-volume:</b> reduced FVC and FEV1, but a normal or high FEV1/FVC ratio. Could relate to healing, pain, pleural fluid, atelectasis, weakness, or chest wall mechanics. Spirometry can suggest this, but confirming true restriction needs full lung volume testing (TLC).</li>
+    <li><b>Mixed:</b> reduced FEV1, FVC, and FEV1/FVC together — suggests both obstruction and reduced volume may be present, usually needing fuller testing to sort out.</li>
+  </ul>
+
+  <h4>Reference Values: Predicted, % Predicted, LLN, Z-Score</h4>
+  <p>Results are compared to an expected value for someone of similar height, age, and sex. <b>% predicted</b> is the easiest to understand (measured ÷ predicted), but isn't always the best statistical measure. <b>LLN</b> (Lower Limit of Normal) is often more meaningful — a value below it is more likely truly abnormal. A <b>z-score</b> shows how many standard deviations the result is from predicted; a z-score around 0 is close to predicted, and below roughly -1.64 is often considered below normal.</p>
+
+  <h4>Why the Trend Matters More Than Any Single Test</h4>
+  <p>A single test is useful, but the trend is far more powerful. The best comparison usually isn't against "normal predicted" — it's against <b>your own post-transplant best baseline</b>. Some patients never reach textbook-normal numbers but are doing very well if their results are stable and consistent for them.</p>
+
+  <h4>Test Quality Matters</h4>
+  <p>Spirometry is highly technique-dependent — a good machine can't compensate for a hesitant start, an early stop, a cough mid-test, an air leak, or inconsistent effort between attempts. When quality standards aren't met, the numbers can still be informative, but should be interpreted cautiously, especially if a decision would hinge on a small change. If a result looks important or unexpected, repeating the test with good technique is often the cleanest next step.</p>`;
+
+function openPFTGeneralInfo() {
+  document.getElementById('pft-info-body').innerHTML = PFT_GENERAL_INFO;
+  document.getElementById('pft-info-modal').style.display = 'flex';
+}
+function closePFTGeneralInfo() {
+  document.getElementById('pft-info-modal').style.display = 'none';
+}
+
 function openPFTDetail(key) {
   const points = pftAllRecords.filter(r => r.values[key] != null);
   if (!points.length) return;
@@ -1067,6 +1148,11 @@ function openPFTDetail(key) {
     (delta !== null ? ` &nbsp;·&nbsp; Change since ${points[0].day}: <b style="color:${delta>=0?'var(--good)':'var(--danger)'}">${delta>=0?'+':''}${delta}${unit}</b>` : '');
 
   document.getElementById('pft-detail-modal').style.display = 'flex';
+
+  const readmoreBody = document.getElementById('pft-readmore-body');
+  readmoreBody.innerHTML = PFT_PARAM_INFO[key] || '<p>No additional explanation available for this parameter yet.</p>';
+  readmoreBody.classList.remove('open');
+  document.getElementById('pft-readmore-toggle').querySelector('span').textContent = '▼';
 
   if (pftDetailChart) { try{pftDetailChart.destroy();}catch(e){} pftDetailChart = null; }
   if (points.length >= 2) {
