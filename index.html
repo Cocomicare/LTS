@@ -644,8 +644,13 @@ async function renderTiles() {
 
     if (lastRow) {
       const ts = lastRow[mod.dateField];
-      const days = Math.floor((new Date() - new Date(ts)) / 86400000);
-      sinceStr = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
+      // Compare Eastern *calendar* dates, not raw elapsed hours — an entry
+      // at 9:58 PM yesterday is only ~11 hrs before a 9:13 AM "today" check,
+      // which would floor to 0 days and wrongly show "Today".
+      const todayStr = easternDateInputValue();
+      const entryStr = easternDateInputValue(ts);
+      const days = Math.round((new Date(todayStr + 'T00:00:00Z') - new Date(entryStr + 'T00:00:00Z')) / 86400000);
+      sinceStr = days <= 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
       overdue = days >= 3;
       const displayVal = lastRow.value ?? lastRow.fev1 ?? lastRow.pef ?? lastRow.score ?? lastRow.severity_score
         ?? lastRow.color_score
