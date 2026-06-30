@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Labs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="supabase-client.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -97,11 +98,35 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 .btn-mychart:hover { background:#244870; }
 .paste-hint { font-size:11px; color:var(--ink3); text-align:center; margin-top:10px; }
 .new-key-row .extract-name { font-style:italic; }
+.cat-toggle { display:flex; gap:0; border:1.5px solid var(--border); border-radius:8px; overflow:hidden; margin-left:34px; margin-top:2px; width:100%; }
+.cat-btn { flex:1; padding:6px 10px; font-size:11px; font-weight:600; border:none; background:var(--bg); color:var(--ink3); cursor:pointer; font-family:'DM Sans',sans-serif; }
+.cat-btn.active { background:var(--accent); color:#fff; }
+.cat-btn:first-child { border-right:1px solid var(--border); }
+.tab-upload-shortcut { display:flex; justify-content:flex-end; margin-bottom:12px; }
 .review-group { border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px; background:var(--bg); }
 .review-group-date-row { display:flex; gap:10px; margin-bottom:12px; }
 .review-group-notes { font-size:12px; color:var(--ink2); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-top:10px; line-height:1.5; }
 .review-group-notes-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink3); margin-bottom:3px; }
 .hist-notes { font-size:11.5px; color:var(--ink2); background:var(--surface2); border-radius:6px; padding:7px 10px; margin:-4px 0 8px; line-height:1.5; }
+
+/* PFT tab */
+.pft-hero { background:linear-gradient(135deg, #1A4A52, #0D5C6B); color:#fff; border-radius:var(--radius); padding:20px; margin-bottom:18px; }
+.pft-hero-date { font-size:12px; opacity:.8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.pft-hero-label { font-family:'DM Serif Display',serif; font-size:18px; margin-bottom:14px; }
+.pft-metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.pft-metric { background:rgba(255,255,255,0.1); border-radius:10px; padding:12px 14px; }
+.pft-metric-name { font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; opacity:.75; margin-bottom:3px; }
+.pft-metric-val { font-family:'DM Mono',monospace; font-size:22px; font-weight:600; }
+.pft-metric-unit { font-size:12px; opacity:.75; margin-left:3px; }
+.pft-hero-notes { margin-top:14px; background:rgba(255,255,255,0.12); border-radius:8px; padding:10px 12px; font-size:12.5px; line-height:1.5; }
+.pft-hero-notes-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; opacity:.75; margin-bottom:3px; }
+.pft-chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:18px; }
+.pft-chart-title { font-family:'DM Serif Display',serif; font-size:15px; margin-bottom:12px; }
+.pft-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink3); margin:18px 2px 8px; }
+.pft-compact-row { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+.pft-compact-date { font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
+.pft-compact-vals { font-size:12px; color:var(--ink2); display:flex; flex-wrap:wrap; gap:8px 14px; }
+.pft-compact-vals span b { color:var(--ink); font-family:'DM Mono',monospace; }
 </style>
 </head>
 <body>
@@ -109,13 +134,14 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
 <header>
   <div>
     <span class="logo-title">Labs</span>
-    <span class="logo-sub">Bloodwork Surveillance</span>
+    <span class="logo-sub">Bloodwork &amp; PFT Surveillance</span>
   </div>
 </header>
 
 <div class="tabs">
   <button class="tab active" onclick="showTab('upload')" id="tab-upload">Upload</button>
-  <button class="tab" onclick="showTab('history')" id="tab-history">History</button>
+  <button class="tab" onclick="showTab('bloodwork')" id="tab-bloodwork">Bloodwork</button>
+  <button class="tab" onclick="showTab('pft')" id="tab-pft">🫁 PFT</button>
 </div>
 
 <!-- UPLOAD -->
@@ -126,6 +152,16 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   </div>
   <div class="disclaimer">⚠️ AI-extracted values can be wrong. Always review against the original lab report before relying on these numbers, and verify anything unusual with your transplant team.</div>
 
+  <div id="upload-home-slot"></div>
+</div>
+
+<!-- The actual sophisticated upload UI — upload zone, paste button, Ctrl+V
+     support, extraction, and the full multi-date review screen. This is a
+     SINGLE shared widget, not duplicated per tab: when you tap "+ Upload"
+     from Bloodwork or PFT, this entire block physically relocates into
+     that tab (see relocateUploadWidget()), so it's always the identical,
+     fully-capable upload experience no matter where you launch it from. -->
+<div id="upload-widget" style="display:none">
   <div class="card" id="upload-card">
     <div class="card-title">📷 Upload Lab Report(s)</div>
     <div class="card-sub">Select multiple screenshots or PDFs at once — e.g. a CBC and a Metabolic Panel together, or a formal PFT/spirometry report from the lab. We extract every value we can find. If a PFT report includes a historical trend table, every past date in it gets extracted as its own entry automatically.</div>
@@ -167,14 +203,28 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
   </div>
 </div>
 
-<!-- HISTORY -->
-<div class="page" id="page-history">
+<!-- BLOODWORK -->
+<div class="page" id="page-bloodwork">
+  <div class="tab-upload-shortcut"><button class="btn btn-primary" onclick="relocateUploadWidget('bloodwork')">+ Upload</button></div>
+  <div id="bloodwork-upload-slot"></div>
   <div class="mychart-note">
     <span class="mychart-text">🩺 This history shows only what's been manually uploaded — a series of snapshots, not continuous monitoring. For complete trends and historical data, check MyChart.</span>
     <a class="btn-mychart" href="https://mychart.shands.org/mychartprd/Authentication/Login" target="_blank" rel="noopener">MyChart →</a>
   </div>
   <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
-  <div id="history-content"></div>
+  <div id="bloodwork-content"></div>
+</div>
+
+<!-- PFT -->
+<div class="page" id="page-pft">
+  <div class="tab-upload-shortcut"><button class="btn btn-primary" onclick="relocateUploadWidget('pft')">+ Upload</button></div>
+  <div id="pft-upload-slot"></div>
+  <div class="mychart-note">
+    <span class="mychart-text">🩺 Lab-administered PFT results. For full historical detail, check MyChart.</span>
+    <a class="btn-mychart" href="https://mychart.shands.org/mychartprd/Authentication/Login" target="_blank" rel="noopener">MyChart →</a>
+  </div>
+  <div class="sync-note">🔄 Live — updates instantly across all your devices</div>
+  <div id="pft-content"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -268,13 +318,14 @@ const recentLocalWriteIds = new Set();
 function markLocalWrite(id) { recentLocalWriteIds.add(id); setTimeout(() => recentLocalWriteIds.delete(id), 5000); }
 
 (async function init() {
+  homeUploadWidget();
   currentUser = await getCurrentUser();
   if (!currentUser) {
     document.body.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-title">Please log in</div><div class="empty-sub">Open this module from the PLTS Care dashboard.</div></div>';
     return;
   }
   labs = await fetchRows('lab_results', currentUser.id, 'taken_at', true);
-  renderHistory();
+  renderBloodwork();
   realtimeChannel = subscribeToTable('lab_results', currentUser.id, handleRealtimeChange);
   setupPasteListener();
 })();
@@ -286,7 +337,8 @@ function handleRealtimeChange(payload) {
   else if (payload.eventType === 'UPDATE') { const i=labs.findIndex(l=>l.id===payload.new.id); if(i>=0) labs[i]=payload.new; else labs.push(payload.new); }
   else if (payload.eventType === 'DELETE') { labs = labs.filter(l=>l.id!==payload.old.id); }
   labs.sort((a,b)=>new Date(a.taken_at)-new Date(b.taken_at));
-  if (document.getElementById('page-history').classList.contains('active')) renderHistory();
+  if (document.getElementById('page-bloodwork').classList.contains('active')) renderBloodwork();
+  if (document.getElementById('page-pft').classList.contains('active')) renderPFT();
   if (!isOwn) showToast('Updated from another device', 'success');
 }
 
@@ -295,7 +347,38 @@ function showTab(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('page-'+name).classList.add('active');
-  if (name==='history') renderHistory();
+  if (name==='upload') homeUploadWidget();
+  if (name==='bloodwork') renderBloodwork();
+  if (name==='pft') renderPFT();
+}
+
+// ══════════════════════════════════════════════════
+//  UPLOAD WIDGET RELOCATION — there is exactly ONE upload widget in
+//  the DOM (#upload-widget: drop zone, paste button, Ctrl+V support,
+//  extraction, multi-date review). Tapping "+ Upload" from Bloodwork
+//  or PFT physically MOVES that same element into that tab instead of
+//  navigating away, so it's never a stripped-down duplicate — there is
+//  nothing to fall out of sync because there's only one of it.
+// ══════════════════════════════════════════════════
+function homeUploadWidget() {
+  const widget = document.getElementById('upload-widget');
+  const home = document.getElementById('upload-home-slot');
+  if (!home.contains(widget)) home.appendChild(widget);
+  widget.style.display = 'block';
+}
+
+function relocateUploadWidget(target) {
+  const widget = document.getElementById('upload-widget');
+  const slot = document.getElementById(target + '-upload-slot');
+  if (slot.contains(widget) && widget.style.display !== 'none') {
+    // Already showing here — treat a second tap as "collapse it away".
+    document.getElementById('upload-home-slot').appendChild(widget);
+    widget.style.display = 'none';
+    return;
+  }
+  slot.appendChild(widget);
+  widget.style.display = 'block';
+  slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ══════════════════════════════════════════════════
@@ -343,9 +426,13 @@ async function pasteFromClipboardLabs() {
 // ══════════════════════════════════════════════════
 function setupPasteListener() {
   document.addEventListener('paste', (e) => {
-    // Only intercept when we're on the Upload tab and not actively
-    // typing into a text field (so normal copy/paste elsewhere still works).
-    if (!document.getElementById('page-upload').classList.contains('active')) return;
+    // Only intercept when the upload widget is actually visible — it can
+    // now live inline inside Bloodwork or PFT (relocated there via the
+    // "+ Upload" button), not just on the dedicated Upload tab — and not
+    // while actively typing into a text field (so normal paste elsewhere
+    // still works).
+    const widget = document.getElementById('upload-widget');
+    if (!widget || widget.style.display === 'none' || widget.offsetParent === null) return;
     const active = document.activeElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
 
@@ -568,6 +655,10 @@ function showReview(parsed) {
         unit: v.unit || (known ? known.unit : ''),
         signal: known ? !!known.signal : false,
         isNew: !known,
+        // For unrecognized values, guess which tab they belong in based on
+        // the label/key — correctable below before saving. Recognized
+        // values already have a fixed home (their key prefix decides it).
+        category: known ? (isPFTLab(v.key) ? 'pft' : 'bloodwork') : guessLabCategory(v.key, v.label),
       };
     });
     return {
@@ -583,6 +674,30 @@ function showReview(parsed) {
   renderReviewGroups();
 }
 
+// Best-effort guess for an unrecognized value's category, based on common
+// pulmonary-function terminology. Only matters for new keys — anything
+// already in LAB_PARAMS is unambiguous via its key prefix. The user can
+// always override this on the review screen before saving.
+function guessLabCategory(key, label) {
+  const text = `${key} ${label||''}`.toLowerCase();
+  const pftHints = ['fev', 'fvc', 'pft', 'dlco', 'pef', 'spiro', 'pulmonary function', 'lung volume', 'tlc', 'frc', 'rv ', 'flow-volume'];
+  return pftHints.some(h => text.indexOf(h) !== -1) ? 'pft' : 'bloodwork';
+}
+
+function setItemCategory(g, i, category) {
+  // Find the matching item by its position among ALL items in the group
+  // (rowHtml is called with group.items.indexOf(item), so i here is that
+  // same index into group.items — not the filtered signal/ref sub-array).
+  const item = reviewGroups[g].items[i];
+  if (!item) return;
+  item.category = category;
+  const toggle = document.getElementById(`cat-${g}-${i}`);
+  if (toggle) {
+    toggle.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
+    toggle.querySelector(category === 'pft' ? '.cat-btn:last-child' : '.cat-btn:first-child').classList.add('active');
+  }
+}
+
 function renderReviewGroups() {
   const container = document.getElementById('review-groups');
   if (!reviewGroups.length) {
@@ -591,12 +706,18 @@ function renderReviewGroups() {
   }
 
   function rowHtml(item, g, i) {
+    const categoryToggle = item.isNew ? `
+        <div class="cat-toggle" id="cat-${g}-${i}">
+          <button type="button" class="cat-btn${item.category==='bloodwork'?' active':''}" onclick="setItemCategory(${g},${i},'bloodwork')">Bloodwork</button>
+          <button type="button" class="cat-btn${item.category==='pft'?' active':''}" onclick="setItemCategory(${g},${i},'pft')">PFT</button>
+        </div>` : '';
     return `
-      <div class="extract-row${item.isNew ? ' new-key-row' : ''}">
+      <div class="extract-row${item.isNew ? ' new-key-row' : ''}" style="${item.isNew ? 'flex-wrap:wrap' : ''}">
         <input type="checkbox" class="extract-check" id="ec-${g}-${i}" checked>
-        <div class="extract-name">${item.name}</div>
+        <div class="extract-name">${item.name}${item.isNew ? ' <span style="font-weight:400;color:var(--ink3);font-style:normal">(new — not yet a known parameter)</span>' : ''}</div>
         <input type="number" step="0.01" class="extract-input" id="ev-${g}-${i}" value="${item.value}">
         <div class="extract-unit">${item.unit}</div>
+        ${categoryToggle}
       </div>`;
   }
 
@@ -655,6 +776,7 @@ async function saveExtractedValues() {
   const btn = document.getElementById('save-extract-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   let totalSaved = 0;
+  let savedAnyPFT = false, savedAnyBloodwork = false;
   try {
     for (let g = 0; g < reviewGroups.length; g++) {
       const group = reviewGroups[g];
@@ -671,8 +793,17 @@ async function saveExtractedValues() {
         .filter(item => item.checked && !isNaN(item.value));
 
       for (const item of toSave) {
+        // For unrecognized values, bake the user's category choice into the
+        // actual saved key — a pft_ prefix is what isPFTLab() checks on
+        // every future load, so this is what makes the manual override
+        // permanent and self-routing, not just a one-time display choice.
+        let saveKey = item.key;
+        if (item.isNew && item.category === 'pft' && saveKey.indexOf('pft_') !== 0) saveKey = 'pft_' + saveKey;
+        if (item.isNew && item.category === 'bloodwork' && saveKey.indexOf('pft_') === 0) saveKey = saveKey.slice(4);
+        isPFTLab(saveKey) ? (savedAnyPFT = true) : (savedAnyBloodwork = true);
+
         const inserted = await insertRow('lab_results', {
-          user_id: currentUser.id, lab_type: item.key, value: item.value, unit: item.unit, taken_at,
+          user_id: currentUser.id, lab_type: saveKey, value: item.value, unit: item.unit, taken_at,
           notes: group.notes || null,
         });
         markLocalWrite(inserted.id);
@@ -684,7 +815,17 @@ async function saveExtractedValues() {
     if (totalSaved === 0) { showToast('Nothing checked to save', 'error'); return; }
     showToast(`Saved ${totalSaved} value${totalSaved>1?'s':''} across ${reviewGroups.length} date${reviewGroups.length>1?'s':''} ✓`, 'success');
     resetUpload();
-    showTab('history');
+    // Collapse the widget back to its home (hidden) after a successful
+    // save, regardless of where it was relocated from — Cancel/Clear All
+    // intentionally leave it open for another attempt, but a completed
+    // save should close it cleanly.
+    const widget = document.getElementById('upload-widget');
+    document.getElementById('upload-home-slot').appendChild(widget);
+    widget.style.display = 'none';
+    // Land on whichever tab actually has the new data. If both kinds were
+    // saved in one upload, prefer PFT since that's the rarer/more
+    // deliberate upload and the one most worth confirming visually.
+    if (savedAnyPFT) showTab('pft'); else if (savedAnyBloodwork) showTab('bloodwork'); else showTab('upload');
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error');
   } finally {
@@ -693,19 +834,25 @@ async function saveExtractedValues() {
 }
 
 // ══════════════════════════════════════════════════
-//  HISTORY
+//  BLOODWORK / PFT — split into two views. PFT params (key prefix
+//  "pft_") get pulled out of the flat bloodwork list entirely and
+//  rendered as their own tab: a prominent "most recent result" hero
+//  card, a trend chart across all dates, then a compact list of
+//  older entries — instead of being buried in a flat numeric list.
 // ══════════════════════════════════════════════════
 function fmtDate(iso){ return fmtEasternDate(iso); }
 function labDisplayName(labType) { return LAB_PARAMS[labType] ? LAB_PARAMS[labType].name : labType; }
 function isSignalLab(labType) { return LAB_PARAMS[labType] ? !!LAB_PARAMS[labType].signal : false; }
+function isPFTLab(labType) { return labType.indexOf('pft_') === 0; }
 
 async function deleteLab(id) {
   if (!confirm('Delete this value?')) return;
   try {
     await deleteRow('lab_results', id);
     markLocalWrite(id);
+    const wasPFT = isPFTLab((labs.find(l=>l.id===id) || {}).lab_type || '');
     labs = labs.filter(l=>l.id!==id);
-    renderHistory();
+    wasPFT ? renderPFT() : renderBloodwork();
     showToast('Deleted');
   } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
 }
@@ -721,17 +868,18 @@ async function editLabValue(id) {
     const updated = await updateRow('lab_results', id, { value: v });
     markLocalWrite(updated.id);
     const i = labs.findIndex(l=>l.id===id); if (i>=0) labs[i]=updated;
-    renderHistory();
+    isPFTLab(row.lab_type) ? renderPFT() : renderBloodwork();
     showToast('Updated ✓', 'success');
   } catch (e) { showToast('Update failed: ' + e.message, 'error'); }
 }
 
-function renderHistory() {
-  const el = document.getElementById('history-content');
-  if (!labs.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">🧪</div><div class="empty-title">No lab values yet</div><div class="empty-sub">Upload a screenshot or PDF above to get started.</div></div>`; return; }
+function renderBloodwork() {
+  const el = document.getElementById('bloodwork-content');
+  const bloodworkLabs = labs.filter(r => !isPFTLab(r.lab_type));
+  if (!bloodworkLabs.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">🧪</div><div class="empty-title">No bloodwork yet</div><div class="empty-sub">Upload a screenshot or PDF above to get started.</div></div>`; return; }
 
   const groups = {};
-  labs.slice().reverse().forEach(r => {
+  bloodworkLabs.slice().reverse().forEach(r => {
     const day = fmtDate(r.taken_at);
     if (!groups[day]) groups[day] = [];
     groups[day].push(r);
@@ -755,6 +903,89 @@ function renderHistory() {
     }).join('')}
   `;
   }).join('');
+}
+
+let pftChart = null;
+
+function renderPFT() {
+  const el = document.getElementById('pft-content');
+  const pftLabs = labs.filter(r => isPFTLab(r.lab_type));
+  if (!pftLabs.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">🫁</div><div class="empty-title">No PFT results yet</div><div class="empty-sub">Upload a PFT/spirometry report above to get started.</div></div>`; return; }
+
+  // Group by calendar day into one record per visit.
+  const byDay = {};
+  pftLabs.forEach(r => {
+    const day = fmtDate(r.taken_at);
+    if (!byDay[day]) byDay[day] = { day, taken_at: r.taken_at, values: {}, notes: null };
+    byDay[day].values[r.lab_type] = r.value;
+    byDay[day].unit = byDay[day].unit || {};
+    byDay[day].unit[r.lab_type] = r.unit;
+    if (r.notes) byDay[day].notes = r.notes;
+  });
+  const records = Object.values(byDay).sort((a,b) => new Date(a.taken_at) - new Date(b.taken_at));
+  const latest = records[records.length - 1];
+  const older = records.slice(0, -1).reverse(); // newest-of-the-rest first
+
+  const heroMetrics = [
+    { key:'pft_fev1', label:'FEV1' }, { key:'pft_fvc', label:'FVC' },
+    { key:'pft_fev1_fvc_ratio', label:'FEV1/FVC' }, { key:'pft_fef2575', label:'FEF25-75%' },
+    { key:'pft_pef', label:'PEF' }, { key:'pft_dlco', label:'DLCO' },
+  ].filter(m => latest.values[m.key] != null);
+
+  const heroHtml = `
+    <div class="pft-hero">
+      <div class="pft-hero-date">Most Recent — ${latest.day}</div>
+      <div class="pft-hero-label">🫁 Latest PFT Result</div>
+      <div class="pft-metric-grid">
+        ${heroMetrics.map(m => `
+          <div class="pft-metric">
+            <div class="pft-metric-name">${m.label}</div>
+            <div class="pft-metric-val">${latest.values[m.key]}<span class="pft-metric-unit">${latest.unit[m.key]||''}</span></div>
+          </div>`).join('')}
+      </div>
+      ${latest.notes ? `<div class="pft-hero-notes"><div class="pft-hero-notes-label">📋 Interpretation / Notes</div>${latest.notes}</div>` : ''}
+    </div>`;
+
+  const chartableRecords = records.filter(r => r.values.pft_fev1 != null || r.values.pft_fvc != null);
+  const chartHtml = chartableRecords.length >= 2
+    ? `<div class="pft-chart-card"><div class="pft-chart-title">Lung Function Trend</div><div style="height:220px"><canvas id="pft-chart-canvas"></canvas></div></div>`
+    : '';
+
+  const olderHtml = older.length ? `
+    <div class="pft-section-label">Earlier Results</div>
+    ${older.map(r => {
+      const vals = heroMetrics.map(m => r.values[m.key] != null ? `<span>${m.label}: <b>${r.values[m.key]}${r.unit[m.key]||''}</b></span>` : '').filter(Boolean).join('');
+      return `<div class="pft-compact-row">
+        <div class="pft-compact-date">${r.day}</div>
+        <div class="pft-compact-vals">${vals}</div>
+        ${r.notes ? `<div class="hist-notes" style="margin-top:8px">📋 ${r.notes}</div>` : ''}
+      </div>`;
+    }).join('')}` : '';
+
+  el.innerHTML = heroHtml + chartHtml + olderHtml;
+
+  if (pftChart) { try{pftChart.destroy();}catch(e){} pftChart = null; }
+  if (chartableRecords.length >= 2) {
+    const labels = chartableRecords.map(r => r.day);
+    const datasets = [];
+    if (chartableRecords.some(r => r.values.pft_fvc != null)) datasets.push({ label:'FVC (L)', data: chartableRecords.map(r=>r.values.pft_fvc ?? null), borderColor:'#3B7DC4', backgroundColor:'rgba(59,125,196,0.08)', borderWidth:2.5, pointRadius:4, tension:.2, spanGaps:true, yAxisID:'yL' });
+    if (chartableRecords.some(r => r.values.pft_fev1 != null)) datasets.push({ label:'FEV1 (L)', data: chartableRecords.map(r=>r.values.pft_fev1 ?? null), borderColor:'#B5453A', backgroundColor:'rgba(181,69,58,0.08)', borderWidth:2.5, pointRadius:4, tension:.2, spanGaps:true, yAxisID:'yL' });
+    if (chartableRecords.some(r => r.values.pft_fev1_fvc_ratio != null)) datasets.push({ label:'FEV1/FVC (%)', data: chartableRecords.map(r=>r.values.pft_fev1_fvc_ratio ?? null), borderColor:'#2D9E6B', backgroundColor:'rgba(45,158,107,0.06)', borderWidth:2, pointRadius:3, borderDash:[5,3], tension:.2, spanGaps:true, yAxisID:'yPct' });
+
+    pftChart = new Chart(document.getElementById('pft-chart-canvas').getContext('2d'), {
+      type:'line',
+      data:{ labels, datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:true, position:'bottom', labels:{ boxWidth:10, font:{size:11} } } },
+        scales:{
+          yL:   { type:'linear', position:'left', title:{display:true,text:'Liters',font:{size:10}}, grid:{color:'#E8EAF0'} },
+          yPct: { type:'linear', position:'right', min:0, max:120, title:{display:true,text:'%',font:{size:10}}, grid:{display:false} },
+          x:    { grid:{display:false}, ticks:{font:{size:10}} },
+        }
+      }
+    });
+  }
 }
 
 function showToast(msg, type='') {
