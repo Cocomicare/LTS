@@ -448,12 +448,28 @@ function teardownDashboardRealtime() {
 async function renderHeroScore() {
   const container = document.getElementById('hero-score-container');
   try {
-    const [settingsRes, historyRes] = await Promise.all([
-      sb.from('health_index_settings').select('*').eq('user_id', currentUser.id).maybeSingle(),
-      sb.from('health_index_history').select('*').eq('user_id', currentUser.id).order('computed_at', { ascending: false }).limit(1),
-    ]);
+    // Run the SAME live calculation health_index.html uses, instead of
+    // just reading whatever was last saved to history. A cached row can
+    // go stale silently — e.g. a required parameter that was fresh when
+    // last computed has since expired — which previously caused the
+    // dashboard to keep showing an old score while the module itself
+    // correctly reported "not enough data".
+    const result = await ewsComputeAndSave(currentUser.id);
+    const settingsRes = await sb.from('health_index_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
     const thresholds = { red:85, orange:90, amber:95, ...((settingsRes.data && settingsRes.data.thresholds) || {}) };
-    const latest = historyRes.data && historyRes.data[0];
+
+    if (result.missingRequired && result.missingRequired.length > 0) {
+      container.innerHTML = `
+        <div class="hero-score-card zone-none" onclick="openModule('health')">
+          <div class="hero-eyebrow">Early Warning Signal</div>
+          <div class="hero-empty-icon">❓</div>
+          <div class="hero-empty-text">Not enough current data to calculate a score — required readings are missing or expired: ${result.missingRequired.join(' · ')}</div>
+          <div class="hero-updated">Tap card for full breakdown</div>
+        </div>`;
+      return;
+    }
+
+    const latest = result.score !== null ? { score: result.score, computed_at: new Date().toISOString() } : null;
 
     if (!latest) {
       container.innerHTML = `
