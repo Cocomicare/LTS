@@ -1,0 +1,17 @@
+{
+  "name": "PLTS Care",
+  "short_name": "PLTS Care",
+  "description": "Post-Lung-Transplant Surveillance & Care",
+  "start_url": "/LTS/",
+  "scope": "/LTS/",
+  "display": "standalone",
+  "background_color": "#F0F4F8",
+  "theme_color": "#0D5C6B",
+  "icons": [
+    {
+      "src": "https://cocomicare.github.io/LTS/body_diagram.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}
