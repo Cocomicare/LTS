@@ -807,28 +807,28 @@ function showScoreInfo(paramKey) {
       [0, 100, 'At or above baseline'],
       [0.5, 95, ''], [1.0, 85, ''], [2.0, 65, ''], [3.0, 40, ''],
     ];
-    table = buildTable(rows, baseline, pctDev);
+    table = buildTable(rows, baseline, pctDev, score);
     table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Beyond 3% below baseline, the score continues dropping smoothly toward 0.</p>`;
   } else if (direction === 'higher_better') {
     methodExplainer = `This parameter is scored as a ratio against your baseline — the closer your reading is to (or above) your usual level, the higher the score. The score is <strong>continuously interpolated</strong> between these calibration points — any reading between two rows gets a precise calculated score, not a rounded bucket.`;
     const rows = [
       [2, 100, 'Within 2% of baseline'], [5, 85, ''], [10, 65, ''], [15, 40, ''],
     ];
-    table = buildTable(rows, baseline, pctDev);
+    table = buildTable(rows, baseline, pctDev, score);
     table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve. A 7.5% deviation scores exactly halfway between the 5% and 10% anchors, for example — not snapped to 65 or 85.</p>`;
   } else if (direction === 'lower_better') {
     methodExplainer = `Lower readings are better for this parameter (e.g. fever). The score penalizes deviation in <strong>either</strong> direction from baseline, since both a spike and an unusual drop can be meaningful. The score is <strong>continuously interpolated</strong> — readings between anchor points get a precise in-between score.`;
     const rows = [
       [0.5, 100, 'Within 0.5% of baseline'], [1.0, 85, ''], [1.5, 65, ''], [2.5, 40, ''],
     ];
-    table = buildTable(rows, baseline, Math.abs(pctDev));
+    table = buildTable(rows, baseline, Math.abs(pctDev), score);
     table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve — not discrete buckets. Any reading between rows gets a precisely calculated score.</p>`;
   } else {
     methodExplainer = `This parameter is scored on <strong>stability</strong> — it's meant to stay roughly steady, so the score penalizes deviation in either direction from your usual baseline, not just movement toward "better" or "worse." The score is <strong>continuously interpolated</strong> between these anchor points — a 7% deviation scores precisely between the 5% and 10% values, not snapped to either bucket.`;
     const rows = [
       [2, 100, 'Within 2% of baseline'], [5, 85, ''], [10, 65, ''], [15, 40, ''],
     ];
-    table = buildTable(rows, baseline, Math.abs(pctDev));
+    table = buildTable(rows, baseline, Math.abs(pctDev), score);
     table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve — not discrete buckets. Your actual score of <strong>${score ?? '—'}</strong> reflects your exact deviation of <strong>${Math.abs(pctDev).toFixed(1)}%</strong>, calculated precisely.</p>`;
   }
 
@@ -862,18 +862,50 @@ function showScoreInfo(paramKey) {
   overlay.classList.add('open');
 }
 
-function buildTable(rows, baseline, currentPctDev) {
-  let html = `<table class="modal-table"><tr><th>Deviation</th><th>Approx. Reading</th><th>Score</th></tr>`;
+function buildTable(rows, baseline, currentPctDev, actualScore) {
+  // Show anchor rows de-emphasised, and insert the user's actual reading
+  // as its own highlighted row between the two surrounding anchors. This
+  // makes the continuous interpolation immediately obvious — you see 65.2
+  // sitting visibly between the 85 and 65 anchors rather than reading
+  // the table as discrete buckets.
+  let html = `<table class="modal-table">
+    <tr>
+      <th>Deviation</th>
+      <th>Approx. Reading</th>
+      <th>Score</th>
+    </tr>`;
+
+  let userRowInserted = false;
+
   rows.forEach((r, i) => {
-    const [pct, score, note] = r;
+    const [pct, anchorScore, note] = r;
     const readingVal = (baseline * (1 - pct/100)).toFixed(1);
-    const isCurrentRange = i === 0 ? currentPctDev <= pct : (currentPctDev > rows[i-1][0] && currentPctDev <= pct);
-    html += `<tr class="${isCurrentRange ? 'current-row' : ''}">
-      <td>${pct === 0 ? '0%' : 'up to ' + pct + '%'}${note ? ' <span style="color:var(--ink3)">(' + note + ')</span>' : ''}</td>
+
+    // Determine if the user's reading falls within this anchor's range.
+    const prevPct = i === 0 ? -Infinity : rows[i-1][0];
+    const isUserRange = currentPctDev > prevPct && currentPctDev <= pct;
+
+    // Insert the user's "your reading" row just before the upper anchor
+    // of whatever range they fall in, so it visually sits between the two.
+    if (isUserRange && actualScore != null && !userRowInserted && Math.abs(currentPctDev - pct) > 0.05) {
+      const userReading = (baseline * (1 - currentPctDev/100)).toFixed(1);
+      html += `<tr style="background:var(--accent-bg,#EAF0FB);font-weight:600">
+        <td>${currentPctDev.toFixed(1)}% &nbsp;<span style="font-size:11px;font-weight:400;color:var(--accent,#2E5A8C)">← your reading</span></td>
+        <td>${userReading}</td>
+        <td style="color:var(--accent,#2E5A8C)">${actualScore}</td>
+      </tr>`;
+      userRowInserted = true;
+    }
+
+    // Anchor rows — shown at reduced opacity to reinforce that they're
+    // reference points, not the actual computed score.
+    html += `<tr style="opacity:0.65">
+      <td>${pct === 0 ? '0%' : pct + '%'}&nbsp;<span style="font-size:10px;color:var(--ink3)">(anchor)</span>${note ? '&nbsp;<span style="color:var(--ink3);font-size:11px">(' + note + ')</span>' : ''}</td>
       <td>${readingVal}${i===0?' or higher':''}</td>
-      <td>${score}</td>
+      <td>${anchorScore}</td>
     </tr>`;
   });
+
   html += `</table>`;
   return html;
 }
