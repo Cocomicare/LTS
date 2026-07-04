@@ -107,6 +107,21 @@ function ewsRollingBaseline(recs, days) {
   return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
 }
 
+function ewsRollingStdDev(recs, days) {
+  // Standard deviation of the same rolling window used for the mean.
+  // Requires at least 2 readings; returns null otherwise (caller falls
+  // back to the % deviation floor — see ewsComputeParamScore).
+  if (!recs.length) return null;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+  const windowRecs = recs.filter(r => new Date(r.date) >= cutoff);
+  const useRecs = windowRecs.length > 0 ? windowRecs : recs;
+  const vals = useRecs.map(r => r.value).filter(v => v != null && !isNaN(v));
+  if (vals.length < 2) return null;
+  const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+  const variance = vals.reduce((a,v) => a + (v-mean)**2, 0) / (vals.length - 1);
+  return Math.sqrt(variance);
+}
+
 // Blood pressure: scored against fixed clinical categories (not personal baseline),
 // using whichever of systolic/diastolic falls into the more concerning category.
 //
@@ -175,7 +190,7 @@ function interpolateScore(x, points) {
 }
 function round1(n) { return Math.round(n * 10) / 10; }
 
-function ewsComputeParamScore(param, latest, baseline) {
+function ewsComputeParamScore(param, latest, baseline, stddev) {
   if (latest === null || latest === undefined) return null;
 
   if (param.direction === 'cfdna_binary') {
@@ -186,22 +201,48 @@ function ewsComputeParamScore(param, latest, baseline) {
   if (base === 0) return 75;
 
   if (param.key === 'spo2') {
+    // SpO₂ stays as absolute % deviation — clinically, even a 1% drop
+    // matters regardless of how variable a person's readings normally
+    // are, and it's bounded at 100%, so SD-based scoring is less
+    // meaningful here than for unconstrained physiological parameters.
     const pctDev = ((base - latest) / base) * 100;
     return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[0.5,95],[1.0,85],[2.0,65],[3.0,40],[7,0]])));
   }
+
+  // ── SD-based scoring (all other personal-baseline parameters) ──
+  //
+  // How many standard deviations is the latest reading from the rolling
+  // mean? This automatically scales to how variable EACH parameter
+  // actually is for THIS patient — someone whose heart rate normally
+  // swings ±15 bpm needs a larger swing to get flagged than someone
+  // rock-steady at ±3 bpm, which the old fixed-% approach couldn't do.
+  //
+  // Minimum SD floor = 3% of baseline. This prevents over-sensitivity
+  // when readings are unnaturally consistent (e.g., all exactly 72 bpm
+  // → SD = 0 → any tiny deviation = ∞ SDs). 3% of baseline roughly
+  // matches the lower bound of real-world measurement variability for
+  // most physiological parameters on consumer devices.
+  const sdFloor = Math.abs(base) * 0.03;
+  const effectiveSD = (stddev != null && stddev > sdFloor) ? stddev : sdFloor;
+
+  // Calibration curve in SD units — same shape for all directions,
+  // direction determines which side(s) get penalized.
+  // Anchor scores: 0 SD = 100, 1 SD = 85, 2 SD = 65, 3 SD = 40, 5 SD = 0
+  const SD_CURVE = [[0,100],[0.5,100],[1,85],[2,65],[3,40],[5,0]];
+
   if (param.direction === 'higher_better') {
-    const ratio = latest / base;
-    // ratio decreases as things get worse, so points must ascend by ratio.
-    return round1(Math.max(0, interpolateScore(ratio, [[0,0],[0.85,40],[0.90,65],[0.95,85],[0.98,100],[1,100]])));
+    // Only penalize drops below baseline — going above never costs points.
+    const sdDev = Math.max(0, (base - latest) / effectiveSD);
+    return round1(Math.max(0, interpolateScore(sdDev, SD_CURVE)));
   }
   if (param.direction === 'lower_better') {
-    const pctDev = Math.abs((latest - base) / base) * 100;
-    return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[0.5,100],[1.0,85],[1.5,65],[2.5,40],[5,0]])));
+    // Penalize deviation in either direction.
+    const sdDev = Math.abs((latest - base) / effectiveSD);
+    return round1(Math.max(0, interpolateScore(sdDev, SD_CURVE)));
   }
-  // 'stable' — deviation in EITHER direction is concerning (e.g. CRP, WBC,
-  // neutrophils/lymphocytes, heart rate, weight)
-  const pctDev = Math.abs((latest - base) / base) * 100;
-  return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[2,100],[5,85],[10,65],[15,40],[30,0]])));
+  // 'stable' — penalize deviation in either direction (hr, wt, labs, etc.)
+  const sdDev = Math.abs((latest - base) / effectiveSD);
+  return round1(Math.max(0, interpolateScore(sdDev, SD_CURVE)));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -258,6 +299,7 @@ async function ewsComputeAndSave(userId) {
     const latestRec = recs.length ? recs[recs.length-1] : null;
     const latest = latestRec ? latestRec.value : null;
     const baseline = ewsRollingBaseline(recs, baselineDays);
+    const stddev = ewsRollingStdDev(recs, baselineDays);
     const latestDate = latestRec ? new Date(easternDateInputValue(latestRec.date) + 'T00:00:00Z') : null;
 
     const maxAge = windows[param.key] || param.maxAgeDays || 7;
@@ -274,14 +316,14 @@ async function ewsComputeAndSave(userId) {
     }
 
     if (freshness === 'missing') {
-      breakdown.push({ param, score:null, latest, baseline, w, freshness, daysAgo });
+      breakdown.push({ param, score:null, latest, baseline, stddev, w, freshness, daysAgo });
       return;
     }
 
-    const score = ewsComputeParamScore(param, latest, baseline);
+    const score = ewsComputeParamScore(param, latest, baseline, stddev);
     totalWeight += w;
     weightedSum += score * w;
-    breakdown.push({ param, score, latest, baseline, w, freshness, daysAgo });
+    breakdown.push({ param, score, latest, baseline, stddev, w, freshness, daysAgo });
   });
 
   if (missingRequired.length > 0) {

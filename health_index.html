@@ -725,7 +725,7 @@ function showTab(name) {
 function showScoreInfo(paramKey) {
   const b = lastBreakdown.find(x => x.param.key === paramKey);
   if (!b) return;
-  const { param, score, latest, baseline } = b;
+  const { param, score, latest, baseline, stddev } = b;
 
   const overlay = document.getElementById('score-info-overlay');
   const sheet = document.getElementById('score-info-sheet');
@@ -795,41 +795,42 @@ function showScoreInfo(paramKey) {
   }
 
   const pctDev = ((baseline - latest) / baseline) * 100;
-  const absDev = Math.abs(baseline - latest);
   const direction = param.direction;
+
+  // SD-based deviation for display — mirrors score_engine.js logic exactly
+  const sdFloor = Math.abs(baseline) * 0.03;
+  const effectiveSD = (stddev != null && stddev > sdFloor) ? stddev : sdFloor;
+  const usingSDFloor = stddev == null || stddev <= sdFloor;
+  const sdDev = param.key === 'spo2' ? null
+    : direction === 'higher_better'
+      ? Math.max(0, (baseline - latest) / effectiveSD)
+      : Math.abs((latest - baseline) / effectiveSD);
 
   let methodExplainer = '';
   let table = '';
 
   if (param.key === 'spo2') {
-    methodExplainer = `SpO₂ uses the steepest scoring curve of any parameter, since small drops can be an early infection/rejection signal. The score only penalizes readings <strong>below</strong> your baseline — going higher never costs points. The score is continuously interpolated between these calibration points — readings between two rows get a precise in-between score, not a bucket.`;
+    methodExplainer = `SpO₂ uses the steepest scoring curve of any parameter, since small drops can be an early infection/rejection signal. The score only penalizes readings <strong>below</strong> your baseline — going higher never costs points. The score is continuously interpolated between these calibration points.`;
     const rows = [
       [0, 100, 'At or above baseline'],
       [0.5, 95, ''], [1.0, 85, ''], [2.0, 65, ''], [3.0, 40, ''],
     ];
     table = buildTable(rows, baseline, pctDev, score);
     table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Beyond 3% below baseline, the score continues dropping smoothly toward 0.</p>`;
-  } else if (direction === 'higher_better') {
-    methodExplainer = `This parameter is scored as a ratio against your baseline — the closer your reading is to (or above) your usual level, the higher the score. The score is <strong>continuously interpolated</strong> between these calibration points — any reading between two rows gets a precise calculated score, not a rounded bucket.`;
-    const rows = [
-      [2, 100, 'Within 2% of baseline'], [5, 85, ''], [10, 65, ''], [15, 40, ''],
-    ];
-    table = buildTable(rows, baseline, pctDev, score);
-    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve. A 7.5% deviation scores exactly halfway between the 5% and 10% anchors, for example — not snapped to 65 or 85.</p>`;
-  } else if (direction === 'lower_better') {
-    methodExplainer = `Lower readings are better for this parameter (e.g. fever). The score penalizes deviation in <strong>either</strong> direction from baseline, since both a spike and an unusual drop can be meaningful. The score is <strong>continuously interpolated</strong> — readings between anchor points get a precise in-between score.`;
-    const rows = [
-      [0.5, 100, 'Within 0.5% of baseline'], [1.0, 85, ''], [1.5, 65, ''], [2.5, 40, ''],
-    ];
-    table = buildTable(rows, baseline, Math.abs(pctDev), score);
-    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve — not discrete buckets. Any reading between rows gets a precisely calculated score.</p>`;
   } else {
-    methodExplainer = `This parameter is scored on <strong>stability</strong> — it's meant to stay roughly steady, so the score penalizes deviation in either direction from your usual baseline, not just movement toward "better" or "worse." The score is <strong>continuously interpolated</strong> between these anchor points — a 7% deviation scores precisely between the 5% and 10% values, not snapped to either bucket.`;
-    const rows = [
-      [2, 100, 'Within 2% of baseline'], [5, 85, ''], [10, 65, ''], [15, 40, ''],
-    ];
-    table = buildTable(rows, baseline, Math.abs(pctDev), score);
-    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve — not discrete buckets. Your actual score of <strong>${score ?? '—'}</strong> reflects your exact deviation of <strong>${Math.abs(pctDev).toFixed(1)}%</strong>, calculated precisely.</p>`;
+    const dirNote = direction === 'higher_better'
+      ? 'Only readings <strong>below</strong> your baseline are penalized — going above never costs points.'
+      : direction === 'lower_better'
+        ? 'Deviation in <strong>either</strong> direction is penalized — both spikes and unusual drops can be meaningful.'
+        : 'Deviation in <strong>either</strong> direction is penalized — this parameter is expected to stay roughly steady.';
+
+    methodExplainer = `${dirNote} The score uses <strong>standard deviations (SD)</strong> from your rolling mean rather than a fixed percentage — so sensitivity automatically matches how variable <em>your</em> readings actually are. Someone whose heart rate normally swings ±15 bpm needs a bigger deviation to get flagged than someone rock-steady at ±3 bpm.
+      <br><br>Your personal SD for this parameter: <strong>${stddev != null ? stddev.toFixed(2) : '—'} ${param.unit}</strong>${usingSDFloor ? ' <span style="color:var(--ink3);font-size:12px">(not enough history yet — using the 3% floor)</span>' : ''}.
+      Your current deviation: <strong>${sdDev != null ? sdDev.toFixed(2) : '—'} SD</strong>.`;
+
+    const sdRows = [[0,100,'At baseline'],[0.5,100,''],[1,85,'1 SD'],[2,65,'2 SD'],[3,40,'3 SD'],[5,0,'5 SD']];
+    table = buildSDTable(sdRows, baseline, effectiveSD, sdDev, score, param.unit);
+    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Your SD = ${stddev != null ? stddev.toFixed(2) : 'N/A'} ${param.unit}${usingSDFloor ? ' (floor applied)' : ''}. Anchor points on a smooth curve — your score of <strong>${score ?? '—'}</strong> reflects your exact deviation of <strong>${sdDev != null ? sdDev.toFixed(2) : '—'} SD</strong>, calculated precisely.</p>`;
   }
 
   sheet.innerHTML = `
@@ -839,9 +840,10 @@ function showScoreInfo(paramKey) {
     <div class="modal-section">
       <h4>Your Numbers Right Now</h4>
       <div class="modal-numbers">
-        Your baseline: <span class="hl">${baseline.toFixed(2)} ${param.unit}</span><br>
+        Your baseline (${getBaselineDays()}-day mean): <span class="hl">${baseline.toFixed(2)} ${param.unit}</span><br>
+        ${param.key !== 'spo2' ? `Your personal SD: <span class="hl">${stddev != null ? stddev.toFixed(2) : '—'} ${param.unit}</span><br>` : ''}
         Latest reading: <span class="hl">${Number(latest).toFixed(2)} ${param.unit}</span><br>
-        Deviation: <span class="hl">${pctDev >= 0 ? pctDev.toFixed(1) : Math.abs(pctDev).toFixed(1)}%</span> ${pctDev > 0 ? 'below' : pctDev < 0 ? 'above' : 'from'} baseline<br>
+        ${param.key !== 'spo2' && sdDev != null ? `Deviation: <span class="hl">${sdDev.toFixed(2)} SD</span><br>` : `Deviation: <span class="hl">${Math.abs(pctDev).toFixed(1)}%</span> ${pctDev > 0 ? 'below' : pctDev < 0 ? 'above' : 'from'} baseline<br>`}
         Resulting score: <span class="hl">${score ?? '—'} / 100</span>
       </div>
     </div>
@@ -849,11 +851,10 @@ function showScoreInfo(paramKey) {
     <div class="modal-section">
       <h4>How the Math Works</h4>
       <p>${methodExplainer}</p>
-      <p style="margin-top:8px">Your baseline is the average of your last <strong>${getBaselineDays()} days</strong> of readings for this parameter — so it's personalized to you, not a fixed population-wide "normal" number.</p>
     </div>
 
     <div class="modal-section">
-      <h4>Score Curve — Calibration Points (baseline: ${baseline.toFixed(1)} ${param.unit})</h4>
+      <h4>Score Curve${param.key !== 'spo2' ? ' — in SD units' : ' — Calibration Points'} (baseline: ${baseline.toFixed(1)} ${param.unit})</h4>
       ${table}
     </div>
 
@@ -912,6 +913,40 @@ function buildTable(rows, baseline, currentPctDev, actualScore) {
 
 function closeScoreInfo() {
   document.getElementById('score-info-overlay').classList.remove('open');
+}
+
+// SD-based table: same insert-the-user's-row approach as buildTable, but
+// x-axis is in SD units, and the "approx reading" column shows the actual
+// measurement value that corresponds to each SD level.
+function buildSDTable(rows, baseline, effectiveSD, currentSdDev, actualScore, unit) {
+  let html = `<table class="modal-table">
+    <tr><th>Deviation (SD)</th><th>Approx. Reading</th><th>Score</th></tr>`;
+
+  let userRowInserted = false;
+  rows.forEach((r, i) => {
+    const [sd, anchorScore, label] = r;
+    const readingVal = (baseline - sd * effectiveSD).toFixed(2);
+    const prevSD = i === 0 ? -Infinity : rows[i-1][0];
+    const isUserRange = currentSdDev > prevSD && currentSdDev <= sd;
+
+    if (isUserRange && actualScore != null && !userRowInserted && Math.abs(currentSdDev - sd) > 0.01) {
+      const userReading = (baseline - currentSdDev * effectiveSD).toFixed(2);
+      html += `<tr style="background:var(--accent-bg,#EAF0FB);font-weight:600">
+        <td>${currentSdDev.toFixed(2)} SD &nbsp;<span style="font-size:11px;font-weight:400;color:var(--accent,#2E5A8C)">← your reading</span></td>
+        <td>${userReading} ${unit}</td>
+        <td style="color:var(--accent,#2E5A8C)">${actualScore}</td>
+      </tr>`;
+      userRowInserted = true;
+    }
+
+    html += `<tr style="opacity:0.65">
+      <td>${sd === 0 ? '0' : sd} SD&nbsp;<span style="font-size:10px;color:var(--ink3)">${label ? '(' + label + ')' : '(anchor)'}</span></td>
+      <td>${readingVal} ${unit}</td>
+      <td>${anchorScore}</td>
+    </tr>`;
+  });
+  html += `</table>`;
+  return html;
 }
 
 function showToast(msg, type='') {
