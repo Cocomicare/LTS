@@ -767,13 +767,15 @@ function showScoreInfo(paramKey) {
 
       <div class="modal-section">
         <h4>How the Math Works</h4>
-        <p>Unlike most parameters in this app, Blood Pressure is <strong>not</strong> scored against your personal baseline. Instead it uses standard clinical categories, since "normal" blood pressure is a recognized medical standard rather than something that safely varies a lot person to person.</p>
-        <p style="margin-top:8px">Your systolic and diastolic numbers are each checked against the table below, and the <strong>worse</strong> of the two categories determines your score — so a normal systolic reading paired with an elevated diastolic reading still gets flagged.</p>
+        <p>Blood Pressure is <strong>not</strong> scored against your personal baseline — it uses standard clinical categories, since "normal" blood pressure is a recognized medical standard rather than something that safely varies a lot person to person.</p>
+        <p style="margin-top:8px">Each clinical category has an anchor score (shown below). The score is <strong>continuously interpolated</strong> between category midpoints, so a reading just inside a boundary doesn't score identically to one at the far extreme of that same category — the closer your reading is to a more concerning category, the more the score reflects that.</p>
+        <p style="margin-top:8px">Your systolic and diastolic are each evaluated independently, and the <strong>worse</strong> of the two determines your score.</p>
       </div>
 
       <div class="modal-section">
-        <h4>Score Categories</h4>
-        <table class="modal-table"><tr><th>Category</th><th>Systolic / Diastolic</th><th>Score</th></tr>${tableRows}</table>
+        <h4>Score Curve — Clinical Category Anchors</h4>
+        <table class="modal-table"><tr><th>Category</th><th>Systolic / Diastolic</th><th>Anchor Score</th></tr>${tableRows}</table>
+        <p style="font-size:12px;color:var(--ink3);margin-top:6px">These are midpoint anchors on a smooth curve — not hard cutoffs. A reading between two categories gets a precisely interpolated score, not a sudden jump.</p>
       </div>
 
       <button class="btn btn-primary modal-close-btn" onclick="closeScoreInfo()">Close</button>
@@ -800,32 +802,34 @@ function showScoreInfo(paramKey) {
   let table = '';
 
   if (param.key === 'spo2') {
-    methodExplainer = `SpO₂ uses the steepest scoring curve of any parameter, since small drops can be an early infection/rejection signal. The score only penalizes readings <strong>below</strong> your baseline — going higher never costs points.`;
+    methodExplainer = `SpO₂ uses the steepest scoring curve of any parameter, since small drops can be an early infection/rejection signal. The score only penalizes readings <strong>below</strong> your baseline — going higher never costs points. The score is continuously interpolated between these calibration points — readings between two rows get a precise in-between score, not a bucket.`;
     const rows = [
       [0, 100, 'At or above baseline'],
       [0.5, 95, ''], [1.0, 85, ''], [2.0, 65, ''], [3.0, 40, ''],
     ];
     table = buildTable(rows, baseline, pctDev);
-    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Beyond 3% below baseline, the score drops a further 5 points for every additional 1% deviation, down to a floor of 0.</p>`;
+    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Beyond 3% below baseline, the score continues dropping smoothly toward 0.</p>`;
   } else if (direction === 'higher_better') {
-    methodExplainer = `This parameter is scored as a ratio against your baseline — the closer your reading is to (or above) your usual level, the higher the score.`;
+    methodExplainer = `This parameter is scored as a ratio against your baseline — the closer your reading is to (or above) your usual level, the higher the score. The score is <strong>continuously interpolated</strong> between these calibration points — any reading between two rows gets a precise calculated score, not a rounded bucket.`;
     const rows = [
       [2, 100, 'Within 2% of baseline'], [5, 85, ''], [10, 65, ''], [15, 40, ''],
     ];
     table = buildTable(rows, baseline, pctDev);
-    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Below that, score ≈ ratio × 47, down to 0.</p>`;
+    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve. A 7.5% deviation scores exactly halfway between the 5% and 10% anchors, for example — not snapped to 65 or 85.</p>`;
   } else if (direction === 'lower_better') {
-    methodExplainer = `Lower readings are better for this parameter (e.g. fever). The score penalizes deviation in <strong>either</strong> direction from baseline, since both a spike and an unusual drop can be meaningful.`;
+    methodExplainer = `Lower readings are better for this parameter (e.g. fever). The score penalizes deviation in <strong>either</strong> direction from baseline, since both a spike and an unusual drop can be meaningful. The score is <strong>continuously interpolated</strong> — readings between anchor points get a precise in-between score.`;
     const rows = [
       [0.5, 100, 'Within 0.5% of baseline'], [1.0, 85, ''], [1.5, 65, ''], [2.5, 40, ''],
     ];
     table = buildTable(rows, baseline, Math.abs(pctDev));
+    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve — not discrete buckets. Any reading between rows gets a precisely calculated score.</p>`;
   } else {
-    methodExplainer = `This parameter is scored on <strong>stability</strong> — it's meant to stay roughly steady, so the score penalizes deviation in either direction from your usual baseline, not just movement toward "better" or "worse."`;
+    methodExplainer = `This parameter is scored on <strong>stability</strong> — it's meant to stay roughly steady, so the score penalizes deviation in either direction from your usual baseline, not just movement toward "better" or "worse." The score is <strong>continuously interpolated</strong> between these anchor points — a 7% deviation scores precisely between the 5% and 10% values, not snapped to either bucket.`;
     const rows = [
       [2, 100, 'Within 2% of baseline'], [5, 85, ''], [10, 65, ''], [15, 40, ''],
     ];
     table = buildTable(rows, baseline, Math.abs(pctDev));
+    table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">These are anchor points on a smooth curve — not discrete buckets. Your actual score of <strong>${score ?? '—'}</strong> reflects your exact deviation of <strong>${Math.abs(pctDev).toFixed(1)}%</strong>, calculated precisely.</p>`;
   }
 
   sheet.innerHTML = `
@@ -849,7 +853,7 @@ function showScoreInfo(paramKey) {
     </div>
 
     <div class="modal-section">
-      <h4>Score Thresholds (for your current baseline of ${baseline.toFixed(1)} ${param.unit})</h4>
+      <h4>Score Curve — Calibration Points (baseline: ${baseline.toFixed(1)} ${param.unit})</h4>
       ${table}
     </div>
 

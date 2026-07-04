@@ -109,18 +109,38 @@ function ewsRollingBaseline(recs, days) {
 
 // Blood pressure: scored against fixed clinical categories (not personal baseline),
 // using whichever of systolic/diastolic falls into the more concerning category.
+//
+// Previously used hard if/else steps that cliff-jumped the score the instant
+// a reading crossed a category boundary. Now uses interpolateScore with each
+// category's midpoint as the calibration anchor — the score smoothly approaches
+// each category's value as the reading moves through the range, so a reading
+// just inside a boundary doesn't get punished identically to one at the far
+// extreme of that same category. The categories and their anchor scores are
+// unchanged; only the space *between* them is now a smooth ramp instead of a
+// cliff edge.
 function ewsComputeBPScore(sys, dia) {
   function sysScore(s) {
-    if (s >= 160) return 15; if (s >= 140) return 45; if (s >= 130) return 70;
-    if (s >= 120) return 90; if (s >= 90)  return 100; if (s >= 80)  return 60;
-    return 20;
+    return interpolateScore(s, [
+      [70,  20],  // deep severe hypotension (<80)
+      [85,  60],  // midpoint of mild hypotension (80–89)
+      [105, 100], // midpoint of normal (90–119)
+      [125, 90],  // midpoint of elevated (120–129)
+      [135, 70],  // midpoint of stage 1 hypertension (130–139)
+      [150, 45],  // midpoint of stage 2 hypertension (140–159)
+      [170, 15],  // deep hypertensive crisis (≥160)
+    ]);
   }
   function diaScore(d) {
-    if (d >= 100) return 15; if (d >= 90)  return 45; if (d >= 80)  return 70;
-    if (d >= 60)  return 100; if (d >= 50)  return 60;
-    return 20;
+    return interpolateScore(d, [
+      [40,  20],  // deep severe hypotension (<50)
+      [55,  60],  // midpoint of mild hypotension (50–59)
+      [70,  100], // midpoint of normal (60–79)
+      [85,  70],  // midpoint of stage 1 (80–89)
+      [95,  45],  // midpoint of stage 2 (90–99)
+      [110, 15],  // deep hypertensive crisis (≥100)
+    ]);
   }
-  return Math.min(sysScore(sys), diaScore(dia));
+  return round1(Math.min(sysScore(sys), diaScore(dia)));
 }
 
 // Donor-derived cfDNA doesn't have a meaningful "personal baseline drift" —
