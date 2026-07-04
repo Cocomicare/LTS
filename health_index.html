@@ -824,11 +824,18 @@ function showScoreInfo(paramKey) {
         ? 'Deviation in <strong>either</strong> direction is penalized — both spikes and unusual drops can be meaningful.'
         : 'Deviation in <strong>either</strong> direction is penalized — this parameter is expected to stay roughly steady.';
 
-    methodExplainer = `${dirNote} The score uses <strong>standard deviations (SD)</strong> from your rolling mean rather than a fixed percentage — so sensitivity automatically matches how variable <em>your</em> readings actually are. Someone whose heart rate normally swings ±15 bpm needs a bigger deviation to get flagged than someone rock-steady at ±3 bpm.
+    methodExplainer = `${dirNote} The score uses <strong>standard deviations (SD)</strong> from your rolling mean rather than a fixed percentage — so sensitivity automatically matches how variable <em>your</em> readings actually are. A person whose ${param.name} is highly consistent day-to-day will get flagged by smaller absolute changes than someone whose readings normally swing wider.
       <br><br>Your personal SD for this parameter: <strong>${stddev != null ? stddev.toFixed(2) : '—'} ${param.unit}</strong>${usingSDFloor ? ' <span style="color:var(--ink3);font-size:12px">(not enough history yet — using the 3% floor)</span>' : ''}.
       Your current deviation: <strong>${sdDev != null ? sdDev.toFixed(2) : '—'} SD</strong>.`;
 
-    const sdRows = [[0,100,'At baseline'],[0.5,100,''],[1,85,'1 SD'],[2,65,'2 SD'],[3,40,'3 SD'],[5,0,'5 SD']];
+    const sdRows = [
+      [0,   100, 'at baseline'],
+      [0.5, 100, 'minor variation'],
+      [1,    85, 'notable'],
+      [2,    65, 'significant'],
+      [3,    40, 'marked'],
+      [5,     0, 'extreme'],
+    ];
     table = buildSDTable(sdRows, baseline, effectiveSD, sdDev, score, param.unit);
     table += `<p style="font-size:12px;color:var(--ink3);margin-top:6px">Your SD = ${stddev != null ? stddev.toFixed(2) : 'N/A'} ${param.unit}${usingSDFloor ? ' (floor applied)' : ''}. Anchor points on a smooth curve — your score of <strong>${score ?? '—'}</strong> reflects your exact deviation of <strong>${sdDev != null ? sdDev.toFixed(2) : '—'} SD</strong>, calculated precisely.</p>`;
   }
