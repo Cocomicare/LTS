@@ -15,43 +15,40 @@
 
 const EWS_PARAMS = [
   // ── Daily/frequent tracking (unchanged from original) ──
+  // sdFloor = realistic minimum SD for this parameter on a home device.
+  // Replaces the old 3%-of-baseline global floor, which was way too
+  // permissive for temperature (3% of 98.7°F = ~3°F!) and too tight
+  // for some lab values.
   { key:'symptoms', name:'Symptom Check-in', icon:'🧠', unit:'', weight:8, maxAgeDays:2, direction:'higher_better',
-    desc:'Subjective wellness score', source:'symptoms' },
+    sdFloor:0.5, desc:'Subjective wellness score', source:'symptoms' },
   { key:'spo2', name:'SpO₂', icon:'🩸', unit:'%', weight:15, maxAgeDays:2, direction:'higher_better',
-    desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
+    sdFloor:0.3, desc:'Oxygen saturation — primary lung function indicator', source:'vitals', vitalType:'spo2' },
   { key:'fev1', name:'FEV1', icon:'📊', unit:'L', weight:15, maxAgeDays:2, direction:'higher_better',
-    desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
+    sdFloor:0.05, desc:'Forced expiratory volume — early rejection signal', source:'peakflow', field:'fev1' },
   { key:'spiro', name:'Spirometer', icon:'🌬️', unit:'mL', weight:8, maxAgeDays:2, direction:'higher_better',
-    desc:'Inspiratory volume — complements FEV1', source:'spiro' },
+    sdFloor:50, desc:'Inspiratory volume — complements FEV1', source:'spiro' },
   { key:'hr', name:'Heart Rate', icon:'❤️', unit:'bpm', weight:5, maxAgeDays:2, direction:'stable',
-    desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
+    sdFloor:3, desc:'Tachycardia signals infection/rejection', source:'vitals', vitalType:'hr' },
   { key:'temp', name:'Temperature', icon:'🌡️', unit:'°F', weight:12, maxAgeDays:2, direction:'lower_better',
-    desc:'Key infection indicator', source:'vitals', vitalType:'temp' },
+    sdFloor:0.3, desc:'Key infection indicator — tightly regulated, small deviations matter', source:'vitals', vitalType:'temp' },
   { key:'wt', name:'Weight', icon:'🟠', unit:'lbs', weight:3, maxAgeDays:14, direction:'stable',
-    desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
+    sdFloor:0.5, desc:'Fluid retention indicator', source:'vitals', vitalType:'wt' },
   { key:'sputum', name:'Sputum', icon:'🫧', unit:'/10', weight:3, maxAgeDays:2, direction:'higher_better',
-    desc:'Composite of color + texture + volume', source:'sputum' },
+    sdFloor:0.5, desc:'Composite of color + texture + volume', source:'sputum' },
 
   // ── LAB-DERIVED PARAMS ──
-  // Ranked by biological lead time (earliest/most specific first). Each
-  // gets its own maxAgeDays reflecting realistic draw cadence: short
-  // windows for markers that are cheap/easy to self-order through
-  // Quest/LabCorp, longer windows for markers that only show up on a
-  // full UF panel or a specialist-ordered test. All of these are
-  // user-adjustable in health_index.html's Settings panel — nothing
-  // here is hardcoded once a settings row exists.
   { key:'dd_cfdna', name:'Donor-Derived cfDNA', icon:'🧬', unit:'%', weight:7, maxAgeDays:7, direction:'cfdna_binary',
-    desc:'Most direct, earliest rejection-specific signal — specialist/UF-only test (e.g. AlloSure). Window is longer than other labs since it is drawn rarely but its biology does not spike/decay as fast as inflammatory markers.', source:'labs' },
+    sdFloor:0.1, desc:'Most direct, earliest rejection-specific signal — specialist/UF-only test (e.g. AlloSure).', source:'labs' },
   { key:'il6', name:'IL-6', icon:'🔥', unit:'pg/mL', weight:4, maxAgeDays:2, direction:'stable',
-    desc:'Earliest general inflammatory cytokine — precedes CRP. Fastest-moving marker on this list (half-life in hours), so the shortest window.', source:'labs' },
+    sdFloor:1.0, desc:'Earliest general inflammatory cytokine — precedes CRP.', source:'labs' },
   { key:'crp', name:'CRP', icon:'🌡️', unit:'mg/L', weight:7, maxAgeDays:3, direction:'stable',
-    desc:'Best practical general inflammation marker — self-orderable', source:'labs' },
+    sdFloor:0.5, desc:'Best practical general inflammation marker — self-orderable', source:'labs' },
   { key:'procalcitonin', name:'Procalcitonin', icon:'🦠', unit:'ng/mL', weight:3, maxAgeDays:2, direction:'stable',
-    desc:'Fast, bacteria-specific — blind to rejection, so weighted lower. ~24hr half-life, short window.', source:'labs' },
+    sdFloor:0.05, desc:'Fast, bacteria-specific — blind to rejection, so weighted lower.', source:'labs' },
   { key:'neutrophils_abs', name:'Absolute Neutrophils', icon:'🛡️', unit:'K/µL', weight:6, maxAgeDays:3, direction:'stable',
-    desc:'Bacterial infection signal; also flags drug-induced neutropenia. Can shift meaningfully within 24-48hrs.', source:'labs' },
+    sdFloor:0.3, desc:'Bacterial infection signal; also flags drug-induced neutropenia.', source:'labs' },
   { key:'lymphocytes_abs', name:'Absolute Lymphocytes', icon:'🛡️', unit:'K/µL', weight:4, maxAgeDays:3, direction:'stable',
-    desc:'Viral reactivation (e.g. CMV) and some rejection correlation', source:'labs' },
+    sdFloor:0.2, desc:'Viral reactivation (e.g. CMV) and some rejection correlation', source:'labs' },
 ];
 // Most lab params will sit "Excluded" for the majority of any given month
 // under typical (monthly) draw cadence — that's intentional. A lab value
@@ -213,16 +210,14 @@ function ewsComputeParamScore(param, latest, baseline, stddev) {
   //
   // How many standard deviations is the latest reading from the rolling
   // mean? This automatically scales to how variable EACH parameter
-  // actually is for THIS patient — someone whose heart rate normally
-  // swings ±15 bpm needs a larger swing to get flagged than someone
-  // rock-steady at ±3 bpm, which the old fixed-% approach couldn't do.
+  // actually is for THIS patient.
   //
-  // Minimum SD floor = 3% of baseline. This prevents over-sensitivity
-  // when readings are unnaturally consistent (e.g., all exactly 72 bpm
-  // → SD = 0 → any tiny deviation = ∞ SDs). 3% of baseline roughly
-  // matches the lower bound of real-world measurement variability for
-  // most physiological parameters on consumer devices.
-  const sdFloor = Math.abs(base) * 0.03;
+  // Each parameter defines its own sdFloor — the realistic minimum SD
+  // for that measurement type on a home device. This replaces the old
+  // blanket 3%-of-baseline rule, which was completely wrong for
+  // temperature (3% of 98.7°F = 2.96°F — so large that a 0.8°F fever
+  // registered as essentially zero deviation and scored 100).
+  const sdFloor = param.sdFloor ?? Math.abs(base) * 0.03;
   const effectiveSD = (stddev != null && stddev > sdFloor) ? stddev : sdFloor;
 
   // Calibration curve in SD units — same shape for all directions,
