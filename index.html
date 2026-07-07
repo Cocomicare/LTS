@@ -184,7 +184,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
       <span class="auth-logo-sub">Post-Lung-Transplant Surveillance & Care</span>
     </div>
     <div class="auth-title">Create your account</div>
-    <div class="auth-subtitle">Your data is stored securely and synced live across every device you log into.</div>
+    <div class="auth-subtitle">Your data is stored securely and synced live across every device you log into. If you are under 13, a parent or guardian must create and manage this account.</div>
     <div class="error-msg" id="signup-error"></div>
     <div class="form-group">
       <label class="form-label">Full Name</label>
@@ -206,8 +206,52 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink);
       <label class="form-label">Confirm Password</label>
       <input type="password" class="form-input" id="signup-confirm">
     </div>
+    <div class="form-group">
+      <label class="form-label">Invitation Code</label>
+      <input type="text" class="form-input" id="signup-invite" placeholder="8-character code from your invite link" autocomplete="off" style="text-transform:uppercase;letter-spacing:1px">
+      <span class="form-hint">You need an invitation to create an account.</span>
+    </div>
+    <div class="form-group" style="background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:12px;color:var(--ink3);line-height:1.55">
+      By creating an account you agree to the <span style="color:var(--teal);font-weight:600">Terms of Use, Privacy Policy</span> and <span style="color:var(--teal);font-weight:600">Medical Disclaimer</span> — available any time in Post Transplant References → Legal & Privacy.
+    </div>
     <button class="btn-primary" id="signup-btn" onclick="handleSignup()">Create Account</button>
     <button class="btn-secondary" onclick="showScreen('screen-login')">Already have an account? Sign in</button>
+  </div>
+</div>
+
+<!-- OPTIONAL PROFILE SETUP (shown after signup) -->
+<div class="screen auth-screen" id="screen-profile">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="auth-logo-icon">🫁</span>
+      <span class="auth-logo-title">One more thing</span>
+    </div>
+    <div class="auth-title">A little about you</div>
+    <div class="auth-subtitle">This helps give context to your data. All fields are optional — you can skip and come back to this anytime.</div>
+    <div class="form-group">
+      <label class="form-label">Transplant Date</label>
+      <input type="date" class="form-input" id="profile-transplant-date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Transplant Type</label>
+      <select class="form-input" id="profile-transplant-type">
+        <option value="">Select…</option>
+        <option>Single lung</option>
+        <option>Bilateral / Double lung</option>
+        <option>Heart-lung</option>
+        <option>Re-transplant</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date of Birth (optional)</label>
+      <input type="date" class="form-input" id="profile-dob">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <input type="text" class="form-input" id="profile-notes" placeholder="Anything else you'd like to note">
+    </div>
+    <button class="btn-primary" onclick="saveProfile()">Save & Continue</button>
+    <button class="btn-secondary" onclick="skipProfile()">Skip for now</button>
   </div>
 </div>
 
@@ -353,41 +397,113 @@ async function handleLogin() {
   await showDashboard();
 }
 
+// ── Read invite code from URL param on page load ──
+// If someone opens the app via an invite link like
+// /LTS/?invite=A3K9XZ2P, auto-fill the invite field
+// and jump straight to the signup screen.
+window.addEventListener('load', () => {
+  const params = new URLSearchParams(window.location.search);
+  const invite = params.get('invite');
+  if (invite) {
+    const field = document.getElementById('signup-invite');
+    if (field) field.value = invite.toUpperCase();
+    showScreen('screen-signup');
+  }
+});
+
 async function handleSignup() {
   const name    = document.getElementById('signup-name').value.trim();
   const email   = document.getElementById('signup-email').value.trim();
   const pass    = document.getElementById('signup-password').value;
   const confirm = document.getElementById('signup-confirm').value;
+  const code    = (document.getElementById('signup-invite').value || '').trim().toUpperCase();
   const errEl   = document.getElementById('signup-error');
   const btn     = document.getElementById('signup-btn');
   errEl.classList.remove('show');
 
   if (!name || !email || !pass) { showErr(errEl, 'Please fill in all fields.'); return; }
-  if (pass.length < 8) { showErr(errEl, 'Password must be at least 8 characters.'); return; }
-  if (pass !== confirm) { showErr(errEl, 'Passwords do not match.'); return; }
+  if (pass.length < 8)          { showErr(errEl, 'Password must be at least 8 characters.'); return; }
+  if (pass !== confirm)         { showErr(errEl, 'Passwords do not match.'); return; }
+  if (!code)                    { showErr(errEl, 'An invitation code is required to create an account.'); return; }
 
-  btn.textContent = 'Creating account…'; btn.disabled = true;
-  const { data, error } = await sb.auth.signUp({
-    email, password: pass,
-    options: { data: { full_name: name } }
-  });
-  btn.textContent = 'Create Account'; btn.disabled = false;
+  btn.textContent = 'Checking invite…'; btn.disabled = true;
 
-  if (error) { showErr(errEl, error.message); return; }
+  try {
+    // Validate the invite code — readable by anyone (anon SELECT policy)
+    const { data: invite, error: invErr } = await sb
+      .from('invitations').select('id, used_at').eq('code', code).maybeSingle();
 
-  if (data.user) {
-    await sb.from('profiles').upsert({ id: data.user.id, full_name: name });
+    if (invErr || !invite) {
+      showErr(errEl, 'That invitation code is not valid. Please check the link you received.');
+      return;
+    }
+    if (invite.used_at) {
+      showErr(errEl, 'That invitation code has already been used. Each code is single-use only.');
+      return;
+    }
+
+    btn.textContent = 'Creating account…';
+
+    const { data, error } = await sb.auth.signUp({
+      email, password: pass, options: { data: { full_name: name } }
+    });
+    if (error) { showErr(errEl, error.message); return; }
+
+    const userId = data.user?.id;
+    if (userId) {
+      // Save email + name into profiles (needed for admin panel visibility)
+      await sb.from('profiles').upsert({
+        id: userId, full_name: name, email: email,
+        updated_at: new Date().toISOString(),
+      });
+      // Consume the invite code
+      await sb.from('invitations').update({
+        used_at: new Date().toISOString(),
+        used_by_user_id: userId,
+        used_by_name: name,
+        used_by_email: email,
+      }).eq('id', invite.id);
+    }
+
+    showToast('Account created!', 'success');
+    if (data.session) {
+      currentUser = data.user;
+      showScreen('screen-profile'); // optional profile step
+    } else {
+      showToast('Check your email to confirm your account.', 'success');
+      showScreen('screen-login');
+    }
+  } catch (e) {
+    showErr(errEl, 'Unexpected error: ' + e.message);
+  } finally {
+    btn.textContent = 'Create Account'; btn.disabled = false;
   }
+}
 
-  showToast('Account created!', 'success');
+async function saveProfile() {
+  const transplantDate = document.getElementById('profile-transplant-date').value;
+  const transplantType = document.getElementById('profile-transplant-type').value;
+  const dob            = document.getElementById('profile-dob').value;
+  const notes          = document.getElementById('profile-notes').value.trim();
+  try {
+    const user = await getCurrentUser();
+    if (user) {
+      await sb.from('profiles').update({
+        transplant_date: transplantDate || null,
+        transplant_type: transplantType || null,
+        date_of_birth: dob || null,
+        profile_notes: notes || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id);
+    }
+  } catch (e) { /* optional — don't block if it fails */ }
+  currentUser = await getCurrentUser();
+  await showDashboard();
+}
 
-  if (data.session) {
-    currentUser = data.user;
-    await showDashboard();
-  } else {
-    showToast('Check your email to confirm your account.', 'success');
-    showScreen('screen-login');
-  }
+async function skipProfile() {
+  currentUser = await getCurrentUser();
+  await showDashboard();
 }
 
 async function handleReset() {
@@ -638,6 +754,23 @@ function renderAssistantTile() {
     </div>`;
   }
   container.innerHTML = html;
+  // Show admin tile only for admin accounts
+  renderAdminTile();
+}
+
+async function renderAdminTile() {
+  const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', currentUser.id).maybeSingle();
+  if (!profile?.is_admin) return;
+  const container = document.getElementById('assistant-tile-container');
+  container.insertAdjacentHTML('beforeend', `
+    <div class="ref-tile" onclick="window.parent.location='admin.html'" style="border-color:#0D5C6B;background:#E5F0F2">
+      <span class="ref-tile-icon">⚙️</span>
+      <div>
+        <div class="ref-tile-name" style="color:#0D5C6B">Admin Panel</div>
+        <div class="ref-tile-desc">Manage users, invitations & accounts</div>
+      </div>
+      <span class="ref-tile-chevron" style="color:#0D5C6B">→</span>
+    </div>`);
 }
 
 function setGreeting() {
