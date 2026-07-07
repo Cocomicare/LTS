@@ -539,13 +539,13 @@ function renderTrend() {
   trendChart = new Chart(document.getElementById('trend-chart'), {
     type:'line',
     data:{ labels, datasets:[
-      { label:'Early Warning Signal', data:scores, borderColor:'#3B82C4', backgroundColor:'rgba(59,130,196,0.08)', borderWidth:2.5, pointBackgroundColor:scores.map(s=>getZoneColor(s,thresholds)), pointRadius:5, fill:true, tension:0.3 },
+      { label:'Early Warning Signal', data:scores, borderColor:'#3B82C4', backgroundColor:'rgba(59,130,196,0.08)', borderWidth:2.5, pointBackgroundColor:scores.map(s=>getZoneColor(s,thresholds)), pointRadius:5, fill:true, tension:0.3, clip:false },
       { label:'Running Avg', data:runAvg, borderColor:'#8A9EAF', borderDash:[6,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.3 }
     ]},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:true, labels:{font:{family:'DM Sans',size:11},color:'#4A5E72',usePointStyle:true,pointStyle:'line',boxWidth:28,padding:12} } },
       scales:{ x:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:9},color:'#8A9EAF',maxTicksLimit:10}},
-               y:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:10},color:'#8A9EAF'},min:0,max:100} }
+               y:{grid:{color:'#E8EFF5'},ticks:{font:{family:'DM Mono',size:10},color:'#8A9EAF'},min:0,max:105} }
     }
   });
 }
