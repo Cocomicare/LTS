@@ -414,12 +414,17 @@ async function handleSignOut() {
 let dashboardRealtimeChannels = [];
 
 async function showDashboard() {
-  showScreen('screen-dashboard');
+  // Keep the loading screen visible while async renders complete.
+  // Previously showScreen was called first, causing the static HTML
+  // (including the Reference tile) to flash before the module tiles
+  // were populated by JS. Now we render everything first, then flip
+  // the screen in one clean transition once it's fully ready.
   setGreeting();
   await renderRefillBanner();
   await renderHeroScore();
   renderAssistantTile();
   await renderTiles();
+  showScreen('screen-dashboard');
   setupDashboardRealtime();
 }
 
