@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal & Privacy</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#F0F4F8; --surface:#FFFFFF; --border:#D0DCE8; --ink:#1A2533; --ink2:#4A5E72; --ink3:#8A9EAF; --teal:#0D5C6B; --teal-bg:#E5F0F2; --warn:#E07B39; --warn-bg:#FDF5EE; --radius:12px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-size:15px; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 20px; }
+.back-link { display:inline-block; font-size:13px; color:var(--teal); text-decoration:none; font-weight:600; margin-bottom:6px; }
+.logo-title { font-family:'DM Serif Display',serif; font-size:19px; }
+.logo-sub { font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.5px; }
+.page { padding:20px 16px 60px; max-width:640px; margin:0 auto; }
+.intro { font-size:13px; color:var(--ink3); line-height:1.5; margin-bottom:20px; }
+
+/* Document tiles */
+.doc-tile { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
+.doc-tile-header { display:flex; align-items:center; gap:12px; padding:16px; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s; }
+.doc-tile-header:hover { background:var(--teal-bg); }
+.doc-tile-icon { font-size:22px; flex-shrink:0; }
+.doc-tile-meta { flex:1; }
+.doc-tile-name { font-size:14px; font-weight:600; color:var(--ink); }
+.doc-tile-desc { font-size:12px; color:var(--ink3); margin-top:2px; }
+.doc-tile-chevron { color:var(--ink3); font-size:16px; flex-shrink:0; transition:transform .2s; }
+.doc-tile.open .doc-tile-chevron { transform:rotate(90deg); }
+.doc-tile-body { display:none; padding:0 18px 20px; border-top:1px solid var(--border); }
+.doc-tile.open .doc-tile-body { display:block; }
+
+/* Document content */
+.doc-updated { font-size:11px; color:var(--ink3); margin:12px 0 16px; text-transform:uppercase; letter-spacing:.4px; }
+.doc-body h3 { font-family:'DM Serif Display',serif; font-size:15px; color:var(--ink); margin:18px 0 6px; }
+.doc-body h3:first-child { margin-top:4px; }
+.doc-body p { font-size:13.5px; color:var(--ink2); line-height:1.65; margin-bottom:10px; }
+.doc-body ul { margin:6px 0 10px 18px; }
+.doc-body li { font-size:13.5px; color:var(--ink2); line-height:1.65; margin-bottom:4px; }
+.doc-body strong { color:var(--ink); }
+.doc-body .warning-note { background:var(--warn-bg); border-left:3px solid var(--warn); padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; color:var(--warn); margin:12px 0; line-height:1.5; }
+.doc-body .section-end { text-align:center; font-size:12px; color:var(--teal); font-weight:600; margin-top:20px; padding-top:14px; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="reference_hub.html" class="back-link">← Post Transplant References</a>
+  <div class="logo-title">Legal & Privacy</div>
+  <div class="logo-sub">Terms, Disclaimer & Privacy Policy</div>
+</header>
+
+<div class="page">
+  <div class="intro">These documents govern your use of PLTS Care and explain how your data is handled. You agreed to these when you created your account — they are always available here for your reference.</div>
+
+  <!-- 1. MEDICAL DISCLAIMER -->
+  <div class="doc-tile" id="tile-disclaimer">
+    <div class="doc-tile-header" onclick="toggleTile('disclaimer')">
+      <span class="doc-tile-icon">⚠️</span>
+      <div class="doc-tile-meta">
+        <div class="doc-tile-name">Medical Disclaimer</div>
+        <div class="doc-tile-desc">Not medical advice — what this app can and cannot do</div>
+      </div>
+      <span class="doc-tile-chevron">›</span>
+    </div>
+    <div class="doc-tile-body">
+      <div class="doc-updated">Version 1.0 · Effective at account creation</div>
+      <div class="doc-body">
+        <div class="warning-note">⚠️ If you are experiencing a medical emergency, call 911 immediately. Do not rely on this app in an emergency.</div>
+
+        <h3>Not Medical Advice</h3>
+        <p>PLTS Care is a personal wellness tracking application. The information, alerts, trends, and outputs provided by this app do <strong>not constitute medical advice</strong> of any kind. Always seek the advice of your physician, transplant team, or other qualified health provider with any questions regarding your medical condition.</p>
+
+        <h3>Not a Diagnostic Tool</h3>
+        <p>This app does not diagnose any medical condition. Alerts and color-coded indicators are for personal awareness based on general reference ranges and user-defined thresholds only. They are not clinical diagnoses. An alert does not mean you have a medical problem — and no alert does not mean you are medically clear.</p>
+
+        <h3>Accuracy of Data</h3>
+        <p>All data is entered by you. The app cannot verify the accuracy of your entries or the calibration of your home devices. Trends and correlations displayed may be misleading if data is entered inconsistently. This app is not a substitute for laboratory testing or clinical examination.</p>
+
+        <h3>Medications</h3>
+        <p><strong>Never adjust, start, stop, or change any medication</strong> — especially immunosuppressants — based on information displayed in this app without first consulting your healthcare provider. Immunosuppressant management requires precise clinical oversight.</p>
+
+        <h3>Lab Results</h3>
+        <p>Lab values displayed in this app are for personal tracking only. Clinical interpretation requires a qualified healthcare provider with full knowledge of your medical history. Do not make medical decisions based solely on lab values shown here.</p>
+
+        <h3>Correlation ≠ Causation</h3>
+        <p>Medication and symptom patterns displayed are statistical observations in your personal data only. They do not establish causal relationships. Any apparent associations must be evaluated by your healthcare team before any conclusions or actions are taken.</p>
+
+        <h3>Post-Transplant Caution</h3>
+        <p>Lung transplant recipients are medically complex patients. Health changes can be serious and progress rapidly. Any concerning changes — declining readings, new symptoms, fever, unusual weight gain — should be reported to your transplant team promptly. <strong>Do not wait for this app to alert you if you feel something is wrong.</strong></p>
+
+        <h3>No Emergency Services</h3>
+        <p>This app is not an emergency service and cannot detect or respond to medical emergencies. <strong>If you are experiencing a medical emergency, call 911 immediately.</strong></p>
+
+        <h3>Hold Harmless</h3>
+        <p>By using this app, you expressly agree to hold harmless and release the creators, developers, and contributors of PLTS Care from any and all claims, liability, damages, or expenses of any kind arising from your use of the app, including any health outcomes or medical decisions made in connection with information displayed here.</p>
+
+        <div class="section-end">— End of Medical Disclaimer —</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. TERMS OF USE -->
+  <div class="doc-tile" id="tile-terms">
+    <div class="doc-tile-header" onclick="toggleTile('terms')">
+      <span class="doc-tile-icon">📄</span>
+      <div class="doc-tile-meta">
+        <div class="doc-tile-name">Terms of Use</div>
+        <div class="doc-tile-desc">Rules governing your use of PLTS Care</div>
+      </div>
+      <span class="doc-tile-chevron">›</span>
+    </div>
+    <div class="doc-tile-body">
+      <div class="doc-updated">Version 1.0 · Effective at account creation</div>
+      <div class="doc-body">
+        <h3>Acceptance</h3>
+        <p>By creating an account and using PLTS Care, you agree to these Terms of Use. If you do not agree, do not use the app.</p>
+
+        <h3>Who May Use This App</h3>
+        <p>PLTS Care is intended exclusively for personal use by post-lung-transplant patients and their designated caregivers. You must be 18 years of age or older to create an account. Use of this app by healthcare professionals as a clinical tool is not authorized.</p>
+
+        <h3>Personal Use Only</h3>
+        <p>Your account is for your personal use only. You may not share your login credentials, create accounts for others, or use this app to track the health of any individual other than yourself or a patient for whom you are a designated caregiver.</p>
+
+        <h3>Accuracy of Your Entries</h3>
+        <p>You are solely responsible for the accuracy of all data you enter into the app. Inaccurate or inconsistent data entry may produce misleading trends, alerts, or scores. The app cannot verify what you enter.</p>
+
+        <h3>No Clinical Use</h3>
+        <p>The scores, trends, and alerts generated by PLTS Care are intended for personal awareness only. They may not be used as the sole basis for any clinical decision, treatment change, medication adjustment, or emergency response. See the Medical Disclaimer for full detail.</p>
+
+        <h3>No Warranty</h3>
+        <p>PLTS Care is provided "as is" without warranty of any kind — express, implied, or statutory. We do not warrant that the app will be error-free, uninterrupted, or free of security vulnerabilities. Use it at your own risk.</p>
+
+        <h3>Limitation of Liability</h3>
+        <p>To the maximum extent permitted by law, the creators and contributors of PLTS Care shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from your use of or inability to use the app, even if advised of the possibility of such damages.</p>
+
+        <h3>Changes to These Terms</h3>
+        <p>These terms may be updated from time to time. Continued use of the app after a change constitutes acceptance of the revised terms. The version date above reflects when these terms last changed.</p>
+
+        <div class="section-end">— End of Terms of Use —</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. PRIVACY POLICY -->
+  <div class="doc-tile" id="tile-privacy">
+    <div class="doc-tile-header" onclick="toggleTile('privacy')">
+      <span class="doc-tile-icon">🔒</span>
+      <div class="doc-tile-meta">
+        <div class="doc-tile-name">Privacy Policy</div>
+        <div class="doc-tile-desc">What data is collected, stored, and who can see it</div>
+      </div>
+      <span class="doc-tile-chevron">›</span>
+    </div>
+    <div class="doc-tile-body">
+      <div class="doc-updated">Version 1.0 · Effective at account creation</div>
+      <div class="doc-body">
+        <h3>What We Collect</h3>
+        <p>PLTS Care collects only what you enter yourself: your name, email address (for login), and health tracking data including vital signs, spirometry readings, symptoms, lab results, medications, body measurements, and sputum logs. We do not collect any data passively from your device, browser, or location.</p>
+
+        <h3>Where Your Data Is Stored</h3>
+        <p>All data is stored in your personal account on Supabase — a secure cloud database platform. Data is encrypted in transit (TLS) and at rest. No data is stored on your device or in your browser's local storage.</p>
+
+        <h3>Who Can See Your Data</h3>
+        <p>Only you can access your data. Row-level security policies in the database ensure that every query is filtered to your account ID — no other user can read, modify, or delete your records. The app developer (Richard) has no routine access to your personal health entries.</p>
+
+        <h3>AI Features & Your Data</h3>
+        <p>When you use the Clinical Assistant, ask for lab extraction, or use other AI-powered features, a summary of your recent readings is sent to Anthropic's API to generate a response. This data is sent securely and is not stored by Anthropic beyond what their standard API data retention policy provides. No identifiable information (name, email, date of birth) is included in these requests.</p>
+
+        <h3>Third-Party Services</h3>
+        <ul>
+          <li><strong>Supabase</strong> — database, authentication, and real-time sync. Your email is stored here for login purposes.</li>
+          <li><strong>Anthropic</strong> — AI responses for the Clinical Assistant and lab extraction features only.</li>
+          <li><strong>Google Fonts</strong> — font files loaded from Google's CDN at render time. No personal data is shared.</li>
+        </ul>
+        <p>We do not sell, rent, or share your personal data with any other third parties. We do not serve advertisements.</p>
+
+        <h3>Data Deletion</h3>
+        <p>You can delete individual entries within the app at any time. If you wish to permanently delete your account and all associated data, contact the app administrator. Account deletion removes all your health records from the database.</p>
+
+        <h3>Children's Privacy</h3>
+        <p>PLTS Care is not intended for use by individuals under 18. If you are under 18, do not create an account or enter data into this app.</p>
+
+        <h3>Changes to This Policy</h3>
+        <p>This policy may be updated from time to time. Continued use of the app after a change constitutes acceptance of the revised policy. The version date above reflects when this policy last changed.</p>
+
+        <div class="section-end">— End of Privacy Policy —</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleTile(id) {
+  const tile = document.getElementById('tile-' + id);
+  const isOpen = tile.classList.contains('open');
+  // Close all tiles first
+  document.querySelectorAll('.doc-tile').forEach(t => t.classList.remove('open'));
+  // Open the one tapped (unless it was already open)
+  if (!isOpen) tile.classList.add('open');
+}
+// Open Medical Disclaimer by default since it's the most important
+window.addEventListener('load', () => toggleTile('disclaimer'));
+</script>
+
+</body>
+</html>
