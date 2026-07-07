@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Post-Lung-Transplant Surveillance & Care</title>
 <link rel="manifest" href="manifest.json">
+<!-- Disable Chrome/Safari scroll restoration BEFORE anything else loads.
+     Without this, refreshing the page restores the previous scroll position
+     instantly on paint — if the user was scrolled to the bottom of the
+     dashboard (where the Post Transplant References tile is), they'd see
+     that section in isolation for a split second before JS re-initializes. -->
+<script>if ('scrollRestoration' in history) history.scrollRestoration = 'manual';</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
