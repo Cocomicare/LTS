@@ -598,11 +598,24 @@ async function runExtraction() {
   try {
     const contentBlocks = [];
     for (const file of selectedFiles) {
+      // On Android, PDFs selected from Google Drive or cloud-synced folders
+      // come through as 0-byte File objects — FileReader reads them but
+      // produces an empty base64 string, which Anthropic rejects as
+      // "PDF cannot be empty". Catch this before hitting the API.
+      if (file.size === 0) {
+        throw new Error(`"${file.name}" appears to be empty or could not be read from cloud storage. Download the file to your device first, then upload it from your local Downloads folder.`);
+      }
+
       const base64 = await fileToBase64(file);
+
+      if (!base64 || base64.length < 100) {
+        throw new Error(`"${file.name}" could not be read — the file may be stored in cloud storage rather than on your device. Download it locally first, then try again.`);
+      }
+
       if (file.type === 'application/pdf') {
         contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
       } else {
-        contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } });
+        contentBlocks.push({ type: 'image', source: { type: 'image', media_type: file.type || 'image/jpeg', data: base64 } });
       }
     }
 
