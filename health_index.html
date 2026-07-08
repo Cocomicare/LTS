@@ -238,8 +238,8 @@ header { background:var(--surface); border-bottom:1px solid var(--border); paddi
     <div class="threshold-row">
       <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-red)">🔴 Critical below</div><input type="number" class="threshold-input" id="th-red" value="85"></div>
       <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-orange)">🟠 Concern below</div><input type="number" class="threshold-input" id="th-orange" value="90"></div>
-      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-amber)">🟡 Watch below</div><input type="number" class="threshold-input" id="th-amber" value="95"></div>
-      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-green)">🟢 Good and above</div><input type="number" class="threshold-input" id="th-green" value="95" disabled></div>
+      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-amber)">🟡 Watch below</div><input type="number" class="threshold-input" id="th-amber" value="95" oninput="document.getElementById('th-green').value=this.value"></div>
+      <div class="threshold-group"><div class="threshold-label" style="color:var(--zone-green)">🟢 Good and above</div><input type="number" class="threshold-input" id="th-green" value="95" oninput="document.getElementById('th-amber').value=this.value"></div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost btn-sm" onclick="resetThresholds()">Reset</button>
@@ -604,6 +604,7 @@ function resetThresholds() {
   document.getElementById('th-red').value = 85;
   document.getElementById('th-orange').value = 90;
   document.getElementById('th-amber').value = 95;
+  document.getElementById('th-green').value = 95;
   showToast('Reset to defaults');
 }
 
@@ -715,6 +716,7 @@ function showTab(name) {
     document.getElementById('th-red').value = t.red;
     document.getElementById('th-orange').value = t.orange;
     document.getElementById('th-amber').value = t.amber;
+    document.getElementById('th-green').value = t.amber;
   }
 }
 
