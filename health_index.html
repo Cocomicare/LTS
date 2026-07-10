@@ -355,6 +355,14 @@ function getZoneColor(score, thresholds) {
 }
 
 function renderDial(score, breakdown, missingCount, missingRequired, floorTriggeredBy) {
+  // Always snapshot the original state so what-if mode can restore it
+  // exactly — including floor caps and missing-param overrides that
+  // a plain weighted-average recalculation would not reproduce.
+  _origScore = score;
+  _origMissingCount = missingCount;
+  _origMissingRequired = missingRequired ? [...missingRequired] : [];
+  _origFloor = floorTriggeredBy;
+  lastBreakdown = breakdown;
   const thresholds = getThresholds();
   const cx = 120, cy = 130, r = 90;
   function arcPath(startAngle, endAngle) {
@@ -417,7 +425,7 @@ function renderDial(score, breakdown, missingCount, missingRequired, floorTrigge
   }
 
   const rowsEl = document.getElementById('breakdown-rows');
-  lastBreakdown = breakdown;
+  // (lastBreakdown already set at top of renderDial)
 
   function rowHtml(b, i, dimmed) {
     const { param, score, latest, baseline, w, freshness, daysAgo } = b;
@@ -480,7 +488,13 @@ function renderDial(score, breakdown, missingCount, missingRequired, floorTrigge
 }
 
 let showInactiveParams = false;
-const whatIfDisabled = new Set(); // param keys the user has excluded in what-if mode
+const whatIfDisabled = new Set();
+
+// Store the original renderDial arguments so re-including all params
+// restores the exact original score — including floor caps, missing-param
+// overrides, and any other engine-level adjustments that a simple
+// weighted-average recalculation would miss.
+let _origScore = null, _origMissingCount = 0, _origMissingRequired = [], _origFloor = null;
 
 function toggleWhatIf(paramKey) {
   if (whatIfDisabled.has(paramKey)) {
@@ -493,6 +507,17 @@ function toggleWhatIf(paramKey) {
 
 function recalcWhatIf() {
   const thresholds = getThresholds();
+
+  // If all exclusions have been removed, restore the exact original state
+  // (respecting floor caps, missing requirements, etc.) rather than
+  // recalculating from scratch — a plain weighted average won't reproduce
+  // a floor-capped score correctly.
+  if (whatIfDisabled.size === 0) {
+    renderDial(_origScore, lastBreakdown, _origMissingCount, _origMissingRequired, _origFloor);
+    document.getElementById('whatif-banner').classList.remove('active');
+    return;
+  }
+
   const activeParams = lastBreakdown.filter(b => b.score !== null && !whatIfDisabled.has(b.param.key));
   const totalWeight = activeParams.reduce((a, b) => a + b.w, 0);
   const weightedSum = activeParams.reduce((a, b) => a + b.score * b.w, 0);
@@ -528,15 +553,21 @@ function recalcWhatIf() {
   // Update what-if banner
   const banner = document.getElementById('whatif-banner');
   const bannerText = document.getElementById('whatif-banner-text');
-  if (whatIfDisabled.size > 0) {
-    banner.classList.add('active');
-    const names = lastBreakdown.filter(b => whatIfDisabled.has(b.param.key)).map(b => b.param.name);
-    bannerText.textContent = `📊 What-if mode — excluding: ${names.join(', ')}. Score would be ${newScore ?? '—'} / 100.`;
-  } else {
-    banner.classList.remove('active');
-  }
+  banner.classList.add('active');
+  const names = lastBreakdown.filter(b => whatIfDisabled.has(b.param.key)).map(b => b.param.name);
+  bannerText.textContent = `📊 What-if mode — excluding: ${names.join(', ')}. Score would be ${newScore ?? '—'} / 100 (was ${_origScore ?? '—'}).`;
 
-  // Re-render breakdown rows to update toggle button states
+  // Re-render rows to update toggle button states
+  _reRenderRows(thresholds);
+}
+
+function resetWhatIf() {
+  whatIfDisabled.clear();
+  renderDial(_origScore, lastBreakdown, _origMissingCount, _origMissingRequired, _origFloor);
+  document.getElementById('whatif-banner').classList.remove('active');
+}
+
+function _reRenderRows(thresholds) {
   const rowsEl = document.getElementById('breakdown-rows');
   const activeRows = [], inactiveRows = [];
   lastBreakdown.forEach(b => { if (b.freshness === 'missing') inactiveRows.push(b); else activeRows.push(b); });
@@ -551,47 +582,6 @@ function recalcWhatIf() {
     </div>`;
   }
   rowsEl.innerHTML = html;
-}
-
-function resetWhatIf() {
-  whatIfDisabled.clear();
-  // Restore original score
-  const result = lastBreakdown;
-  const totalWeight = result.filter(b=>b.score!==null).reduce((a,b)=>a+b.w,0);
-  const weightedSum = result.filter(b=>b.score!==null).reduce((a,b)=>a+b.score*b.w,0);
-  const originalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight * 10) / 10 : null;
-  renderDial(originalScore, lastBreakdown, lastBreakdown.filter(b=>b.freshness==='missing').length, [], null);
-  document.getElementById('whatif-banner').classList.remove('active');
-}
-
-// Extracted row renderer so recalcWhatIf can call it too
-function rowHtmlOuter(b, i, dimmed, thresholds) {
-  const { param, score, latest, baseline, w, freshness, daysAgo } = b;
-  const barColor = score !== null ? getZoneColor(score, thresholds) : 'var(--ink3)';
-  const barWidth = score !== null ? score : 0;
-  const isTopImpact = i === 0 && score !== null && score < 90;
-  const sinceText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo !== null ? `${daysAgo}d ago` : '—';
-  const baselineText = param.key === 'bp' ? 'Scored vs. clinical thresholds' : (baseline !== null ? `Baseline: ${baseline.toFixed(1)} ${param.unit}` : 'Building baseline…');
-  const latestText = param.key === 'bp'
-    ? (b.sys != null ? `Latest: ${b.sys}/${b.dia} mmHg` : 'Not logged')
-    : (latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged');
-  const isExcluded = whatIfDisabled.has(param.key);
-  const rowOpacity = dimmed || isExcluded ? '0.45' : '1';
-  const toggleBtn = !dimmed ? `<button class="param-toggle${isExcluded ? ' excluded' : ''}" onclick="toggleWhatIf('${param.key}')" title="${isExcluded ? 'Re-include' : 'Exclude from score'}">${isExcluded ? '+ Include' : '✕ Exclude'}</button>` : '';
-  return `
-  <div class="param-row" style="opacity:${rowOpacity}">
-    <div class="param-icon">${param.icon}</div>
-    <div class="param-info">
-      <div class="param-name">${param.name} ${isTopImpact ? '<span style="color:var(--warn);font-size:11px">★ highest impact</span>' : ''}</div>
-      <div class="param-detail">${latestText} · ${baselineText} · ${sinceText}</div>
-      <div class="param-bar-bg" style="margin-top:5px"><div class="param-bar-fill" style="width:${barWidth}%;background:${barColor}"></div></div>
-    </div>
-    <div class="param-score" style="color:${barColor}">${isExcluded ? '<s style="color:var(--ink3)">' + (score !== null ? score : '—') + '</s>' : (score !== null ? score : '—')}</div>
-    <div class="param-weight">${w}%</div>
-    ${toggleBtn}
-    <button class="param-info-btn" onclick="showScoreInfo('${param.key}')" title="How is this scored?">ⓘ</button>
-    ${freshness === 'missing' ? `<span class="param-missing">Excluded</span>` : ''}
-  </div>`;
 }
 function toggleInactiveParams() {
   showInactiveParams = !showInactiveParams;
