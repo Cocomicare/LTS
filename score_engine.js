@@ -206,6 +206,15 @@ function ewsComputeParamScore(param, latest, baseline, stddev) {
     return round1(Math.max(0, interpolateScore(pctDev, [[0,100],[0.5,95],[1.0,85],[2.0,65],[3.0,40],[7,0]])));
   }
 
+  if (param.key === 'sputum') {
+    // Sputum composite (average of color + texture + volume, each 1–10,
+    // where 10 is best) is already a clinically meaningful absolute
+    // scale. A 5/10 is concerning regardless of whether the patient's
+    // "usual" is 6 or 8. No baseline or SD comparison — just a direct
+    // linear map: 1 = 0 EWS points, 10 = 100 EWS points.
+    return round1(Math.max(0, Math.min(100, ((latest - 1) / 9) * 100)));
+  }
+
   // ── SD-based scoring (all other personal-baseline parameters) ──
   //
   // How many standard deviations is the latest reading from the rolling
