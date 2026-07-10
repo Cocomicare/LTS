@@ -492,7 +492,22 @@ function recalcWhatIf() {
   const activeParams = lastBreakdown.filter(b => b.score !== null && !whatIfDisabled.has(b.param.key));
   const totalWeight = activeParams.reduce((a, b) => a + b.w, 0);
   const weightedSum = activeParams.reduce((a, b) => a + b.score * b.w, 0);
-  const newScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight * 10) / 10 : null;
+  let newScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight * 10) / 10 : null;
+
+  // Apply the same single-parameter floor cap the engine uses:
+  // if any NON-EXCLUDED parameter scores ≤ 65 (or ≤ 70 for cfDNA),
+  // cap the composite to that score — same as EWS_FLOOR_THRESHOLD.
+  // Without this, excluding SpO₂ bypasses the Sputum floor cap entirely.
+  const FLOOR_THRESHOLD = 65;
+  const FLOOR_OVERRIDES = { dd_cfdna: 70 };
+  if (newScore !== null) {
+    for (const b of activeParams) {
+      const floor = FLOOR_OVERRIDES[b.param.key] ?? FLOOR_THRESHOLD;
+      if (b.score <= floor && b.score < newScore) {
+        newScore = Math.round(b.score * 10) / 10;
+      }
+    }
+  }
 
   // Update dial score and arc
   const scoreEl = document.getElementById('dial-score');
