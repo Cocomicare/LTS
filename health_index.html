@@ -427,41 +427,12 @@ function renderDial(score, breakdown, missingCount, missingRequired, floorTrigge
   const rowsEl = document.getElementById('breakdown-rows');
   // (lastBreakdown already set at top of renderDial)
 
-  function rowHtml(b, i, dimmed) {
-    const { param, score, latest, baseline, w, freshness, daysAgo } = b;
-    const barColor = score !== null ? getZoneColor(score, thresholds) : 'var(--ink3)';
-    const barWidth = score !== null ? score : 0;
-    const isTopImpact = i === 0 && score !== null && score < 90;
-    const sinceText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo !== null ? `${daysAgo}d ago` : '—';
-    const baselineText = param.key === 'bp' ? 'Scored vs. clinical thresholds' : (baseline !== null ? `Baseline: ${baseline.toFixed(1)} ${param.unit}` : 'Building baseline…');
-    const latestText = param.key === 'bp'
-      ? (b.sys != null ? `Latest: ${b.sys}/${b.dia} mmHg` : 'Not logged')
-      : (latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged');
-    const isExcluded = whatIfDisabled.has(param.key);
-    const rowOpacity = dimmed || isExcluded ? '0.45' : '1';
-    const toggleBtn = !dimmed ? `<button class="param-toggle${isExcluded ? ' excluded' : ''}" onclick="toggleWhatIf('${param.key}')" title="${isExcluded ? 'Re-include' : 'Exclude from score'}">${isExcluded ? '+ Include' : '✕ Exclude'}</button>` : '';
-    return `
-    <div class="param-row" style="opacity:${rowOpacity}">
-      <div class="param-icon">${param.icon}</div>
-      <div class="param-info">
-        <div class="param-name">${param.name} ${isTopImpact ? '<span style="color:var(--warn);font-size:11px">★ highest impact</span>' : ''}</div>
-        <div class="param-detail">${latestText} · ${baselineText} · ${sinceText}</div>
-        <div class="param-bar-bg" style="margin-top:5px"><div class="param-bar-fill" style="width:${barWidth}%;background:${barColor}"></div></div>
-      </div>
-      <div class="param-score" style="color:${barColor}">${isExcluded ? '<s style="color:var(--ink3)">' + (score !== null ? score : '—') + '</s>' : (score !== null ? score : '—')}</div>
-      <div class="param-weight">${w}%</div>
-      ${toggleBtn}
-      <button class="param-info-btn" onclick="showScoreInfo('${param.key}')" title="How is this scored?">ⓘ</button>
-      ${freshness === 'missing' ? `<span class="param-missing">Excluded</span>` : ''}
-    </div>`;
-  }
-
   const activeRows = [], inactiveRows = [];
   breakdown.forEach((b, i) => {
     if (b.freshness === 'missing') inactiveRows.push(b); else activeRows.push(b);
   });
 
-  let html = activeRows.map((b,i) => rowHtml(b, i, false)).join('');
+  let html = activeRows.map((b,i) => rowHtmlOuter(b, i, false, thresholds)).join('');
 
   if (inactiveRows.length > 0) {
     html += `
@@ -470,7 +441,7 @@ function renderDial(score, breakdown, missingCount, missingRequired, floorTrigge
         <span class="inactive-toggle-arrow" id="inactive-toggle-arrow">▾</span>
       </div>
       <div class="inactive-params-panel" id="inactive-params-panel">
-        ${inactiveRows.map((b,i) => rowHtml(b, i, true)).join('')}
+        ${inactiveRows.map((b,i) => rowHtmlOuter(b, i, true, thresholds)).join('')}
       </div>`;
   }
 
@@ -583,6 +554,41 @@ function _reRenderRows(thresholds) {
   }
   rowsEl.innerHTML = html;
 }
+// ── Single global row renderer used by both renderDial and recalcWhatIf ──
+// Keeping one definition eliminates the "rowHtmlOuter not defined" error
+// that previously prevented what-if re-renders from working correctly.
+function rowHtmlOuter(b, i, dimmed, thresholds) {
+  const { param, score, latest, baseline, w, freshness, daysAgo } = b;
+  const barColor = score !== null ? getZoneColor(score, thresholds) : 'var(--ink3)';
+  const barWidth = score !== null ? score : 0;
+  const isTopImpact = i === 0 && score !== null && score < 90;
+  const sinceText = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo !== null ? `${daysAgo}d ago` : '—';
+  const baselineText = param.key === 'bp' ? 'Scored vs. clinical thresholds'
+    : (baseline !== null ? `Baseline: ${baseline.toFixed(1)} ${param.unit}` : 'Building baseline…');
+  const latestText = param.key === 'bp'
+    ? (b.sys != null ? `Latest: ${b.sys}/${b.dia} mmHg` : 'Not logged')
+    : (latest !== null ? `Latest: ${Number(latest).toFixed(1)} ${param.unit}` : 'Not logged');
+  const isExcluded = whatIfDisabled.has(param.key);
+  const rowOpacity = dimmed || isExcluded ? '0.45' : '1';
+  const toggleBtn = !dimmed
+    ? `<button class="param-toggle${isExcluded ? ' excluded' : ''}" onclick="toggleWhatIf('${param.key}')" title="${isExcluded ? 'Re-include in score' : 'Exclude from score'}">${isExcluded ? '+ Include' : '✕ Exclude'}</button>`
+    : '';
+  return `
+  <div class="param-row" style="opacity:${rowOpacity}">
+    <div class="param-icon">${param.icon}</div>
+    <div class="param-info">
+      <div class="param-name">${param.name} ${isTopImpact ? '<span style="color:var(--warn);font-size:11px">★ highest impact</span>' : ''}</div>
+      <div class="param-detail">${latestText} · ${baselineText} · ${sinceText}</div>
+      <div class="param-bar-bg" style="margin-top:5px"><div class="param-bar-fill" style="width:${barWidth}%;background:${barColor}"></div></div>
+    </div>
+    <div class="param-score" style="color:${barColor}">${isExcluded ? '<s style="color:var(--ink3)">' + (score !== null ? score : '—') + '</s>' : (score !== null ? score : '—')}</div>
+    <div class="param-weight">${w}%</div>
+    ${toggleBtn}
+    <button class="param-info-btn" onclick="showScoreInfo('${param.key}')" title="How is this scored?">ⓘ</button>
+    ${freshness === 'missing' ? '<span class="param-missing">Excluded</span>' : ''}
+  </div>`;
+}
+
 function toggleInactiveParams() {
   showInactiveParams = !showInactiveParams;
   const panel = document.getElementById('inactive-params-panel');
