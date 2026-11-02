@@ -260,13 +260,13 @@ async function ewsComputeAndSave(userId) {
 
   const [settingsRes, historyRes, symptomRows, vitalsRows, peakflowRows, spiroRows, sputumRows, labRows] = await Promise.all([
     sb.from('health_index_settings').select('*').eq('user_id', userId).maybeSingle(),
-    sb.from('health_index_history').select('*').eq('user_id', userId).order('computed_at', { ascending: true }),
-    sb.from('symptom_checkins').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
-    sb.from('vitals_readings').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
-    sb.from('peak_flow_sessions').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
-    sb.from('spirometer_sessions').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
-    sb.from('sputum_logs').select('*').eq('user_id', userId).order('taken_at', { ascending: true }),
-    sb.from('lab_results').select('*').eq('user_id', userId).in('lab_type', labTypes).order('taken_at', { ascending: true }),
+    fetchAllPaged(() => sb.from('health_index_history').select('*').eq('user_id', userId).order('computed_at', { ascending: true }).order('id', { ascending: true })),
+    fetchAllPaged(() => sb.from('symptom_checkins').select('*').eq('user_id', userId).order('taken_at', { ascending: true }).order('id', { ascending: true })),
+    fetchAllPaged(() => sb.from('vitals_readings').select('*').eq('user_id', userId).order('taken_at', { ascending: true }).order('id', { ascending: true })),
+    fetchAllPaged(() => sb.from('peak_flow_sessions').select('*').eq('user_id', userId).order('taken_at', { ascending: true }).order('id', { ascending: true })),
+    fetchAllPaged(() => sb.from('spirometer_sessions').select('*').eq('user_id', userId).order('taken_at', { ascending: true }).order('id', { ascending: true })),
+    fetchAllPaged(() => sb.from('sputum_logs').select('*').eq('user_id', userId).order('taken_at', { ascending: true }).order('id', { ascending: true })),
+    fetchAllPaged(() => sb.from('lab_results').select('*').eq('user_id', userId).in('lab_type', labTypes).order('taken_at', { ascending: true }).order('id', { ascending: true })),
   ]);
 
   const settingsRow = settingsRes.data || null;

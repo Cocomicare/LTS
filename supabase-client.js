@@ -92,12 +92,31 @@ function subscribeToTable(tableName, userId, onChange) {
 //  (thin wrappers so every module writes the same way)
 // ══════════════════════════════════════════════════
 
+/**
+ * Supabase returns at most 1,000 rows per request. Anything beyond that is
+ * silently dropped, with no error. This pages through 1,000 at a time until
+ * every row is in hand. `buildQuery` must return a fresh, ordered query each
+ * call. Returns { data, error } like a normal Supabase query.
+ */
+const PAGE_SIZE = 1000;
+async function fetchAllPaged(buildQuery) {
+  const all = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) return { data: all, error };
+    all.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return { data: all, error: null };
+}
+
 async function fetchRows(tableName, userId, orderBy = 'created_at', ascending = false) {
-  const { data, error } = await sb
+  const { data, error } = await fetchAllPaged(() => sb
     .from(tableName)
     .select('*')
     .eq('user_id', userId)
-    .order(orderBy, { ascending });
+    .order(orderBy, { ascending })
+    .order('id', { ascending: true }));
   if (error) {
     console.error(`fetchRows(${tableName}) error:`, error.message);
     return [];
